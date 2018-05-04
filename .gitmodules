@@ -1,0 +1,6 @@
+[submodule "lib/paco"]
+	path = lib/paco
+	url = https://github.com/snu-sf/paco
+[submodule "lib/sflib"]
+	path = lib/sflib
+	url = https://github.com/snu-sf/sflib.git

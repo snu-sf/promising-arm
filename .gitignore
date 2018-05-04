@@ -1,0 +1,12 @@
+_CoqProject
+Makefile.coq
+Makefile.coq.conf
+.build
+.coqdeps.d
+.lia.cache
+.nia.cache
+
+*.vo
+*.vio
+*.v.d
+*.glob
