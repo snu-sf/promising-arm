@@ -3,73 +3,24 @@ Require Import sflib.
 Require Import EquivDec.
 Require Import Order.
 Require Import Lang.
+Require Import Memory.
 
 Set Implicit Arguments.
 
 
-Module Msg.
-  Inductive t := mk {
-    loc: Loc.t;
-    val: Val.t;
-    tid: Id.t;
-  }.
-  Hint Constructors t.
-End Msg.
-
-Module Memory.
-  Definition t := list Msg.t.
-
-  Definition get (ts:Time.t) (mem:t): option Msg.t :=
-    List.nth_error mem ts.
-
-  Definition latest (mem:t) (loc:Loc.t) (view:View.t): Time.t := Order.bot. (* TODO *)
-End Memory.
-
-Module FwdItem.
-  Inductive t := mk {
-    ts: Time.t;
-    view: View.t;
-    ex: bool;
-  }.
-  Hint Constructors t.
-
-  Definition read_view (fwd:t) (tsx:Time.t) (o:ord): View.t :=
-    if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (ord_le o pln))
-    then fwd.(view)
-    else tsx.
-
-End FwdItem.
-
-Definition fwdBankT := Loc.t -> option FwdItem.t.
-
-Definition exBankT := option Time.t.
-
-Definition cohT := Loc.t -> Time.t.
-
-Definition promisesT := IdSet.t.
-
-Module Local.
-  Inductive t := mk {
-    coh: cohT;
-    vrp: View.t;
-    vwp: View.t;
-    vrm: View.t;
-    vwm: View.t;
-    vcap: View.t;
-    vrel: View.t;
-    fwd: fwdBankT;
-    ex: exBankT;
-    promises: promisesT;
-  }.
-  Hint Constructors t.
-End Local.
-
 Module Thread.
   Inductive t := mk {
-    lang: stmt;
+    lang: State.t;
     local: Local.t;
   }.
   Hint Constructors t.
+
+  Inductive step (tid:Id.t) (th1:t) (mem1:Memory.t) (th2:t) (mem2:Memory.t): Prop :=
+  | step_intro
+      e
+      (STATE: State.step e th1.(lang) th2.(lang))
+      (LOCAL: Local.step e tid th1.(local) mem1 th2.(local) mem2)
+  .
 End Thread.
 
 Definition threadPoolT := IdMap.t Thread.t.

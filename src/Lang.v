@@ -17,31 +17,36 @@ Module IdSet := PositiveSet.
 Module Val := Nat.
 Module Loc := Val.
 
-Inductive op1 :=
+Inductive opT1 :=
 | op_not
 .
+Hint Constructors opT1.
 
-Inductive op2 :=
+Inductive opT2 :=
 | op_add
 | op_sub
 | op_mul
 .
+Hint Constructors opT2.
 
-Inductive expr :=
+Inductive exprT :=
 | expr_const (const:Val.t)
 | expr_reg (reg:Id.t)
-| expr_op1 (op:op1) (e1:expr)
-| expr_op2 (op:op2) (e1 e2:expr)
+| expr_op1 (op:opT1) (e1:exprT)
+| expr_op2 (op:opT2) (e1 e2:exprT)
 .
+Hint Constructors exprT.
+Coercion expr_const: Val.t >-> exprT.
+Coercion expr_reg: Id.t >-> exprT.
 
-Inductive ord :=
+Inductive ordT :=
 | pln
 | rlx
 | ra
 .
-Hint Constructors ord.
+Hint Constructors ordT.
 
-Definition ord_le (a b:ord): bool :=
+Definition ord_le (a b:ordT): bool :=
   match a, b with
   | pln, _ => true
   | _, ra => true
@@ -50,28 +55,35 @@ Definition ord_le (a b:ord): bool :=
   end.
 Hint Unfold ord_le.
 
-Inductive barrier :=
-| isb
-| dmbst
-| dmbld
-| dmbsy
-.
+Module Barrier.
+  Inductive t :=
+  | isb
+  | dmbst
+  | dmbld
+  | dmbsy
+  .
+  Hint Constructors t.
+End Barrier.
 
-Inductive instr :=
+Inductive instrT :=
 | instr_skip
-| instr_assign (lhs:Id.t) (rhs:expr)
-| instr_load (ex:bool) (o:ord) (lhs:Id.t) (eloc:expr)
-| instr_store (ex:bool) (o:ord) (succ:Id.t) (eloc:expr) (eval:expr)
-| instr_barrier (b:barrier)
+| instr_assign (lhs:Id.t) (rhs:exprT)
+| instr_load (ex:bool) (ord:ordT) (res:Id.t) (eloc:exprT)
+| instr_store (ex:bool) (ord:ordT) (res:Id.t) (eloc:exprT) (eval:exprT)
+| instr_barrier (b:Barrier.t)
 .
+Hint Constructors instrT.
+Coercion instr_barrier: Barrier.t >-> instrT.
 
-Inductive stmt :=
-| stmt_instr (i:instr)
-| stmt_seq (s1 s2:stmt)
-| stmt_if (cond:expr) (s1 s2:stmt)
+Inductive stmtT :=
+| stmt_instr (i:instrT)
+| stmt_if (cond:exprT) (s1 s2:list stmtT)
+| stmt_dowhile (s:list stmtT) (cond:exprT)
 .
+Hint Constructors stmtT.
+Coercion stmt_instr: instrT >-> stmtT.
 
-Definition program := IdMap.t stmt.
+Definition program := IdMap.t (list stmtT).
 
 
 Module Time.
@@ -102,4 +114,62 @@ Module ValV.
   Hint Constructors t.
 End ValV.
 
-Definition rmapT := IdMap.t ValV.t.
+Module RMap.
+  Definition t := IdMap.t ValV.t.
+
+  Definition find (reg:Id.t) (rmap:t): ValV.t :=
+    match IdMap.find reg rmap with
+    | Some v => v
+    | None => ValV.mk 0 bot
+    end.
+End RMap.
+
+Fixpoint sem_expr (rmap:RMap.t) (e:exprT): ValV.t :=
+  match e with
+  | expr_const const => ValV.mk const bot
+  | expr_reg reg => RMap.find reg rmap
+  | expr_op1 op e1 => ValV.mk 0 bot (* TODO *)
+  | expr_op2 op e1 e2 => ValV.mk 0 bot (* TODO *)
+  end.
+
+Module Event.
+  Inductive t :=
+  | internal
+  | read (ex:bool) (ord:ordT) (vloc:ValV.t) (res:ValV.t)
+  | write (ex:bool) (ord:ordT) (vloc:ValV.t) (vval:ValV.t) (res:ValV.t)
+  | barrier (b:Barrier.t)
+  | ctrl (view:View.t)
+  .
+End Event.
+
+Module State.
+  Inductive t := mk {
+    stmt: list stmtT;
+    rmap: RMap.t;
+  }.
+
+  Inductive step: forall (e:Event.t) (st1 st2:t), Prop :=
+  | step_skip
+      stmts rmap:
+      step Event.internal (mk ((stmt_instr instr_skip)::stmts) rmap) (mk stmts rmap)
+  | step_assign
+      lhs rhs stmts rmap:
+      step Event.internal (mk ((stmt_instr (instr_assign lhs rhs))::stmts) rmap) (mk stmts rmap) (* TODO *)
+  | step_load
+      ex o res eloc stmts rmap:
+      step Event.internal (mk ((stmt_instr (instr_load ex o res eloc))::stmts) rmap) (mk stmts rmap) (* TODO *)
+  | step_store
+      ex o res eloc eval stmts rmap:
+      step Event.internal (mk ((stmt_instr (instr_store ex o res eloc eval))::stmts) rmap) (mk stmts rmap) (* TODO *)
+  | step_barrier
+      b stmts rmap:
+      step (Event.barrier b) (mk ((stmt_instr (instr_barrier b))::stmts) rmap) (mk stmts rmap)
+  | step_if
+      cond vcond s1 s2 stmts rmap
+      (COND: vcond = sem_expr rmap cond):
+      step (Event.ctrl vcond.(ValV.view)) (mk ((stmt_if cond s1 s2)::stmts) rmap) (mk ((if vcond.(ValV.val) <> 0 then s1 else s2) ++ stmts) rmap)
+  | step_dowhile
+      s cond stmts rmap:
+      step Event.internal (mk ((stmt_dowhile s cond)::stmts) rmap) (mk (s ++ [stmt_if cond ((stmt_dowhile s cond) :: stmts) stmts]) rmap)
+  .
+End State.
