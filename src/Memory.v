@@ -41,16 +41,32 @@ End Msg.
 Module Memory.
   Definition t := list Msg.t.
 
-  Definition read (ts:Time.t) (mem:t): option Msg.t :=
-    List.nth_error mem ts.
+  Definition read (ts:Time.t) (loc:Loc.t) (mem:t): option Val.t :=
+    match Time.pred_opt ts with
+    | None => Some Val.default
+    | Some ts =>
+      match List.nth_error mem ts with
+      | None => None
+      | Some msg =>
+        if msg.(Msg.loc) == loc
+        then Some msg.(Msg.val)
+        else None
+      end
+    end.
 
   Definition write (ts:Time.t) (msg:Msg.t) (mem:t): option t :=
-    if read ts mem == Some msg
-    then Some mem
-    else
-      if length mem == ts
-      then Some (mem ++ [msg])
-      else None.
+    match Time.pred_opt ts with
+    | None => None
+    | Some ts =>
+      if (List.nth_error mem ts) == Some msg
+      then Some mem
+      else if length mem == ts
+           then Some (mem ++ [msg])
+           else None
+    end.
+
+  Definition append (msg:Msg.t) (mem:t): Time.t * t :=
+    (S (length mem), mem ++ [msg]).
 
   Definition latest (mem:t) (loc:Loc.t) (view:View.t): Time.t := Order.bot. (* TODO *)
 End Memory.
@@ -75,7 +91,69 @@ Definition exBankT := option Time.t.
 
 Definition cohT := Loc.t -> Time.t.
 
-Definition promisesT := IdSet.t.
+Module Promises.
+  Include IdSet.
+
+  Definition id_of_time (ts:Time.t): option positive :=
+    option_map Pos.of_succ_nat (Time.pred_opt ts).
+
+  Lemma id_of_time_inj ts ts'
+        (EQ: id_of_time ts = id_of_time ts'):
+    ts = ts'.
+  Proof.
+    revert EQ. unfold id_of_time, Time.pred_opt.
+    destruct ts, ts'; ss. i. inv EQ.
+    f_equal. apply SuccNat2Pos.inj. ss.
+  Qed.
+
+  Definition lookup (ts:Time.t) (promises:t): bool :=
+    match id_of_time ts with
+    | None => false
+    | Some ts => mem ts promises
+    end.
+
+  Definition set (ts:Time.t) (promises:t): t :=
+    match id_of_time ts with
+    | None => promises
+    | Some ts => add ts promises
+    end.
+
+  Lemma set_o ts' ts promises:
+    lookup ts' (set ts promises) =
+    if ts' == ts
+    then ts' <> 0
+    else lookup ts' promises.
+  Proof.
+    unfold lookup, set.
+    destruct (id_of_time ts') eqn:X', (id_of_time ts) eqn:X, (equiv_dec ts' ts); ss;
+      destruct ts, ts'; ss;
+      try rewrite add_o in *.
+    - inv e. rewrite X in X'. inv X'. condtac; intuition.
+    - condtac; ss. inversion e. subst.
+      rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
+  Qed.
+
+  Definition unset (ts:Time.t) (promises:t): t :=
+    match id_of_time ts with
+    | None => promises
+    | Some ts => IdSet.remove ts promises
+    end.
+
+  Lemma unset_o ts' ts promises:
+    lookup ts' (unset ts promises) =
+    if ts' == ts
+    then false
+    else lookup ts' promises.
+  Proof.
+    unfold lookup, unset.
+    destruct (id_of_time ts') eqn:X', (id_of_time ts) eqn:X, (equiv_dec ts' ts); ss;
+      destruct ts, ts'; ss;
+      try rewrite remove_o in *.
+    - inv e. rewrite X in X'. inv X'. condtac; intuition.
+    - condtac; ss. inversion e. subst.
+      rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
+  Qed.
+End Promises.
 
 Module Local.
   Inductive t := mk {
@@ -88,7 +166,7 @@ Module Local.
     vrel: View.t;
     fwdbank: fwdBankT;
     exbank: exBankT;
-    promises: promisesT;
+    promises: Promises.t;
   }.
   Hint Constructors t.
 
@@ -104,9 +182,28 @@ Module Local.
             (*   lc1.(ex) *)
             (*   lc1.(promises)) *)
 
+  Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
+  | promise_intro
+      ts
+      (LC2: lc2 =
+            mk
+              lc1.(coh)
+              lc1.(vrp)
+              lc1.(vwp)
+              lc1.(vrm)
+              lc1.(vwm)
+              lc1.(vcap)
+              lc1.(vrel)
+              lc1.(fwdbank)
+              lc1.(exbank)
+              (Promises.set ts lc1.(promises)))
+      (MEM2: Memory.append (Msg.mk loc val tid) mem1 = (ts, mem2))
+  .
+  Hint Constructors promise.
+
   Inductive read (ex:bool) (ord:ordT) (vloc:ValV.t) (res: ValV.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
-      ts loc val tid view
+      ts loc val view
       view_ext1 view_ext2
       (LOC: loc = vloc.(ValV.val))
       (VIEW: view = vloc.(ValV.view))
@@ -117,7 +214,7 @@ Module Local.
                                               | None => ts
                                               | Some fwd => fwd.(FwdItem.read_view) ts ord
                                               end))
-      (MSG: Memory.read ts mem1 = Some (Msg.mk loc val tid))
+      (MSG: Memory.read ts loc mem1 = Some val)
       (RES: res = ValV.mk val view_ext2)
       (LC2: lc2 =
             mk
@@ -162,7 +259,7 @@ Module Local.
               (join lc1.(vrel) (ifc (ord_le ra ord) ts))
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
-              lc1.(promises))
+              (Promises.unset ts lc1.(promises)))
       (MEM2: Memory.write ts (Msg.mk loc val tid) mem1 = Some mem2)
   .
   Hint Constructors write.

@@ -13,12 +13,47 @@ Set Implicit Arguments.
 
 Module Id := Pos.
 Module IdMap := PositiveMap.
-Module IdSet := PositiveSet.
+Module IdSet.
+  Include PositiveSet.
 
-Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
-Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
+  Lemma add_o x' x s:
+    mem x' (add x s) =
+    if x' == x
+    then true
+    else mem x' s.
+  Proof.
+    destruct (equiv_dec x' x).
+    - inv e. apply mem_1. apply add_spec. intuition.
+    - destruct (mem x' s) eqn:MEM.
+      + apply mem_1. apply add_spec. intuition.
+      + destruct (mem x' (add x s)) eqn:MEM'; ss.
+        apply mem_1 in MEM'. apply add_spec in MEM'. des; intuition.
+        apply mem_1 in MEM'. eauto.
+  Qed.
 
-Module Val := Z.
+  Lemma remove_o x' x s:
+    mem x' (remove x s) =
+    if x' == x
+    then false
+    else mem x' s.
+  Proof.
+    destruct (equiv_dec x' x).
+    - inv e. destruct (mem x (remove x s)) eqn:MEM; ss.
+      apply remove_spec in MEM. des; ss.
+    - destruct (mem x' s) eqn:MEM.
+      + apply mem_1. apply remove_spec. intuition.
+      + destruct (mem x' (remove x s)) eqn:MEM'; ss.
+        apply mem_1 in MEM'. apply remove_spec in MEM'. des.
+        apply mem_1 in MEM'0. eauto.
+  Qed.
+End IdSet.
+
+Module Val.
+  Include Z.
+
+  Definition default: t := 0.
+End Val.
+
 Module Loc := Val.
 
 Inductive opT1 :=
@@ -43,6 +78,7 @@ Hint Constructors exprT.
 Coercion expr_const: Val.t >-> exprT.
 Coercion expr_reg: Id.t >-> exprT.
 
+(* TODO: we need to deal with acquirePC ("[Q]" in the "Simplifying ARM Concurrency" paper). *)
 Inductive ordT :=
 | pln
 | rlx
@@ -93,6 +129,12 @@ Definition program := IdMap.t (list stmtT).
 Module Time.
   Include Nat.
 
+  Definition pred_opt (ts:t): option t :=
+    match ts with
+    | O => None
+    | S n => Some n
+    end.
+
   (* Definition le (a b:t) := a <= b. *)
   Definition join (a b:t) := max a b.
   Definition bot: t := 0.
@@ -130,7 +172,7 @@ Module RMap.
   Definition add (reg:Id.t) (val:ValV.t) (rmap:t): t :=
     IdMap.add reg val rmap.
 
-  Lemma add_spec reg' reg val rmap:
+  Lemma add_o reg' reg val rmap:
     find reg' (add reg val rmap) =
     if reg' == reg
     then val

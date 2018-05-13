@@ -1,3 +1,5 @@
+Require Import PArith.
+Require Import ZArith.
 Require Import FunctionalExtensionality.
 Require Import Relations.
 Require Import RelationClasses.
@@ -9,6 +11,7 @@ Set Implicit Arguments.
 
 
 Ltac refl := reflexivity.
+Ltac congr := congruence.
 Ltac etrans := etransitivity.
 Ltac etrans' :=
   match goal with
@@ -21,6 +24,13 @@ Ltac antisym :=
     apply (partial_order_antisym H)
   end.
 Ltac funext := apply functional_extensionality.
+
+Ltac condtac :=
+  match goal with
+  | [|- context[if ?c then _ else _]] =>
+    let X := fresh "X" in
+    destruct c eqn:X
+  end.
 
 Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
   if a then true else false.
@@ -109,6 +119,10 @@ Qed.
 Definition le (A:Type) `{_: orderC A} := R.
 Definition join (A:Type) `{_: orderC A} := join.
 Definition bot (A:Type) `{_: orderC A} := bot.
+
+
+Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
+Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
 
 
 Definition fun_add A B `{_: EqDec A} (a:A) (b:B) (f:A -> B): A -> B :=
