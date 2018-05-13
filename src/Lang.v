@@ -1,5 +1,6 @@
 Require Import NArith.
 Require Import PArith.
+Require Import ZArith.
 Require Import Lia.
 Require Import FMapPositive.
 Require Import FSetPositive.
@@ -14,7 +15,10 @@ Module Id := Pos.
 Module IdMap := PositiveMap.
 Module IdSet := PositiveSet.
 
-Module Val := Nat.
+Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
+Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
+
+Module Val := Z.
 Module Loc := Val.
 
 Inductive opT1 :=
@@ -89,11 +93,11 @@ Definition program := IdMap.t (list stmtT).
 Module Time.
   Include Nat.
 
-  Definition le (a b:t) := a <= b.
+  (* Definition le (a b:t) := a <= b. *)
   Definition join (a b:t) := max a b.
   Definition bot: t := 0.
 
-  Program Instance order: orderC join bot.
+  Global Program Instance order: orderC join bot.
   Next Obligation. unfold join. lia. Qed.
   Next Obligation. unfold join. lia. Qed.
   Next Obligation. eauto using Max.max_assoc. Qed.
@@ -101,7 +105,7 @@ Module Time.
   Next Obligation. unfold join. lia. Qed.
   Next Obligation. unfold bot. lia. Qed.
 
-  Instance eqdec: EqDec t eq := nat_eq_eqdec.
+  Global Instance eqdec: EqDec t eq := nat_eq_eqdec.
 End Time.
 
 Module View := Time.
@@ -122,14 +126,47 @@ Module RMap.
     | Some v => v
     | None => ValV.mk 0 bot
     end.
+
+  Definition add (reg:Id.t) (val:ValV.t) (rmap:t): t :=
+    IdMap.add reg val rmap.
+
+  Lemma add_spec reg' reg val rmap:
+    find reg' (add reg val rmap) =
+    if reg' == reg
+    then val
+    else find reg' rmap.
+  Proof.
+    unfold add, find. rewrite PositiveMapAdditionalFacts.gsspec.
+    repeat match goal with
+           | [|- context[if ?c then _ else _]] => destruct c
+           end; ss.
+  Qed.
 End RMap.
+
+Definition sem0_op1 (op:opT1) (v1:Val.t): Val.t :=
+  match op with
+  | op_not => -v1
+  end.
+
+Definition sem_op1 (op:opT1) (v1:ValV.t): ValV.t :=
+  ValV.mk (sem0_op1 op v1.(ValV.val)) v1.(ValV.view).
+
+Definition sem0_op2 (op:opT2) (v1 v2:Val.t): Val.t :=
+  match op with
+  | op_add => v1 + v1
+  | op_sub => v1 - v2
+  | op_mul => v1 * v2
+  end.
+
+Definition sem_op2 (op:opT2) (v1 v2:ValV.t): ValV.t :=
+  ValV.mk (sem0_op2 op v1.(ValV.val) v2.(ValV.val)) (join v1.(ValV.view) v2.(ValV.view)).
 
 Fixpoint sem_expr (rmap:RMap.t) (e:exprT): ValV.t :=
   match e with
   | expr_const const => ValV.mk const bot
   | expr_reg reg => RMap.find reg rmap
-  | expr_op1 op e1 => ValV.mk 0 bot (* TODO *)
-  | expr_op2 op e1 e2 => ValV.mk 0 bot (* TODO *)
+  | expr_op1 op e1 => sem_op1 op (sem_expr rmap e1)
+  | expr_op2 op e1 e2 => sem_op2 op (sem_expr rmap e1) (sem_expr rmap e2)
   end.
 
 Module Event.
@@ -151,25 +188,48 @@ Module State.
   Inductive step: forall (e:Event.t) (st1 st2:t), Prop :=
   | step_skip
       stmts rmap:
-      step Event.internal (mk ((stmt_instr instr_skip)::stmts) rmap) (mk stmts rmap)
+      step Event.internal
+           (mk ((stmt_instr instr_skip)::stmts) rmap)
+           (mk stmts rmap)
   | step_assign
-      lhs rhs stmts rmap:
-      step Event.internal (mk ((stmt_instr (instr_assign lhs rhs))::stmts) rmap) (mk stmts rmap) (* TODO *)
+      lhs rhs stmts rmap rmap'
+      (RMAP: rmap' = RMap.add lhs (sem_expr rmap rhs) rmap):
+      step Event.internal
+           (mk ((stmt_instr (instr_assign lhs rhs))::stmts) rmap)
+           (mk stmts rmap')
   | step_load
-      ex o res eloc stmts rmap:
-      step Event.internal (mk ((stmt_instr (instr_load ex o res eloc))::stmts) rmap) (mk stmts rmap) (* TODO *)
+      ex o res eloc stmts rmap vloc vres rmap'
+      (LOC: vloc = sem_expr rmap eloc)
+      (RMAP: rmap' = RMap.add res vres rmap):
+      step (Event.read ex o vloc vres)
+           (mk ((stmt_instr (instr_load ex o res eloc))::stmts) rmap)
+           (mk stmts rmap')
   | step_store
-      ex o res eloc eval stmts rmap:
-      step Event.internal (mk ((stmt_instr (instr_store ex o res eloc eval))::stmts) rmap) (mk stmts rmap) (* TODO *)
+      ex o res eloc eval stmts rmap vloc vval vres rmap'
+      (LOC: vloc = sem_expr rmap eloc)
+      (VAL: vval = sem_expr rmap eval)
+      (RMAP: rmap' = RMap.add res vres rmap):
+      step (Event.write ex o vloc vval vres)
+           (mk ((stmt_instr (instr_store ex o res eloc eval))::stmts) rmap)
+           (mk stmts rmap')
   | step_barrier
       b stmts rmap:
-      step (Event.barrier b) (mk ((stmt_instr (instr_barrier b))::stmts) rmap) (mk stmts rmap)
+      step (Event.barrier b)
+           (mk ((stmt_instr (instr_barrier b))::stmts) rmap)
+           (mk stmts rmap)
   | step_if
-      cond vcond s1 s2 stmts rmap
-      (COND: vcond = sem_expr rmap cond):
-      step (Event.ctrl vcond.(ValV.view)) (mk ((stmt_if cond s1 s2)::stmts) rmap) (mk ((if vcond.(ValV.val) <> 0 then s1 else s2) ++ stmts) rmap)
+      cond vcond s1 s2 stmts rmap stmts'
+      (COND: vcond = sem_expr rmap cond)
+      (STMTS: stmts' = (if vcond.(ValV.val) <> 0%Z then s1 else s2) ++ stmts):
+      step (Event.ctrl vcond.(ValV.view))
+           (mk ((stmt_if cond s1 s2)::stmts) rmap)
+           (mk stmts' rmap)
   | step_dowhile
-      s cond stmts rmap:
-      step Event.internal (mk ((stmt_dowhile s cond)::stmts) rmap) (mk (s ++ [stmt_if cond ((stmt_dowhile s cond) :: stmts) stmts]) rmap)
+      s cond stmts rmap stmts'
+      (STMTS: stmts' = s ++ [stmt_if cond ((stmt_dowhile s cond) :: stmts) stmts]):
+      step Event.internal
+           (mk ((stmt_dowhile s cond)::stmts) rmap)
+           (mk stmts' rmap)
   .
+  Hint Constructors step.
 End State.

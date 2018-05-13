@@ -1,4 +1,5 @@
 Require Import List.
+Require Import Bool.
 Require Import NArith.
 Require Import PArith.
 Require Import FMapPositive.
@@ -19,6 +20,22 @@ Module Msg.
     tid: Id.t;
   }.
   Hint Constructors t.
+
+  Global Program Instance eqdec: EqDec t eq.
+  Next Obligation.
+    destruct x, y.
+
+    destruct (loc0 == loc1); cycle 1.
+    { right. intro X. inv X. intuition. }
+
+    destruct (val0 == val1); cycle 1.
+    { right. intro X. inv X. intuition. }
+
+    destruct (tid0 == tid1); cycle 1.
+    { right. intro X. inv X. intuition. }
+
+    left. f_equal; intuition.
+  Defined.
 End Msg.
 
 Module Memory.
@@ -26,6 +43,14 @@ Module Memory.
 
   Definition read (ts:Time.t) (mem:t): option Msg.t :=
     List.nth_error mem ts.
+
+  Definition write (ts:Time.t) (msg:Msg.t) (mem:t): option t :=
+    if read ts mem == Some msg
+    then Some mem
+    else
+      if length mem == ts
+      then Some (mem ++ [msg])
+      else None.
 
   Definition latest (mem:t) (loc:Loc.t) (view:View.t): Time.t := Order.bot. (* TODO *)
 End Memory.
@@ -138,7 +163,7 @@ Module Local.
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               lc1.(promises))
-      (MEM2: True) (* TODO: use (Msg.mk loc val tid) *)
+      (MEM2: Memory.write ts (Msg.mk loc val tid) mem1 = Some mem2)
   .
   Hint Constructors write.
 

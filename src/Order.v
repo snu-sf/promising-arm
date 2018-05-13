@@ -163,6 +163,16 @@ Hint Unfold opt_join.
 Definition opt_bot X `{_: orderC X}: option X := None.
 Hint Unfold opt_bot.
 
+Program Instance opt_eqdec X `{_: EqDec X eq}: EqDec (option X) eq.
+Next Obligation.
+  destruct x, y;
+    (try by left);
+    (try by right; i; ss).
+  destruct (H x x0).
+  - left. f_equal. ss.
+  - right. intro Y. inv Y. intuition.
+Defined.
+
 Program Instance opt_preorder X `{_: orderC X}: PreOrder (opt_le (X:=X)).
 Next Obligation. ii. destruct x; eauto. econs. refl. Qed.
 Next Obligation. ii. inv H1; inv H2; eauto. econs. etrans; eauto. Qed.
@@ -204,6 +214,6 @@ Qed.
 Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
   if a then true else false.
 
-Implicit Arguments proj_sumbool [P Q].
+Arguments proj_sumbool [P Q].
 
 Coercion proj_sumbool: sumbool >-> bool.
