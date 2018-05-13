@@ -10,12 +10,34 @@ Set Implicit Arguments.
 
 Ltac refl := reflexivity.
 Ltac etrans := etransitivity.
+Ltac etrans' :=
+  match goal with
+  | [H: @PreOrder ?A ?R |- ?R (_:?A) (_:?A)] =>
+    eapply (@PreOrder_Transitive _ _ H)
+  end.
 Ltac antisym :=
   match goal with
   | [H: @PartialOrder ?A eq _ ?R _ |- (_:?A) = (_:?A)] =>
     apply (partial_order_antisym H)
   end.
 Ltac funext := apply functional_extensionality.
+
+Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
+  if a then true else false.
+Arguments proj_sumbool [P Q].
+Coercion proj_sumbool: sumbool >-> bool.
+
+Notation rtc := (clos_refl_trans_1n _). (* reflexive transitive closure *)
+Notation rc := (clos_refl _). (* reflexive transitive closure *)
+Notation tc := (clos_trans_1n _). (* transitive closure *)
+Hint Immediate rt1n_refl rt1n_trans t1n_step.
+Hint Resolve Relation_Operators.rt1n_trans.
+
+Program Instance rtc_PreOrder A (R:A -> A -> Prop): PreOrder (rtc R).
+Next Obligation.
+  ii. revert H0. induction H; auto. i.
+  exploit IHclos_refl_trans_1n; eauto.
+Qed.
 
 
 Class orderC (A:Type) (R: relation A) (join: forall (a b:A), A) (bot: A) `{_: PartialOrder A eq R} := mk {
@@ -207,13 +229,3 @@ Qed.
 Next Obligation.
   econs.
 Qed.
-
-
-(* TODO: move *)
-
-Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
-  if a then true else false.
-
-Arguments proj_sumbool [P Q].
-
-Coercion proj_sumbool: sumbool >-> bool.
