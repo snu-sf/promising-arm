@@ -215,6 +215,10 @@ Section State.
     rmap: RMap.t (A:=A);
   }.
 
+  Definition is_terminal (st:t): Prop :=
+    st.(stmts) = [].
+  Hint Unfold is_terminal.
+
   Inductive step: forall (e:Event.t (A:=A)) (st1 st2:t), Prop :=
   | step_skip
       stmts rmap:
