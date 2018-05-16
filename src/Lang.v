@@ -8,6 +8,7 @@ Require Import sflib.
 Require Import EquivDec.
 
 Require Import Order.
+Require Import Time.
 
 Set Implicit Arguments.
 
@@ -126,50 +127,27 @@ Coercion stmt_instr: instrT >-> stmtT.
 Definition program := IdMap.t (list stmtT).
 
 
-Module Time.
-  Include Nat.
-
-  Definition pred_opt (ts:t): option t :=
-    match ts with
-    | O => None
-    | S n => Some n
-    end.
-
-  (* Definition le (a b:t) := a <= b. *)
-  Definition join (a b:t) := max a b.
-  Definition bot: t := 0.
-
-  Global Program Instance order: orderC join bot.
-  Next Obligation. unfold join. lia. Qed.
-  Next Obligation. unfold join. lia. Qed.
-  Next Obligation. eauto using Max.max_assoc. Qed.
-  Next Obligation. eauto using Max.max_comm. Qed.
-  Next Obligation. unfold join. lia. Qed.
-  Next Obligation. unfold bot. lia. Qed.
-
-  Global Instance eqdec: EqDec t eq := nat_eq_eqdec.
-End Time.
-
-Module View := Time.
-
-Module ValV.
-  Inductive t := mk {
+Module ValA.
+  Inductive t A `{_: orderC A} := mk {
     val: Val.t;
-    view: View.t;
+    annot: A;
   }.
   Hint Constructors t.
-End ValV.
+End ValA.
 
 Module RMap.
-  Definition t := IdMap.t ValV.t.
+Section RMap.
+  Context A `{_: orderC A}.
 
-  Definition find (reg:Id.t) (rmap:t): ValV.t :=
+  Definition t := IdMap.t (ValA.t (A:=A)).
+
+  Definition find (reg:Id.t) (rmap:t): (ValA.t (A:=A)) :=
     match IdMap.find reg rmap with
     | Some v => v
-    | None => ValV.mk 0 bot
+    | None => ValA.mk _ 0 bot
     end.
 
-  Definition add (reg:Id.t) (val:ValV.t) (rmap:t): t :=
+  Definition add (reg:Id.t) (val:ValA.t (A:=A)) (rmap:t): t :=
     IdMap.add reg val rmap.
 
   Lemma add_o reg' reg val rmap:
@@ -184,14 +162,12 @@ Module RMap.
            end; ss.
   Qed.
 End RMap.
+End RMap.
 
 Definition sem0_op1 (op:opT1) (v1:Val.t): Val.t :=
   match op with
   | op_not => -v1
   end.
-
-Definition sem_op1 (op:opT1) (v1:ValV.t): ValV.t :=
-  ValV.mk (sem0_op1 op v1.(ValV.val)) v1.(ValV.view).
 
 Definition sem0_op2 (op:opT2) (v1 v2:Val.t): Val.t :=
   match op with
@@ -200,34 +176,44 @@ Definition sem0_op2 (op:opT2) (v1 v2:Val.t): Val.t :=
   | op_mul => v1 * v2
   end.
 
-Definition sem_op2 (op:opT2) (v1 v2:ValV.t): ValV.t :=
-  ValV.mk (sem0_op2 op v1.(ValV.val) v2.(ValV.val)) (join v1.(ValV.view) v2.(ValV.view)).
+Section SEM.
+  Context A `{_: orderC A}.
 
-Fixpoint sem_expr (rmap:RMap.t) (e:exprT): ValV.t :=
-  match e with
-  | expr_const const => ValV.mk const bot
-  | expr_reg reg => RMap.find reg rmap
-  | expr_op1 op e1 => sem_op1 op (sem_expr rmap e1)
-  | expr_op2 op e1 e2 => sem_op2 op (sem_expr rmap e1) (sem_expr rmap e2)
-  end.
+  Definition sem_op1 (op:opT1) (v1:ValA.t): (ValA.t (A:=A)) :=
+    ValA.mk _ (sem0_op1 op v1.(ValA.val)) v1.(ValA.annot).
+
+  Definition sem_op2 (op:opT2) (v1 v2:ValA.t): ValA.t :=
+    ValA.mk _ (sem0_op2 op v1.(ValA.val) v2.(ValA.val)) (join v1.(ValA.annot) v2.(ValA.annot)).
+
+  Fixpoint sem_expr (rmap:RMap.t (A:=A)) (e:exprT): ValA.t :=
+    match e with
+    | expr_const const => ValA.mk _ const bot
+    | expr_reg reg => RMap.find reg rmap
+    | expr_op1 op e1 => sem_op1 op (sem_expr rmap e1)
+    | expr_op2 op e1 e2 => sem_op2 op (sem_expr rmap e1) (sem_expr rmap e2)
+    end.
+End SEM.
 
 Module Event.
-  Inductive t :=
+  Inductive t A `{_: orderC A} :=
   | internal
-  | read (ex:bool) (ord:ordT) (vloc:ValV.t) (res:ValV.t)
-  | write (ex:bool) (ord:ordT) (vloc:ValV.t) (vval:ValV.t) (res:ValV.t)
+  | read (ex:bool) (ord:ordT) (vloc:ValA.t (A:=A)) (res:ValA.t (A:=A))
+  | write (ex:bool) (ord:ordT) (vloc:ValA.t (A:=A)) (vval:ValA.t (A:=A)) (res:ValA.t (A:=A))
   | barrier (b:Barrier.t)
-  | ctrl (view:View.t)
+  | ctrl (a:A)
   .
 End Event.
 
 Module State.
+Section State.
+  Context A `{_: orderC A}.
+
   Inductive t := mk {
     stmt: list stmtT;
-    rmap: RMap.t;
+    rmap: RMap.t (A:=A);
   }.
 
-  Inductive step: forall (e:Event.t) (st1 st2:t), Prop :=
+  Inductive step: forall (e:Event.t (A:=A)) (st1 st2:t), Prop :=
   | step_skip
       stmts rmap:
       step Event.internal
@@ -262,8 +248,8 @@ Module State.
   | step_if
       cond vcond s1 s2 stmts rmap stmts'
       (COND: vcond = sem_expr rmap cond)
-      (STMTS: stmts' = (if vcond.(ValV.val) <> 0%Z then s1 else s2) ++ stmts):
-      step (Event.ctrl vcond.(ValV.view))
+      (STMTS: stmts' = (if vcond.(ValA.val) <> 0%Z then s1 else s2) ++ stmts):
+      step (Event.ctrl vcond.(ValA.annot))
            (mk ((stmt_if cond s1 s2)::stmts) rmap)
            (mk stmts' rmap)
   | step_dowhile
@@ -274,4 +260,5 @@ Module State.
            (mk stmts' rmap)
   .
   Hint Constructors step.
+End State.
 End State.

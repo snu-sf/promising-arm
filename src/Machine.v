@@ -3,6 +3,7 @@ Require Import Relations.
 Require Import EquivDec.
 
 Require Import Order.
+Require Import Time.
 Require Import Lang.
 Require Import Memory.
 
@@ -11,7 +12,7 @@ Set Implicit Arguments.
 
 Module ExecUnit.
   Inductive t := mk {
-    state: State.t;
+    state: State.t (A:=View.t);
     local: Local.t;
     mem: Memory.t;
   }.
@@ -31,7 +32,7 @@ End ExecUnit.
 
 Module Machine.
   Inductive t := mk {
-    tpool: IdMap.t (State.t * Local.t);
+    tpool: IdMap.t (State.t (A:=View.t) * Local.t);
     mem: Memory.t;
   }.
   Hint Constructors t.

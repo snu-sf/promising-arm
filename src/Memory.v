@@ -8,6 +8,7 @@ Require Import EquivDec.
 Require Import sflib.
 
 Require Import Order.
+Require Import Time.
 Require Import Lang.
 
 Set Implicit Arguments.
@@ -201,12 +202,12 @@ Module Local.
   .
   Hint Constructors promise.
 
-  Inductive read (ex:bool) (ord:ordT) (vloc:ValV.t) (res: ValV.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive read (ex:bool) (ord:ordT) (vloc:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       ts loc val view
       view_ext1 view_ext2
-      (LOC: loc = vloc.(ValV.val))
-      (VIEW: view = vloc.(ValV.view))
+      (LOC: loc = vloc.(ValA.val))
+      (VIEW: view = vloc.(ValA.annot))
       (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (ord_le ra ord) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
       (LATEST: le (Memory.latest mem1 loc view_ext1) ts)
@@ -215,7 +216,7 @@ Module Local.
                                               | Some fwd => fwd.(FwdItem.read_view) ts ord
                                               end))
       (MSG: Memory.read ts loc mem1 = Some val)
-      (RES: res = ValV.mk val view_ext2)
+      (RES: res = ValA.mk _ val view_ext2)
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
@@ -231,14 +232,14 @@ Module Local.
   .
   Hint Constructors read.
 
-  Inductive write (ex:bool) (ord:ordT) (vloc:ValV.t) (vval:ValV.t) (res: ValV.t) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t) (mem2: Memory.t): Prop :=
+  Inductive write (ex:bool) (ord:ordT) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t) (mem2: Memory.t): Prop :=
   | write_intro
       ts loc val
       view_loc view_val view_ext
-      (LOC: loc = vloc.(ValV.val))
-      (VIEW_LOC: view_loc = vloc.(ValV.view))
-      (VAL: val = vloc.(ValV.val))
-      (VIEW_VAL: view_val = vloc.(ValV.view))
+      (LOC: loc = vloc.(ValA.val))
+      (VIEW_LOC: view_loc = vloc.(ValA.annot))
+      (VAL: val = vloc.(ValA.val))
+      (VIEW_VAL: view_val = vloc.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwp);
                                 ifc (ord_le ra ord) lc1.(vrm);
@@ -247,7 +248,7 @@ Module Local.
       (COH: le (lc1.(coh) loc) ts)
       (EXT: le (lc1.(coh) loc) ts)
       (EX: ex -> exists tsx, lc1.(exbank) = Some tsx /\ True) (* TODO: non-blocked(M, l tsx, ts) *)
-      (RES: res = ValV.mk 0 bot)
+      (RES: res = ValA.mk _ 0 bot)
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
@@ -264,10 +265,10 @@ Module Local.
   .
   Hint Constructors write.
 
-  Inductive write_failure (ex:bool) (res: ValV.t) (lc1:t) (lc2:t): Prop :=
+  Inductive write_failure (ex:bool) (res: ValA.t (A:=View.t)) (lc1:t) (lc2:t): Prop :=
   | write_failure_intro
       (EX: ex)
-      (RES: res = ValV.mk 1 bot)
+      (RES: res = ValA.mk _ 1 bot)
       (LC2: lc2 =
             mk
               lc1.(coh)
