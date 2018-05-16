@@ -20,6 +20,7 @@ Set Implicit Arguments.
 Inductive labelT :=
 | read (ex:bool) (ord:ordT) (loc:Loc.t) (val:Val.t)
 | write (ex:bool) (ord:ordT) (loc:Loc.t) (val:Val.t) (res:Val.t)
+| barrier (b:Barrier.t)
 .
 
 Module ALocal.
@@ -64,7 +65,13 @@ Module ALocal.
   | step_barrier
       b
       (EVENT: event = Event.barrier b)
-      (CTOR: ctor2 = ctor1)
+      (CTOR: ctor2 =
+             mk
+               (ctor1.(labels) ++ [barrier b])
+               ctor1.(addr)
+               ctor1.(data)
+               ctor1.(ctrl)
+               ctor1.(ctrl_src))
   | step_ctrl
       src
       (EVENT: event = Event.ctrl src)
@@ -77,20 +84,22 @@ Module ALocal.
                ((ctor1.(ctrl_src)) \1/ (src)))
   .
   Hint Constructors step.
+End ALocal.
 
-  Inductive exec_unitT := mk_exec_unit {
+Module AExecUnit.
+  Inductive t := mk {
     state: State.t (A:=nat -> Prop);
     local: ALocal.t;
   }.
-  Hint Constructors exec_unitT.
+  Hint Constructors t.
 
-  Inductive exec_unit_step (eu1 eu2:exec_unitT): Prop :=
-  | step_exec_unit
+  Inductive step (eu1 eu2:t): Prop :=
+  | step_intro
       e
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: ALocal.step e eu1.(local) eu2.(local))
   .
-End ALocal.
+End AExecUnit.
 
 Definition eid := (Id.t * nat)%type.
 
@@ -110,13 +119,13 @@ Inductive is_pre_execution (p:program) (ex:executionT): Prop :=
     (LOCALS: IdMap.for_all
                (fun stmts local =>
                   exists state,
-                    <<STEP: rtc ALocal.exec_unit_step
-                                (ALocal.mk_exec_unit (State.init stmts) ALocal.init)
-                                (ALocal.mk_exec_unit state local)>> /\
+                    <<STEP: rtc AExecUnit.step
+                                (AExecUnit.mk (State.init stmts) ALocal.init)
+                                (AExecUnit.mk state local)>> /\
                     <<TERMINAL: State.is_terminal state>>)
                p locals)
     (LABELS: ex.(labels) = IdMap.map (fun local => local.(ALocal.labels)) locals)
-    (* TODO: po, addr, data, ctrl *)
+    (* TODO: po, addr, data, ctrl, rmw *)
 .
 
 Inductive is_execution (p:program) (ex:executionT): Prop :=
