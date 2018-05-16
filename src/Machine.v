@@ -19,7 +19,7 @@ Module ExecUnit.
   Hint Constructors t.
 
   Inductive step (tid:Id.t) (eu1 eu2:t): Prop :=
-  | step_exec
+  | step_state
       e
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: Local.step e tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
@@ -36,6 +36,11 @@ Module Machine.
     mem: Memory.t;
   }.
   Hint Constructors t.
+
+  Definition init (p:program): t :=
+    mk
+      (IdMap.map (fun stmts => (State.mk stmts (RMap.init (A:=View.t)), Local.init)) p)
+      Memory.empty.
 
   Inductive step (th1 th2:t): Prop :=
   | step_intro

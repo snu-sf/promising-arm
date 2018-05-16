@@ -141,6 +141,8 @@ Section RMap.
 
   Definition t := IdMap.t (ValA.t (A:=A)).
 
+  Definition init: t := IdMap.empty _.
+
   Definition find (reg:Id.t) (rmap:t): (ValA.t (A:=A)) :=
     match IdMap.find reg rmap with
     | Some v => v
@@ -209,7 +211,7 @@ Section State.
   Context A `{_: orderC A}.
 
   Inductive t := mk {
-    stmt: list stmtT;
+    stmts: list stmtT;
     rmap: RMap.t (A:=A);
   }.
 

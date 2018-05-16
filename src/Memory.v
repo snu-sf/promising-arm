@@ -42,6 +42,8 @@ End Msg.
 Module Memory.
   Definition t := list Msg.t.
 
+  Definition empty: t := [].
+
   Definition read (ts:Time.t) (loc:Loc.t) (mem:t): option Val.t :=
     match Time.pred_opt ts with
     | None => Some Val.default
@@ -182,6 +184,8 @@ Module Local.
             (*   lc1.(fwd) *)
             (*   lc1.(ex) *)
             (*   lc1.(promises)) *)
+
+  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) bot IdSet.empty.
 
   Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | promise_intro
