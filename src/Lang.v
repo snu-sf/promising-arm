@@ -13,7 +13,27 @@ Require Import Time.
 Set Implicit Arguments.
 
 Module Id := Pos.
-Module IdMap := PositiveMap.
+
+Module IdMap.
+  Include PositiveMap.
+
+  Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
+  | opt_pred_None:
+      opt_pred pred None None
+  | opt_pred_Some
+      a b
+      (PRED: pred a b):
+      opt_pred pred (Some a) (Some b)
+  .
+
+  Definition for_all A B
+             (pred: A -> B -> Prop)
+             (a: IdMap.t A)
+             (b: IdMap.t B)
+    : Prop :=
+    forall id, opt_pred pred (find id a) (find id b).
+End IdMap.
+
 Module IdSet.
   Include PositiveSet.
 
@@ -214,6 +234,8 @@ Section State.
     stmts: list stmtT;
     rmap: RMap.t (A:=A);
   }.
+
+  Definition init (stmts:list stmtT): t := mk stmts (RMap.init (A:=A)).
 
   Definition is_terminal (st:t): Prop :=
     st.(stmts) = [].

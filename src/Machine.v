@@ -39,7 +39,7 @@ Module Machine.
 
   Definition init (p:program): t :=
     mk
-      (IdMap.map (fun stmts => (State.mk stmts (RMap.init (A:=View.t)), Local.init)) p)
+      (IdMap.map (fun stmts => (State.init stmts, Local.init)) p)
       Memory.empty.
 
   Inductive step (th1 th2:t): Prop :=
