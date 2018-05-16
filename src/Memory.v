@@ -373,7 +373,7 @@ Module Local.
   .
   Hint Constructors ctrl.
 
-  Inductive step (event:Event.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
+  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | step_internal
       (EVENT: event = Event.internal)
       (LC: lc2 = lc1)

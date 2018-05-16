@@ -7,6 +7,9 @@ Require Import EquivDec.
 Require Import List.
 Require Import sflib.
 
+(* TODO: it's an axiom. *)
+Require Import ProofIrrelevance.
+
 Set Implicit Arguments.
 
 
@@ -20,7 +23,7 @@ Ltac etrans' :=
   end.
 Ltac antisym :=
   match goal with
-  | [H: @PartialOrder ?A eq _ ?R _ |- (_:?A) = (_:?A)] =>
+  | [H: @PartialOrder ?A ?EQ _ ?LE _ |- ?EQ (_:?A) (_:?A)] =>
     apply (partial_order_antisym H)
   end.
 Ltac funext := apply functional_extensionality.
@@ -50,18 +53,18 @@ Next Obligation.
 Qed.
 
 
-Class orderC (A:Type) (R: relation A) (join: forall (a b:A), A) (bot: A) `{_: PartialOrder A eq R} := mk {
-  join_l: forall a b, R a (join a b);
-  join_r: forall a b, R b (join a b);
-  join_assoc: forall a b c, join (join a b) c = join a (join b c);
-  join_comm: forall a b, join a b = join b a;
+Class orderC (A:Type) (EQ LE: relation A) (join: forall (a b:A), A) (bot: A) `{_: PartialOrder A EQ LE} := mk {
+  join_l: forall a b, LE a (join a b);
+  join_r: forall a b, LE b (join a b);
+  join_assoc: forall a b c, EQ (join (join a b) c) (join a (join b c));
+  join_comm: forall a b, EQ (join a b) (join b a);
   join_spec:
     forall a b c
-      (AC: R a c)
-      (BC: R b c),
-      R (join a b) c;
+      (AC: LE a c)
+      (BC: LE b c),
+      LE (join a b) c;
 
-  bot_spec: forall a, R bot a;
+  bot_spec: forall a, LE bot a;
 }.
 
 Definition ifc (A:Type) `{_: orderC A} (cond:bool) (a:A): A :=
@@ -71,7 +74,7 @@ Definition joins (A:Type) `{_: orderC A} (l:list A): A :=
   List.fold_right join bot l.
 
 
-Lemma join_le (A:Type) (le:relation A) `{_: orderC A le}
+Lemma join_le (A:Type) (eq le:relation A) `{_: orderC A eq le}
       a b c d
       (AC: le a c)
       (BD: le b d):
@@ -82,9 +85,9 @@ Proof.
   - etrans; eauto using join_r.
 Qed.
 
-Lemma bot_join (A:Type) (le: relation A) `{_: orderC A le}
+Lemma bot_join (A:Type) (eq le: relation A) `{_: orderC A eq le}
       a:
-  join a bot = a.
+  eq (join a bot) a.
 Proof.
   antisym.
   - eapply join_spec; eauto.
@@ -93,7 +96,7 @@ Proof.
   - eapply join_l.
 Qed.
 
-Lemma joins_le A (le: relation A) `{_: orderC A le}
+Lemma joins_le A (eq le: relation A) `{_: orderC A eq le}
       (a:A) (l:list A)
       (IN: In a l):
   le a (joins l).
@@ -103,7 +106,7 @@ Proof.
   - etrans; eauto. apply join_r.
 Qed.
 
-Lemma joins_spec A (le: relation A) `{_: orderC A le}
+Lemma joins_spec A (eq le: relation A) `{_: orderC A eq le}
       (l:list A) (b:A)
       (LE: forall a (IN: In a l), le a b):
   le (joins l) b.
@@ -116,7 +119,8 @@ Proof.
 Qed.
 
 
-Definition le (A:Type) `{_: orderC A} := R.
+Definition equiv (A:Type) `{_: Equivalence A} := R.
+Definition le (A:Type) `{_: orderC A} := LE.
 Definition join (A:Type) `{_: orderC A} := join.
 Definition bot (A:Type) `{_: orderC A} := bot.
 
@@ -133,8 +137,12 @@ Lemma fun_add_spec A B `{_: EqDec A} a (b:B) f x:
   (fun_add a b f) x = if a == x then b else f x.
 Proof. refl. Qed.
 
-Definition fun_le A B `{_: orderC B} (f g: A -> B): Prop :=
+Definition fun_eq A B `{_: Equivalence B} (f g: A -> B): Prop :=
   forall a, R (f a) (g a).
+Hint Unfold fun_eq.
+
+Definition fun_le A B `{_: orderC B} (f g: A -> B): Prop :=
+  forall a, LE (f a) (g a).
 Hint Unfold fun_le.
 
 Definition fun_join A B `{_: orderC B} (f g: A -> B) :=
@@ -144,18 +152,34 @@ Hint Unfold fun_join.
 Definition fun_bot A B `{_: orderC B} := fun (_:A) => bot.
 Hint Unfold fun_bot.
 
+Program Instance fun_equiv A B `{_: Equivalence B}: Equivalence (fun_eq (A:=A) (B:=B)).
+Next Obligation. ii. refl. Qed.
+Next Obligation. ii. symmetry. ss. Qed.
+Next Obligation. ii. etrans; eauto. Qed.
+
 Program Instance fun_preorder A B `{_: orderC B}: PreOrder (fun_le (A:=A) (B:=B)).
 Next Obligation. ii. refl. Qed.
 Next Obligation. ii. etrans; eauto. Qed.
 
-Program Instance fun_partialorder A B `{_: orderC B}: PartialOrder eq (fun_le (A:=A) (B:=B)).
+Program Instance fun_partialorder A B `{_: orderC B}: @PartialOrder (A -> B) (fun_eq (A:=A) (B:=B)) _ (fun_le (A:=A) (B:=B)) _.
 Next Obligation.
   econs.
-  - i. subst. econs; ii; refl.
-  - i. funext. i. inv H1. antisym; eauto.
+  - econs; ii.
+    + eapply (H (x a)) in H1. inv H1. ss.
+    + eapply (H (x a)) in H1. inv H1. ss.
+  - ii. antisym; apply H1.
 Qed.
 
-Program Instance fun_order A B `{_: orderC B}: @orderC (A -> B) (fun_le (A:=A) (B:=B)) (fun_join (A:=A) (B:=B)) (fun_bot (A:=A) (B:=B)) eq_equivalence (fun_preorder A B) (fun_partialorder A B).
+Program Instance fun_order A B `{_: orderC B}:
+  @orderC
+    (A -> B)
+    (fun_eq (A:=A) (B:=B))
+    (fun_le (A:=A) (B:=B))
+    (fun_join (A:=A) (B:=B))
+    (fun_bot (A:=A) (B:=B))
+    (fun_equiv A B)
+    (fun_preorder A B)
+    (fun_partialorder A B).
 Next Obligation.
   unfold fun_le, fun_join, fun_bot.
   ii. apply join_l.
@@ -165,26 +189,32 @@ Next Obligation.
   ii. apply join_r.
 Qed.
 Next Obligation.
-  unfold fun_le, fun_join, fun_bot.
-  funext. i. eauto using join_assoc.
+  unfold fun_eq, fun_le, fun_join, fun_bot.
+  i. eauto using join_assoc.
 Qed.
 Next Obligation.
-  unfold fun_le, fun_join, fun_bot.
-  funext. i. eauto using join_comm.
+  unfold fun_eq, fun_le, fun_join, fun_bot.
+  i. eauto using join_comm.
 Qed.
 Next Obligation.
-  unfold fun_le, fun_join, fun_bot.
+  unfold fun_eq, fun_le, fun_join, fun_bot.
   eauto using join_spec.
 Qed.
 Next Obligation.
-  unfold fun_le, fun_join, fun_bot.
+  unfold fun_eq, fun_le, fun_join, fun_bot.
   eauto using bot_spec.
 Qed.
 
 
+Inductive opt_eq X `{_: Equivalence X}: forall (a b: option X), Prop :=
+| opt_eq_None: opt_eq None None
+| opt_eq_Some a b (EQX: equiv a b): opt_eq (Some a) (Some b)
+.
+Hint Constructors opt_eq.
+
 Inductive opt_le X `{_: orderC X}: forall (a b: option X), Prop :=
 | opt_le_None b: opt_le None b
-| opt_le_Some a b (LE: le a b): opt_le (Some a) (Some b)
+| opt_le_Some a b (LEX: le a b): opt_le (Some a) (Some b)
 .
 Hint Constructors opt_le.
 
@@ -198,6 +228,11 @@ Hint Unfold opt_join.
 
 Definition opt_bot X `{_: orderC X}: option X := None.
 Hint Unfold opt_bot.
+
+Program Instance opt_equiv X `{_: Equivalence X}: Equivalence (opt_eq (X:=X)).
+Next Obligation. ii. destruct x; eauto. econs. refl. Qed.
+Next Obligation. ii. inv H0; eauto. econs. symmetry. ss. Qed.
+Next Obligation. ii. inv H0; inv H1; eauto. econs. etrans; eauto. Qed.
 
 Program Instance opt_eqdec X `{_: EqDec X eq}: EqDec (option X) eq.
 Next Obligation.
@@ -213,14 +248,25 @@ Program Instance opt_preorder X `{_: orderC X}: PreOrder (opt_le (X:=X)).
 Next Obligation. ii. destruct x; eauto. econs. refl. Qed.
 Next Obligation. ii. inv H1; inv H2; eauto. econs. etrans; eauto. Qed.
 
-Program Instance opt_partialorder X `{_: orderC X}: PartialOrder eq (opt_le (X:=X)).
+Program Instance opt_partialorder X `{_: orderC X}: PartialOrder (opt_eq (X:=X)) (opt_le (X:=X)).
 Next Obligation.
   econs.
-  - i. subst. econs; ii; refl.
-  - i. inv H1. inv H2; inv H3; ss. f_equal. antisym; ss.
+  - i. inv H1.
+    + econs; ss.
+    + econs; econs; rewrite EQX; refl.
+  - i. inv H1. inv H2; inv H3; econs. antisym; eauto.
 Qed.
 
-Program Instance opt_order X `{_: orderC X}: @orderC (option X) (opt_le (X:=X)) (opt_join (X:=X)) (opt_bot (X:=X)) eq_equivalence (opt_preorder X) (opt_partialorder X).
+Program Instance opt_order X `{_: orderC X}:
+  @orderC
+    (option X)
+    (opt_eq (X:=X))
+    (opt_le (X:=X))
+    (opt_join (X:=X))
+    (opt_bot (X:=X))
+    (opt_equiv X)
+    (opt_preorder X)
+    (opt_partialorder X).
 Next Obligation.
   destruct a, b; ss; econs.
   - apply join_l.
@@ -232,14 +278,73 @@ Next Obligation.
   - refl.
 Qed.
 Next Obligation.
-  destruct  a, b, c; ss. f_equal. apply join_assoc.
+  destruct  a, b, c; econs; try by refl.
+  apply join_assoc.
 Qed.
 Next Obligation.
-  destruct  a, b; ss. f_equal. apply join_comm.
+  destruct  a, b; econs; try by refl.
+  apply join_comm.
 Qed.
 Next Obligation.
   inv AC; inv BC; econs; eauto. apply join_spec; ss.
 Qed.
 Next Obligation.
   econs.
+Qed.
+
+
+Definition prop_eq (a b:Prop): Prop := a <-> b.
+
+Definition prop_le (a b:Prop): Prop := a -> b.
+
+Definition prop_join (a b:Prop): Prop := a \/ b.
+
+Definition prop_bot: Prop := False.
+
+Program Instance prop_equiv: Equivalence prop_eq.
+
+Program Instance prop_preorder: PreOrder prop_le.
+Next Obligation. ii. ss. Qed.
+Next Obligation. ii. auto. Qed.
+
+Program Instance prop_partialorder: PartialOrder iff prop_le.
+Next Obligation.
+  econs.
+  - i. inv H. econs; ss.
+  - i. inv H. econs; ss.
+Qed.
+
+Program Instance prop_order:
+  @orderC
+    Prop
+    prop_eq
+    prop_le
+    prop_join
+    prop_bot
+    prop_equiv
+    prop_preorder
+    prop_partialorder.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
+Qed.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
+Qed.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
+Qed.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
+Qed.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
+Qed.
+Next Obligation.
+  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  intuition.
 Qed.
