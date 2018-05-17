@@ -317,12 +317,6 @@ Inductive is_valid_pre (p:program) (ex:Execution.t): Prop :=
     (ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals))
     (DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals))
     (CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals))
-.
-Hint Constructors is_valid_pre.
-
-Inductive is_valid (p:program) (ex:Execution.t): Prop :=
-| is_valid_intro
-    (PRE: is_valid_pre p ex)
     (RMW: forall eid1 ord1 loc val1
            (LABEL1: Execution.label eid1 ex = Some (Label.write true ord1 loc val1)),
         exists eid2 ord2 val2,
@@ -334,6 +328,12 @@ Inductive is_valid (p:program) (ex:Execution.t): Prop :=
                    (PO31: ex.(Execution.po) eid3 eid1)
                    (LABEL3: Execution.label eid3 ex = Some label3),
               Label.is_ex label3 = false>>)
+.
+Hint Constructors is_valid_pre.
+
+Inductive is_valid (p:program) (ex:Execution.t): Prop :=
+| is_valid_intro
+    (PRE: is_valid_pre p ex)
     (CO: forall loc
            eid1 ex1 ord1 val1
            eid2 ex2 ord2 val2
