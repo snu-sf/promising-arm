@@ -110,8 +110,8 @@ Module ALocal.
                (ctor1.(ctrl) ∪ (ctor1.(ctrl_src) × (eq (next_eid ctor1))))
                ctor1.(ctrl_src))
   | step_write_failure
-      ex ord vloc vval
-      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 1 bot))
+      ord vloc vval
+      (EVENT: event = Event.write true ord vloc vval (ValA.mk _ 1 bot))
       (CTOR: ctor2 =
              mk
                ctor1.(labels)
@@ -203,12 +203,13 @@ Module Execution.
 (* let obs = rfe | fr | co *)
 
 (* let dob = *)
-(*   | (addr | data); rfi? *)
+(* 	| (addr | data); rfi? *)
 (* 	| (ctrl | (addr; po)); ([W] | [ISB]; po; [R]) *)
 
 (* let aob = [range(rmw)]; rfi; [A | Q] *)
 
-(* let bob = [R|W]; po; [dmb.full]; po; [R|W] *)
+(* let bob = *)
+(* 	| [R|W]; po; [dmb.full]; po; [R|W] *)
 (* 	| [L]; po; [A] *)
 (* 	| [R]; po; [dmb.ld]; po; [R|W] *)
 (* 	| [A | Q]; po; [R|W] *)
@@ -347,6 +348,6 @@ Inductive is_valid (p:program) (ex:Execution.t): Prop :=
           <<RF: ex.(Execution.rf) eid2 eid1>>)
     (INTERNAL: acyclic ex.(Execution.internal))
     (EXTERNAL: acyclic ex.(Execution.ob))
-    (ATOMIC: ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe)) = bot)
+    (ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot)
 .
 Hint Constructors is_valid.
