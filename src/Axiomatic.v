@@ -221,20 +221,20 @@ Module Execution.
 (* acyclic ob as external *)
 (* empty rmw & (fre; coe) as atomic *)
 
-  Definition internal: relation eidT :=
+  Definition i: relation eidT :=
     fun x y => x.(fst) = y.(fst).
 
-  Definition external: relation eidT :=
+  Definition e: relation eidT :=
     fun x y => x.(fst) <> y.(fst).
 
   Definition po_loc (ex:t): relation eidT := ex.(label_rel) label_loc.
   Definition fr (ex:t): relation eidT := ex.(rf)⁻¹ ⨾ ex.(co).
-  Definition rfi (ex:t): relation eidT := ex.(rf) ∩ internal.
-  Definition rfe (ex:t): relation eidT := ex.(rf) ∩ external.
-  Definition fre (ex:t): relation eidT := ex.(fr) ∩ external.
-  Definition coe (ex:t): relation eidT := ex.(co) ∩ external.
+  Definition rfi (ex:t): relation eidT := ex.(rf) ∩ i.
+  Definition rfe (ex:t): relation eidT := ex.(rf) ∩ e.
+  Definition fre (ex:t): relation eidT := ex.(fr) ∩ e.
+  Definition coe (ex:t): relation eidT := ex.(co) ∩ e.
 
-  Definition coh (ex:t): relation eidT := ex.(po_loc) ∪ ex.(fr) ∪ ex.(co) ∪ ex.(rf).
+  Definition internal (ex:t): relation eidT := ex.(po_loc) ∪ ex.(fr) ∪ ex.(co) ∪ ex.(rf).
 
   Definition obs (ex:t): relation eidT := ex.(rfe) ∪ ex.(fr) ∪ ex.(co).
 
@@ -317,16 +317,15 @@ Inductive is_valid_pre (p:program) (ex:Execution.t): Prop :=
     (DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals))
     (CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals))
 .
+Hint Constructors is_valid_pre.
 
 Inductive is_valid (p:program) (ex:Execution.t): Prop :=
 | is_valid_intro
     (PRE: is_valid_pre p ex)
-    (RMW: forall eid1 label1 ord1 loc val1
-           (LABEL1: Execution.label eid1 ex = Some label1)
-           (WRITE1: label1 = Label.write true ord1 loc val1),
-        exists eid2 label2 ord2 val2,
-          <<LABEL: Execution.label eid2 ex = Some label2>> /\
-          <<WRITE: label2 = Label.read true ord2 loc val2>> /\
+    (RMW: forall eid1 ord1 loc val1
+           (LABEL1: Execution.label eid1 ex = Some (Label.write true ord1 loc val1)),
+        exists eid2 ord2 val2,
+          <<LABEL: Execution.label eid2 ex = Some (Label.read true ord2 loc val2)>> /\
           <<PO: ex.(Execution.po) eid2 eid1>> /\
           <<RMW: ex.(Execution.rmw) eid2 eid1>> /\
           <<BTW: forall eid3 label3
@@ -334,23 +333,20 @@ Inductive is_valid (p:program) (ex:Execution.t): Prop :=
                    (PO31: ex.(Execution.po) eid3 eid1)
                    (LABEL3: Execution.label eid3 ex = Some label3),
               Label.is_ex label3 = false>>)
-    (CO: forall eid1 label1 ex1 ord1 loc1 val1
-           eid2 label2 ex2 ord2 loc2 val2
+    (CO: forall loc
+           eid1 ex1 ord1 val1
+           eid2 ex2 ord2 val2
            (EID: eid1 <> eid2)
-           (LABEL1: Execution.label eid1 ex = Some label1)
-           (LABEL2: Execution.label eid2 ex = Some label2)
-           (WRITE1: label1 = Label.write ex1 ord1 loc1 val1)
-           (WRITE2: label2 = Label.write ex2 ord2 loc2 val2)
-           (LOC: loc1 = loc2),
+           (LABEL1: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1))
+           (LABEL2: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)),
         ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1)
-    (RF: forall eid1 label1 ex1 ord1 loc val
-           (LABEL1: Execution.label eid1 ex = Some label1)
-           (READ1: label1 = Label.read ex1 ord1 loc val),
-        exists eid2 label2 ex2 ord2,
-          <<LABEL: Execution.label eid2 ex = Some label2>> /\
-          <<WRITE: label2 = Label.write ex2 ord2 loc val>> /\
+    (RF: forall eid1 ex1 ord1 loc val
+           (LABEL1: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
+        exists eid2 ex2 ord2,
+          <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
           <<RF: ex.(Execution.rf) eid2 eid1>>)
-    (INTERNAL: acyclic ex.(Execution.coh))
+    (INTERNAL: acyclic ex.(Execution.internal))
     (EXTERNAL: acyclic ex.(Execution.ob))
     (ATOMIC: ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe)) = bot)
 .
+Hint Constructors is_valid.
