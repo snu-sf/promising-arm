@@ -26,7 +26,7 @@ Lemma linearize A
       (rel: relation A)
       (ACYCLIC: acyclic rel):
   exists l',
-    <<PERM: Permutation l l'>> /\
+    <<PERM: Permutation l' l>> /\
     <<REL: forall i j x y
              (X: List.nth_error l' i = Some x)
              (Y: List.nth_error l' j = Some y)
@@ -156,13 +156,13 @@ Definition Local_init_with_promises
            bot
            promises.
 
-Inductive sim (ex:Execution.t) (m: Machine.t): Prop :=
-| sim_intro
+Inductive sim_mem (ex:Execution.t) (mem: Memory.t): Prop :=
+| sim_mem_intro
     eids
     (EIDS: Permutation eids (Execution.eids ex))
-    (MEM: m.(Machine.mem) = mem_of_ex ex eids)
+    (MEM: mem = mem_of_ex ex eids)
 .
-Hint Constructors sim.
+Hint Constructors sim_mem.
 
 Lemma promise_mem
       p mem
@@ -207,31 +207,136 @@ Proof.
   - ss.
 Qed.
 
-Lemma axiomatic_to_promising
+(* TODO: move *)
+Lemma IdMap_add_add A i v1 v2 (m:IdMap.t A):
+  IdMap.add i v1 (IdMap.add i v2 m) = IdMap.add i v1 m.
+Proof.
+  revert m. induction i; destruct m; ss; try congruence.
+Qed.
+
+(* TODO: move *)
+Lemma rtc_eu_step_machine_step0
+      tid m st1 lc1 mem1 st2 lc2 mem2
+      (FIND: IdMap.find tid m.(Machine.tpool) = Some (st1, lc1))
+      (MEM: m.(Machine.mem) = mem1)
+      (EX: rtc (ExecUnit.step tid)
+               (ExecUnit.mk st1 lc1 mem1)
+               (ExecUnit.mk st2 lc2 mem2)):
+  rtc Machine.step0
+      m
+      (Machine.mk
+         (IdMap.add tid (st2, lc2) m.(Machine.tpool))
+         mem2).
+Proof.
+  revert m FIND MEM.
+  (* TODO: move *)
+  Require Import Coq.Program.Equality.
+  depind EX.
+  { i. subst. destruct m. s. rewrite PositiveMapAdditionalFacts.gsident; ss. refl. }
+  destruct y. i. subst. econs.
+  - instantiate (1 := Machine.mk _ _). econs; ss; eauto.
+  - exploit IHEX; eauto.
+    + instantiate (1 := Machine.mk _ _). s.
+      rewrite IdMap.add_spec. condtac; eauto. exfalso. apply c. ss.
+    + ss.
+    + s. rewrite (IdMap_add_add tid (st2, lc2)). eauto.
+Qed.
+
+Theorem axiomatic_to_promising
       p ex
-      (AXIOMATIC: is_valid p ex):
-  exists m,
+      (VALID: is_valid p ex):
+  exists (m: Machine.t),
     <<STEP: rtc Machine.step (Machine.init p) m>> /\
-    <<SIM: sim ex m>>.
+    <<TERMINAL: Machine.is_terminal m>> /\
+    <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
   (* Linearize events and construct memory. *)
   exploit (linearize (Execution.eids ex)).
-  { inv AXIOMATIC. apply EXTERNAL. }
+  { inv VALID. apply EXTERNAL. }
   i. des. rename l' into eids.
   remember (mem_of_ex ex eids) as mem eqn:MEM.
 
   (* Construct promise steps. *)
   exploit (promise_mem p mem); eauto.
   { i. subst. unfold mem_of_ex in MSG. rewrite in_filter_map_iff in MSG. des.
-    symmetry in PERM. exploit Permutation_in; eauto. intro X.
+    exploit Permutation_in; eauto. intro X.
     generalize (Execution.eids_spec ex). i. des.
     apply LABEL in X. destruct (Execution.label a ex) eqn:Y; ss.
     destruct t; ss. inv MSG0. s. unfold Execution.label in Y.
-    inv AXIOMATIC. inv PRE. rewrite LABELS, IdMap.map_spec in Y.
+    inv VALID. inv PRE. rewrite LABELS, IdMap.map_spec in Y.
     destruct (IdMap.find (fst a) locals) eqn:Z; ss.
     specialize (LOCALS (fst a)). inv LOCALS; ss. congr.
   }
+  i. des. subst.
 
-  (* TODO: execute each thread. *)
+  (* It's sufficient to construct steps from the promised state. *)
+  cut (exists m0,
+          <<STEP: rtc Machine.step0 m m0>> /\
+          <<TERMINAL: Machine.is_terminal m0>> /\
+          <<MEM: sim_mem ex (Machine.mem m0)>>).
+  { i. des. esplits; cycle 1; eauto.
+    apply Machine.rtc_step0_step.
+    - etrans; eauto.
+    - econs. i. inv TERMINAL. exploit TERMINAL0; eauto. i. des. ss.
+  }
+  clear STEP.
+
+  (* Execute threads one-by-one (induction). *)
+  assert (IN: forall tid stmts
+                (FIND1: IdMap.find tid p = Some stmts),
+             IdMap.find tid m.(Machine.tpool) =
+             Some (State.init stmts,
+                   Local_init_with_promises (promises_from_mem tid (Machine.mem m)))).
+  { i. rewrite TPOOL, FIND1. ss. }
+  assert (OUT: forall tid st lc
+                 (FIND1: IdMap.find tid p = None)
+                 (FIND2: IdMap.find tid m.(Machine.tpool) = Some (st, lc)),
+             State.is_terminal st /\ Promises.is_empty lc.(Local.promises)).
+  { i. rewrite TPOOL, FIND1 in FIND2. ss. }
+
+  clear TPOOL.
+  setoid_rewrite IdMap.elements_spec in IN at 1.
+  setoid_rewrite IdMap.elements_spec in OUT at 1.
+  generalize (IdMap.elements_3w p). intro NODUP. revert NODUP.
+  revert IN OUT. generalize (IdMap.elements p). intro ps.
+  revert m MEM0. induction ps; ss.
+  { i. esplits; eauto. }
+  i.
+
+  destruct a as [tid stmts].
+  exploit (IN tid); eauto.
+  { destruct (equiv_dec tid tid); [|congr]. ss. }
+  intro FIND.
+  cut (exists st2 lc2,
+          <<STEP: rtc (ExecUnit.step tid)
+                      (ExecUnit.mk
+                         (State.init stmts)
+                         (Local_init_with_promises (promises_from_mem tid (Machine.mem m)))
+                         (Machine.mem m))
+                      (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
+          <<TERMINAL: State.is_terminal st2 /\ Promises.is_empty lc2.(Local.promises)>>).
+  { i. des. subst.
+    exploit rtc_eu_step_machine_step0; try exact STEP; eauto. i.
+    exploit (IHps (Machine.mk
+                     (IdMap.add tid (st2, lc2) (Machine.tpool m))
+                     (Machine.mem m))); ss.
+    { i. rewrite IdMap.add_spec. condtac; ss.
+      - inversion e. subst. inv NODUP. contradict H2.
+        revert H. clear. induction ps; ss. destruct a.
+        destruct (equiv_dec tid k); ss.
+        + inv e. left. ss.
+        + i. right. apply IHps. ss.
+      - apply IN. destruct (equiv_dec tid0 tid); ss.
+    }
+    { i. revert FIND2. rewrite IdMap.add_spec. condtac.
+      - i. inv FIND2. inversion e. eauto.
+      - apply OUT. destruct (equiv_dec tid0 tid); ss.
+    }
+    { inv NODUP. ss. }
+    i. des. esplits; cycle 1; eauto. etrans; eauto.
+  }
+  clear NODUP IN OUT IHps ps.
+
+  (* Execute a thread `tid`. *)
   admit.
 Admitted.

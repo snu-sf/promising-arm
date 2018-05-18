@@ -42,6 +42,15 @@ Module Machine.
       (IdMap.map (fun stmts => (State.init stmts, Local.init)) p)
       Memory.empty.
 
+  Inductive is_terminal (m:t): Prop :=
+  | is_terminal_intro
+      (TERMINAL:
+         forall tid st lc
+           (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
+           State.is_terminal st /\ Promises.is_empty lc.(Local.promises))
+  .
+  Hint Constructors is_terminal.
+
   Inductive step0 (m1 m2:t): Prop :=
   | step0_intro
       tid st1 lc1 st2 lc2
@@ -76,7 +85,7 @@ Module Machine.
   .
   Hint Constructors step.
 
-  Lemma step0_step m1 m2
+  Lemma rtc_step0_step m1 m2
         (STEP: rtc step0 m1 m2)
         (NOPROMISE: no_promise m2):
     rtc step m1 m2.
