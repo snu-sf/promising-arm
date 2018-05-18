@@ -1,6 +1,8 @@
 Require Import sflib.
 Require Import Relations.
 Require Import EquivDec.
+Require Import Equality.
+Require Import FMapPositive.
 
 Require Import Order.
 Require Import Time.
@@ -92,4 +94,30 @@ Module Machine.
   Proof.
     induction STEP; [refl|]. econs; eauto.
   Qed.
+
+  Lemma rtc_eu_step_step0
+        tid m st1 lc1 mem1 st2 lc2 mem2
+        (FIND: IdMap.find tid m.(tpool) = Some (st1, lc1))
+        (MEM: m.(mem) = mem1)
+        (EX: rtc (ExecUnit.step tid)
+                 (ExecUnit.mk st1 lc1 mem1)
+                 (ExecUnit.mk st2 lc2 mem2)):
+    rtc step0
+        m
+        (mk
+           (IdMap.add tid (st2, lc2) m.(tpool))
+           mem2).
+  Proof.
+    revert m FIND MEM.
+    depind EX.
+    { i. subst. destruct m. s. rewrite PositiveMapAdditionalFacts.gsident; ss. refl. }
+    destruct y. i. subst. econs.
+    - instantiate (1 := mk _ _). econs; ss; eauto.
+    - exploit IHEX; eauto.
+      + instantiate (1 := mk _ _). s.
+        rewrite IdMap.add_spec. condtac; eauto. exfalso. apply c. ss.
+      + ss.
+      + s. rewrite (IdMap.add_add tid (st2, lc2)). eauto.
+  Qed.
+  
 End Machine.

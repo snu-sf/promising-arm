@@ -70,6 +70,12 @@ Module IdMap.
       apply elements_2 in FIND'. congr.
   Qed.
 
+  Lemma add_add A i v1 v2 (m:t A):
+    add i v1 (add i v2 m) = add i v1 m.
+  Proof.
+    revert m. induction i; destruct m; ss; try congruence.
+  Qed.
+
   Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
   | opt_pred_None:
       opt_pred pred None None

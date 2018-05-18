@@ -207,41 +207,6 @@ Proof.
   - ss.
 Qed.
 
-(* TODO: move *)
-Lemma IdMap_add_add A i v1 v2 (m:IdMap.t A):
-  IdMap.add i v1 (IdMap.add i v2 m) = IdMap.add i v1 m.
-Proof.
-  revert m. induction i; destruct m; ss; try congruence.
-Qed.
-
-(* TODO: move *)
-Lemma rtc_eu_step_machine_step0
-      tid m st1 lc1 mem1 st2 lc2 mem2
-      (FIND: IdMap.find tid m.(Machine.tpool) = Some (st1, lc1))
-      (MEM: m.(Machine.mem) = mem1)
-      (EX: rtc (ExecUnit.step tid)
-               (ExecUnit.mk st1 lc1 mem1)
-               (ExecUnit.mk st2 lc2 mem2)):
-  rtc Machine.step0
-      m
-      (Machine.mk
-         (IdMap.add tid (st2, lc2) m.(Machine.tpool))
-         mem2).
-Proof.
-  revert m FIND MEM.
-  (* TODO: move *)
-  Require Import Coq.Program.Equality.
-  depind EX.
-  { i. subst. destruct m. s. rewrite PositiveMapAdditionalFacts.gsident; ss. refl. }
-  destruct y. i. subst. econs.
-  - instantiate (1 := Machine.mk _ _). econs; ss; eauto.
-  - exploit IHEX; eauto.
-    + instantiate (1 := Machine.mk _ _). s.
-      rewrite IdMap.add_spec. condtac; eauto. exfalso. apply c. ss.
-    + ss.
-    + s. rewrite (IdMap_add_add tid (st2, lc2)). eauto.
-Qed.
-
 Theorem axiomatic_to_promising
       p ex
       (VALID: is_valid p ex):
@@ -316,7 +281,7 @@ Proof.
                       (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
           <<TERMINAL: State.is_terminal st2 /\ Promises.is_empty lc2.(Local.promises)>>).
   { i. des. subst.
-    exploit rtc_eu_step_machine_step0; try exact STEP; eauto. i.
+    exploit Machine.rtc_eu_step_step0; try exact STEP; eauto. i.
     exploit (IHps (Machine.mk
                      (IdMap.add tid (st2, lc2) (Machine.tpool m))
                      (Machine.mem m))); ss.
