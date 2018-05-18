@@ -51,6 +51,25 @@ Module IdMap.
       intro X. inv X. congr.
   Qed.
 
+  Lemma elements_spec A id (am:t A):
+    find id am = SetoidList.findA (fun id' => if id == id' then true else false) (elements am).
+  Proof.
+    generalize (elements_3w am).
+    destruct (find id am) eqn:FIND.
+    - apply elements_correct in FIND. revert FIND.
+      induction (elements am); ss. i. des.
+      + subst. destruct (equiv_dec id id); ss. congr.
+      + destruct a0; ss. inv H. rewrite <- IHl; eauto.
+        destruct (equiv_dec id k); ss. inv e.
+        exfalso. apply H2. apply SetoidList.InA_alt. esplits; eauto. econs.
+    - match goal with
+      | [|- context[_ = ?f]] => destruct f eqn:FIND'
+      end; ss.
+      i. eapply SetoidList.findA_NoDupA in FIND'; eauto; cycle 1.
+      { apply eq_equivalence. }
+      apply elements_2 in FIND'. congr.
+  Qed.
+
   Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
   | opt_pred_None:
       opt_pred pred None None

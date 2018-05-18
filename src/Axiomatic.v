@@ -184,11 +184,94 @@ Module Execution.
       ex.(labels)
       [].
 
+  (* TODO: move *)
+  Lemma SetoidList_findA_rev
+        (A B : Type) (eqA : A -> A -> Prop)
+        (EQUIV: Equivalence eqA)
+        (eqA_dec : forall x y : A, {eqA x y} + {~ eqA x y})
+        (l : list (A * B)) 
+        (a : A) (b : B)
+        (NODUP: SetoidList.NoDupA (fun p p' : A * B => eqA (fst p) (fst p')) l):
+    SetoidList.findA (fun a' : A => if eqA_dec a a' then true else false) l =
+    SetoidList.findA (fun a' : A => if eqA_dec a a' then true else false) (List.rev l).
+  Proof.
+    hexploit SetoidList.NoDupA_rev; try exact NODUP; [|i].
+    { econs; ii.
+      - refl.
+      - symmetry. ss.
+      - etrans; eauto.
+    }
+
+    match goal with
+    | [|- ?f = _] => destruct f eqn:FIND
+    end.
+    { rewrite <- SetoidList.findA_NoDupA in FIND; ss.
+      rewrite <- SetoidList.InA_rev in FIND.
+      rewrite SetoidList.findA_NoDupA in FIND; ss.
+      eauto.
+    }
+
+    match goal with
+    | [|- _ = ?f] => destruct f eqn:FIND'
+    end.
+    { rewrite <- SetoidList.findA_NoDupA in FIND'; ss.
+      rewrite SetoidList.InA_rev in FIND'.
+      rewrite SetoidList.findA_NoDupA in FIND'; ss.
+      rewrite FIND' in FIND. congr.
+    }
+
+    ss.
+  Qed.
+
   Lemma eids_spec ex:
     <<LABEL: forall eid, label eid ex <> None <-> List.In eid (eids ex)>> /\
     <<NODUP: List.NoDup (eids ex)>>.
   Proof.
-  Admitted.
+    generalize (PositiveMap.elements_3w (labels ex)). intro NODUP.
+    hexploit SetoidList.NoDupA_rev; eauto.
+    { apply IdMap.eqk_equiv. }
+    intro NODUP_REV. splits.
+    - (* LABEL *)
+      i. destruct eid. unfold label, eids. s.
+      rewrite IdMap.fold_1, <- List.fold_left_rev_right, IdMap.elements_spec.
+      rewrite SetoidList_findA_rev; eauto; cycle 1.
+      { apply eq_equivalence. }
+      { apply []. }
+      revert NODUP_REV. induction (List.rev (IdMap.elements (labels ex))); ss.
+      destruct a. i. inv NODUP_REV. s. rewrite List.in_app_iff, <- IHl; ss.
+      match goal with
+      | [|- context[if ?c then true else false]] => destruct c
+      end; ss; i; cycle 1.
+      { econs; eauto. i. des; ss.
+        apply List.in_map_iff in H. des. inv H. congr.
+      }
+      inv e. rewrite List.nth_error_Some, List.in_map_iff.
+      econs; i; des.
+      + left. esplits; eauto. apply HahnList.in_seq0_iff. ss.
+      + inv H. apply HahnList.in_seq0_iff. ss.
+      + revert H.
+        match goal with
+        | [|- context[match ?f with Some _ => _ | None => _ end]] => destruct f eqn:FIND
+        end; ss.
+        apply SetoidList.findA_NoDupA in FIND; ss; cycle 1.
+        { apply eq_equivalence. }
+        exfalso. apply H1. revert FIND. clear. induction l; i; inv FIND.
+        * destruct a. ss. des. inv H0. left. ss.
+        * right. apply IHl. ss.
+    - (* NODUP *)
+      unfold eids. rewrite IdMap.fold_1, <- List.fold_left_rev_right.
+      revert NODUP_REV. induction (List.rev (IdMap.elements (labels ex))); ss. i.
+      inv NODUP_REV. destruct a. s.
+      apply HahnList.nodup_app. splits; eauto.
+      + apply FinFun.Injective_map_NoDup.
+        * ii. inv H. ss.
+        * apply List.seq_NoDup.
+      + ii. apply List.in_map_iff in IN1. des. subst.
+        apply H1. revert IN2. clear. induction l; ss.
+        i. apply List.in_app_iff in IN2. des.
+        * apply List.in_map_iff in IN2. des. inv IN2. left. ss.
+        * right. eauto.
+  Qed.
 
   Inductive label_is (ex:t) (pred:Label.t -> Prop) (eid:eidT): Prop :=
   | label_is_intro

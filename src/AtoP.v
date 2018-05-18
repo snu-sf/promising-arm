@@ -80,11 +80,6 @@ Inductive sim (ex:Execution.t) (m: Machine.t): Prop :=
 | sim_intro
     eids
     (EIDS: Permutation eids (Execution.eids ex))
-    (OB: forall i j x y
-           (X: List.nth_error eids i = Some x)
-           (X: List.nth_error eids j = Some y)
-           (OB: ex.(Execution.ob) x y),
-        i < j)
     (MEM: m.(Machine.mem) = mem_of_ex ex eids)
 .
 Hint Constructors sim.
