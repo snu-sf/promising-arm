@@ -178,6 +178,18 @@ Module Execution.
     | Some labels => List.nth_error labels eid.(snd)
     end.
 
+  Definition eids (ex:t): list eidT :=
+    IdMap.fold
+      (fun tid local eids => (List.map (fun i => (tid, i)) (List.seq 0 (List.length local))) ++ eids)
+      ex.(labels)
+      [].
+
+  Lemma eids_spec ex:
+    <<LABEL: forall eid, label eid ex <> None <-> List.In eid (eids ex)>> /\
+    <<NODUP: List.NoDup (eids ex)>>.
+  Proof.
+  Admitted.
+
   Inductive label_is (ex:t) (pred:Label.t -> Prop) (eid:eidT): Prop :=
   | label_is_intro
       l

@@ -17,6 +17,17 @@ Module Id := Pos.
 Module IdMap.
   Include PositiveMap.
 
+  Lemma map_spec
+        A B (f: A -> B) am id:
+    find id (map f am) = option_map f (find id am).
+  Proof.
+    destruct (find id am) eqn:FIND; s.
+    - eapply map_1 in FIND; eauto.
+    - destruct (find id (map f am)) eqn:FIND'; ss.
+      exploit map_2; [by econs; eauto|].
+      intro X. inv X. congr.
+  Qed.
+
   Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
   | opt_pred_None:
       opt_pred pred None None
@@ -28,8 +39,8 @@ Module IdMap.
 
   Definition for_all A B
              (pred: A -> B -> Prop)
-             (a: IdMap.t A)
-             (b: IdMap.t B)
+             (a: t A)
+             (b: t B)
     : Prop :=
     forall id, opt_pred pred (find id a) (find id b).
 End IdMap.

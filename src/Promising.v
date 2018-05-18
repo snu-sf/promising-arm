@@ -42,24 +42,45 @@ Module Machine.
       (IdMap.map (fun stmts => (State.init stmts, Local.init)) p)
       Memory.empty.
 
-  Inductive step (th1 th2:t): Prop :=
-  | step_intro
+  Inductive step0 (m1 m2:t): Prop :=
+  | step0_intro
       tid st1 lc1 st2 lc2
-      (FIND: IdMap.find tid th1.(tpool) = Some (st1, lc1))
-      (STEP: ExecUnit.step tid (ExecUnit.mk st1 lc1 th1.(mem)) (ExecUnit.mk st2 lc2 th2.(mem)))
-      (ADD: th2.(tpool) = IdMap.add tid (st2, lc2) th1.(tpool))
+      (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
+      (STEP: ExecUnit.step tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
+      (ADD: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
+  .
+  Hint Constructors step0.
+
+  Inductive no_promise (m:t): Prop :=
+  | no_promise_intro
+      (PROMISES:
+         forall tid st lc
+           (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
+           Promises.is_empty lc.(Local.promises))
+  .
+  Hint Constructors no_promise.
+
+  (* The "global" consistency condition: in certification, machine may take any thread's steps. *)
+  Inductive consistent (m:t): Prop :=
+  | consistent_intro
+      m'
+      (STEP: rtc step0 m m')
+      (NOPROMISE: no_promise m')
+  .
+  Hint Constructors consistent.
+
+  Inductive step (m1 m2:t): Prop :=
+  | step_intro
+      (STEP: step0 m1 m2)
+      (CONSISTENT: consistent m2)
   .
   Hint Constructors step.
 
-  (* The consistency condition for the "lazy" semantics. *)
-  Inductive consistent (th:t): Prop :=
-  | consistent_intro
-      th'
-      (STEP: rtc step th th')
-      (PROMISES:
-         forall tid st lc
-           (FIND: IdMap.find tid th'.(tpool) = Some (st, lc)),
-           Promises.is_empty lc.(Local.promises))
-  .
-  Hint Constructors consistent.
+  Lemma step0_step m1 m2
+        (STEP: rtc step0 m1 m2)
+        (NOPROMISE: no_promise m2):
+    rtc step m1 m2.
+  Proof.
+    induction STEP; [refl|]. econs; eauto.
+  Qed.
 End Machine.
