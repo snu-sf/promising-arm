@@ -53,7 +53,7 @@ Fixpoint filter_map A B (f: A -> option B) (l: list A): list B :=
     end
   end.
 
-Definition construct_mem
+Definition mem_of_ex
            (ex:Execution.t)
            (eids:list eidT):
   Memory.t :=
@@ -65,6 +65,17 @@ Definition construct_mem
        end)
     eids.
 
+Definition promises_from_mem
+           (tid: Id.t) (mem: Memory.t): Promises.t :=
+  Promises.empty. (* TODO *)
+
+Definition Local_init_with_promises
+           (promises: Promises.t): Local.t :=
+  Local.mk bot bot bot bot bot bot bot
+           (fun _ => None)
+           bot
+           promises.
+
 Inductive sim (ex:Execution.t) (m: Machine.t): Prop :=
 | sim_intro
     eids
@@ -74,7 +85,7 @@ Inductive sim (ex:Execution.t) (m: Machine.t): Prop :=
            (X: List.nth_error eids j = Some y)
            (OB: ex.(Execution.ob) x y),
         i < j)
-    (MEM: m.(Machine.mem) = construct_mem ex eids)
+    (MEM: m.(Machine.mem) = mem_of_ex ex eids)
 .
 Hint Constructors sim.
 
@@ -83,11 +94,15 @@ Lemma promise_mem
       (MEM: forall msg (MSG: List.In msg mem), IdMap.find msg.(Msg.tid) p <> None):
   exists m,
     <<STEP: rtc Machine.step0 (Machine.init p) m>> /\
-    <<TPOOL: m.(Machine.tpool) = (Machine.init p).(Machine.tpool)>> /\ (* TODO: Local.promises.. *)
+    <<TPOOL: forall tid, IdMap.find tid m.(Machine.tpool) =
+                    option_map
+                      (fun stmts => (State.init stmts,
+                                  Local_init_with_promises (promises_from_mem tid m.(Machine.mem))))
+                      (IdMap.find tid p)>> /\
     <<MEM: m.(Machine.mem) = mem>>.
 Proof.
   revert MEM. induction mem using List.rev_ind; i.
-  { esplits; eauto. }
+  { esplits; eauto. apply IdMap.map_spec. }
   exploit IHmem; eauto.
   { i. apply MEM. apply List.in_app_iff. intuition. }
   i. des. subst. destruct x.
@@ -100,10 +115,14 @@ Proof.
   eexists (Machine.mk _ _). esplits.
   - etrans; [eauto|]. econs 2; [|refl].
     econs.
-    + rewrite TPOOL, IdMap.map_spec, FIND. ss.
+    + rewrite TPOOL, FIND. ss.
     + econs 2; ss. econs; eauto. ss.
     + ss.
-  - admit. (* Local.promises is updated *)
+  - s. i. rewrite IdMap.add_spec. condtac; ss.
+    + inversion e. subst. rewrite FIND. s.
+      unfold Local_init_with_promises. repeat f_equal.
+      admit.
+    + rewrite TPOOL. ss.
   - ss.
 Admitted.
 
@@ -118,7 +137,7 @@ Proof.
   exploit (linearize (Execution.eids ex)).
   { inv AXIOMATIC. apply EXTERNAL. }
   i. des. rename l' into eids.
-  remember (construct_mem ex eids) as mem eqn:MEM.
+  remember (mem_of_ex ex eids) as mem eqn:MEM.
 
   (* Construct promise steps. *)
   exploit (promise_mem p mem); eauto.

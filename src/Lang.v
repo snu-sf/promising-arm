@@ -17,6 +17,17 @@ Module Id := Pos.
 Module IdMap.
   Include PositiveMap.
 
+  Lemma add_spec
+        A id' id (a:A) am:
+    find id' (add id a am) =
+    if id' == id
+    then Some a
+    else find id' am.
+  Proof.
+    erewrite PositiveMapAdditionalFacts.gsspec; eauto.
+    repeat condtac; ss.
+  Qed.
+
   Lemma map_spec
         A B (f: A -> B) am id:
     find id (map f am) = option_map f (find id am).
@@ -25,6 +36,18 @@ Module IdMap.
     - eapply map_1 in FIND; eauto.
     - destruct (find id (map f am)) eqn:FIND'; ss.
       exploit map_2; [by econs; eauto|].
+      intro X. inv X. congr.
+  Qed.
+
+  Lemma mapi_spec
+        A B (f: key -> A -> B) am id:
+    find id (mapi f am) = option_map (f id) (find id am).
+  Proof.
+    destruct (find id am) eqn:FIND; s.
+    - eapply mapi_1 in FIND; eauto. des.
+      inv FIND. inv FIND0. eauto.
+    - destruct (find id (mapi f am)) eqn:FIND'; ss.
+      exploit mapi_2; [by econs; eauto|].
       intro X. inv X. congr.
   Qed.
 
