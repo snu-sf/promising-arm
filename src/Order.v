@@ -7,9 +7,6 @@ Require Import EquivDec.
 Require Import List.
 Require Import sflib.
 
-(* TODO: it's an axiom. *)
-Require Import ProofIrrelevance.
-
 Set Implicit Arguments.
 
 
