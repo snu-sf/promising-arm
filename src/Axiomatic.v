@@ -390,29 +390,30 @@ Definition tid_join
       <<REL: rel x.(snd) y.(snd)>>.
 Hint Unfold tid_join.
 
-Inductive is_valid_pre (p:program) (ex:Execution.t): Prop :=
-| is_valid_pre_intro
-    locals
-    (LOCALS: IdMap.for_all
-               (fun stmts local =>
-                  exists state,
-                    <<STEP: rtc AExecUnit.step
-                                (AExecUnit.mk (State.init stmts) ALocal.init)
-                                (AExecUnit.mk state local)>> /\
-                    <<TERMINAL: State.is_terminal state>>)
-               p locals)
-    (LABELS: ex.(Execution.labels) = IdMap.map (fun local => local.(ALocal.labels)) locals)
-    (PO: ex.(Execution.po) = tid_join (IdMap.map
-                               (fun local =>
-                                  fun x y =>
-                                    0 <= x /\
-                                    x < y /\
-                                    y < List.length local.(ALocal.labels))
-                               locals))
-    (ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals))
-    (DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals))
-    (CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals))
-    (RMW: forall eid1 ord1 loc val1
+Module Valid.
+  Inductive pre_ex (p:program) (ex:Execution.t) := mk_pre_ex {
+    locals: IdMap.t ALocal.t;
+
+    LOCALS: IdMap.for_all
+              (fun stmts local =>
+                 exists state,
+                   <<STEP: rtc AExecUnit.step
+                               (AExecUnit.mk (State.init stmts) ALocal.init)
+                               (AExecUnit.mk state local)>> /\
+                   <<TERMINAL: State.is_terminal state>>)
+              p locals;
+    LABELS: ex.(Execution.labels) = IdMap.map (fun local => local.(ALocal.labels)) locals;
+    PO: ex.(Execution.po) = tid_join (IdMap.map
+                                        (fun local =>
+                                           fun x y =>
+                                             0 <= x /\
+                                             x < y /\
+                                             y < List.length local.(ALocal.labels))
+                                        locals);
+    ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals);
+    DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals);
+    CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals);
+    RMW: forall eid1 ord1 loc val1
            (LABEL1: Execution.label eid1 ex = Some (Label.write true ord1 loc val1)),
         exists eid2 ord2 val2,
           <<LABEL: Execution.label eid2 ex = Some (Label.read true ord2 loc val2)>> /\
@@ -422,27 +423,29 @@ Inductive is_valid_pre (p:program) (ex:Execution.t): Prop :=
                    (PO23: ex.(Execution.po) eid2 eid3)
                    (PO31: ex.(Execution.po) eid3 eid1)
                    (LABEL3: Execution.label eid3 ex = Some label3),
-              Label.is_ex label3 = false>>)
-.
-Hint Constructors is_valid_pre.
+              Label.is_ex label3 = false>>;
+  }.
+  Hint Constructors pre_ex.
 
-Inductive is_valid (p:program) (ex:Execution.t): Prop :=
-| is_valid_intro
-    (PRE: is_valid_pre p ex)
-    (CO: forall loc
-           eid1 ex1 ord1 val1
-           eid2 ex2 ord2 val2
-           (EID: eid1 <> eid2)
-           (LABEL1: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1))
-           (LABEL2: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)),
-        ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1)
-    (RF: forall eid1 ex1 ord1 loc val
-           (LABEL1: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
+  Inductive ex (p:program) (ex:Execution.t) := mk_ex {
+    PRE: pre_ex p ex;
+    CO: forall loc
+          eid1 ex1 ord1 val1
+          eid2 ex2 ord2 val2
+          (EID: eid1 <> eid2)
+          (LABEL1: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1))
+          (LABEL2: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)),
+        ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1;
+    RF: forall eid1 ex1 ord1 loc val
+          (LABEL1: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
         exists eid2 ex2 ord2,
           <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
-          <<RF: ex.(Execution.rf) eid2 eid1>>)
-    (INTERNAL: acyclic ex.(Execution.internal))
-    (EXTERNAL: acyclic ex.(Execution.ob))
-    (ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot)
-.
-Hint Constructors is_valid.
+          <<RF: ex.(Execution.rf) eid2 eid1>>;
+    INTERNAL: acyclic ex.(Execution.internal);
+    EXTERNAL: acyclic ex.(Execution.ob);
+    ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
+  }.
+  Hint Constructors ex.
+End Valid.
+
+Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.
