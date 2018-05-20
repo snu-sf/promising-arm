@@ -62,11 +62,17 @@ Module Label.
     | _ => false
     end.
 
-  Definition is_accessing (label:t): option Loc.t :=
+  Definition is_writing (loc:Loc.t) (label:t): bool :=
     match label with
-    | read _ _ loc _ => Some loc
-    | write _ _ loc _ => Some loc
-    | barrier _ => None
+    | write _ _ loc' _ => loc' == loc
+    | _ => false
+    end.
+
+  Definition is_accessing (loc:Loc.t) (label:t): bool :=
+    match label with
+    | read _ _ loc' _ => loc' == loc
+    | write _ _ loc' _ => loc' == loc
+    | _ => false
     end.
 End Label.
 
@@ -291,8 +297,8 @@ Module Execution.
   Inductive label_loc (x y:Label.t): Prop :=
   | label_loc_intro
       loc
-      (X: Label.is_accessing x = Some loc)
-      (Y: Label.is_accessing y = Some loc)
+      (X: Label.is_accessing loc x)
+      (Y: Label.is_accessing loc y)
   .    
 
 (* let obs = rfe | fr | co *)
@@ -394,7 +400,7 @@ Module Valid.
   Inductive pre_ex (p:program) (ex:Execution.t) := mk_pre_ex {
     locals: IdMap.t ALocal.t;
 
-    LOCALS: IdMap.for_all
+    LOCALS: IdMap.Forall2
               (fun stmts local =>
                  exists state,
                    <<STEP: rtc AExecUnit.step
@@ -403,13 +409,7 @@ Module Valid.
                    <<TERMINAL: State.is_terminal state>>)
               p locals;
     LABELS: ex.(Execution.labels) = IdMap.map (fun local => local.(ALocal.labels)) locals;
-    PO: ex.(Execution.po) = tid_join (IdMap.map
-                                        (fun local =>
-                                           fun x y =>
-                                             0 <= x /\
-                                             x < y /\
-                                             y < List.length local.(ALocal.labels))
-                                        locals);
+    PO: ex.(Execution.po) = (fun eid1 eid2 => eid1.(fst) = eid2.(fst) /\ eid1.(snd) < eid2.(snd));
     ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals);
     DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals);
     CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals);

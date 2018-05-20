@@ -12,6 +12,17 @@ Require Import Time.
 
 Set Implicit Arguments.
 
+(* TODO: move *)
+Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
+| opt_pred_None:
+    opt_pred pred None None
+| opt_pred_Some
+    a b
+    (PRED: pred a b):
+    opt_pred pred (Some a) (Some b)
+.
+Hint Constructors opt_pred.
+
 Module Id := Pos.
 
 Module IdMap.
@@ -76,16 +87,7 @@ Module IdMap.
     revert m. induction i; destruct m; ss; try congruence.
   Qed.
 
-  Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
-  | opt_pred_None:
-      opt_pred pred None None
-  | opt_pred_Some
-      a b
-      (PRED: pred a b):
-      opt_pred pred (Some a) (Some b)
-  .
-
-  Definition for_all A B
+  Definition Forall2 A B
              (pred: A -> B -> Prop)
              (a: t A)
              (b: t B)

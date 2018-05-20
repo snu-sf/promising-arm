@@ -106,7 +106,7 @@ Proof.
 Defined.
 
 Definition promises_from_mem
-           (tid: Id.t) (mem: Memory.t): Promises.t.
+           (tid:Id.t) (mem: Memory.t): Promises.t.
 Proof.
   induction mem using list_rev_rect.
   - apply Promises.empty.
@@ -163,6 +163,170 @@ Inductive sim_mem (ex:Execution.t) (mem: Memory.t): Prop :=
     (MEM: mem = mem_of_ex ex eids)
 .
 Hint Constructors sim_mem.
+
+Inductive inverse A (rel:relation A) (codom:A -> Prop) (a:A): Prop :=
+| inverse_intro
+    a'
+    (REL: rel a a')
+    (CODOM: codom a')
+.
+
+Fixpoint view_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): View.t :=
+  match ob with
+  | [] => 0
+  | e::ob =>
+    (if match Execution.label e ex with
+        | Some label => Label.is_write label
+        | None => false
+        end
+     then 1
+     else 0) +
+    (if e == eid
+     then 0
+     else view_eid ex ob eid)
+  end.
+
+Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:View.t): Prop :=
+| sim_view_bot
+    (VIEW: view = bot)
+| sim_view_event
+    eid
+    (EID: eids eid)
+    (VIEW: le view (view_eid ex ob eid))
+.
+
+Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t)): Prop :=
+| sim_state_intro
+    (STMTS: astate.(State.stmts) = state.(State.stmts))
+    (RMAP: IdMap.Forall2
+             (fun avala vala =>
+                avala.(ValA.val) = vala.(ValA.val) /\
+                sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot))
+             astate.(State.rmap) state.(State.rmap))
+.
+Hint Constructors sim_state.
+
+Inductive sim_local (ex:Execution.t) (ob: list eidT) (eid:eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
+| sim_local_intro
+    (COH: forall loc,
+        sim_view
+          ex ob
+          (inverse
+             (⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾
+              ex.(Execution.rfe)^? ⨾
+              ex.(Execution.po))
+             (eq eid))
+          (local.(Local.coh) loc))
+    (VRP:
+       sim_view
+         ex ob
+         (inverse
+            ((ex.(Execution.po) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
+              ex.(Execution.po) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po))) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
+              (ex.(Execution.po))))
+            (eq eid))
+         local.(Local.vrp))
+    (VWP:
+       sim_view
+         ex ob
+         (inverse
+            ((ex.(Execution.po) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
+              ex.(Execution.po) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
+              ex.(Execution.po) ⨾
+              ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbst))⦘ ⨾
+              (ex.(Execution.po))) ∪
+
+             (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
+              (ex.(Execution.po))))
+            (eq eid))
+         local.(Local.vwp))
+    (VRM:
+       sim_view
+         ex ob
+         (inverse
+            (⦗ex.(Execution.label_is) (Label.is_read)⦘ ⨾ ex.(Execution.po))
+            (eq eid))
+         local.(Local.vrm))
+    (VWM:
+       sim_view
+         ex ob
+         (inverse
+            (⦗ex.(Execution.label_is) (Label.is_write)⦘ ⨾ ex.(Execution.po))
+            (eq eid))
+         local.(Local.vwm))
+    (VCAP:
+       sim_view
+         ex ob
+         (inverse
+            ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po))) ⨾ (ex.(Execution.po)))
+            (eq eid))
+         local.(Local.vcap))
+    (VREL:
+       sim_view
+         ex ob
+         (inverse
+            (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ ex.(Execution.po))
+            (eq eid))
+         local.(Local.vrel))
+.
+Hint Constructors sim_local.
+(* TODO: fwdbank, exbank, promises *)
+
+Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (iid:nat) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
+| sim_eu_intro
+    (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state))
+    (LOCAL: sim_local ex ob (tid, iid) aeu.(AExecUnit.local) eu.(ExecUnit.local))
+    (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
+.
+Hint Constructors sim_eu.
+
+Lemma sim_eu_step
+      tid ex ob iid aeu1 eu1 aeu2
+      (SIM: sim_eu tid ex ob iid aeu1 eu1)
+      (STEP: AExecUnit.step aeu1 aeu2):
+  exists eu2,
+    <<STEP: ExecUnit.step tid eu1 eu2>> /\
+    <<SIM: sim_eu tid ex ob (iid + 1) aeu2 eu2>>.
+Proof.
+  destruct eu1 as [state1 local1].
+  destruct aeu1 as [astate1 alocal1].
+  destruct aeu2 as [astate2 alocal2].
+Admitted.
+
+Lemma sim_eu_rtc_step
+      tid ex ob iid1 aeu1 eu1 aeu2
+      (SIM: sim_eu tid ex ob iid1 aeu1 eu1)
+      (STEP: rtc AExecUnit.step aeu1 aeu2):
+  exists iid2 eu2,
+    <<SIM: sim_eu tid ex ob iid2 aeu2 eu2>> /\
+    <<STEP: rtc (ExecUnit.step tid) eu1 eu2>>.
+Proof.
+  revert iid1 eu1 SIM. induction STEP.
+  { esplits; eauto. }
+  i. exploit sim_eu_step; eauto. i. des.
+  exploit IHSTEP; eauto. i. des.
+  esplits; eauto.
+Qed.
 
 Lemma promise_mem
       p mem
@@ -310,10 +474,31 @@ Proof.
   }
   generalize (P tid stmts). destruct (equiv_dec tid tid); [|congr].
   intro FINDP. specialize (FINDP eq_refl).
-  clear NODUP IN OUT P IHps ps e.
+  rewrite MEM0 in *.
+  clear NODUP IN OUT P IHps MEM0 FIND ps e m.
 
   (* Execute a thread `tid`. *)
   generalize (EX.(Valid.LOCALS) tid). rewrite FINDP.
-  intro X. inv X. des. rename b into local.
-  admit.
+  intro X. inv X. des. rename b into local, H into LOCAL. clear FINDP.
+  
+  (* aex: (init stmts, init) -> (state, local)
+   * ->
+   * pex: (init stmts, init w/ promises) -> (state', local')
+   * state ~= state': the same program state
+   * local ~= local': the simulation relation
+     - view: as @cp546 said
+     - promises: (promises_from_mem tid (Machine.mem m)) - (fulfilled promises in local.labels)
+       (finally we have to prove that (promises_from_mem tid (Machine.mem m)) = (fulfilled promises in local.labels))
+   *)
+
+  exploit (@sim_eu_rtc_step tid ex eids 0); eauto.
+  { instantiate (1 := ExecUnit.mk (State.init stmts) (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex eids))) (mem_of_ex ex eids)).
+    econs; ss.
+    - econs; ss. ii. rewrite ? IdMap.gempty. ss.
+    - admit. (* sim_local holds initially. *)
+  }
+  i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
+  esplits; eauto.
+  - unfold State.is_terminal in *. inv STATE. congr.
+  - admit. (* promises is empty. *)
 Admitted.
