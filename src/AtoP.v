@@ -303,6 +303,7 @@ Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (
 .
 Hint Constructors sim_eu.
 
+(* TODO: move *)
 Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
 | tid_lift_intro
     (TID1: eid1.(fst) = tid)
@@ -316,6 +317,8 @@ Lemma sim_eu_step
       (OB: Permutation ob (Execution.eids ex))
       (SIM: sim_eu tid ex ob aeu1 eu1)
       (STEP: AExecUnit.step aeu1 aeu2)
+      (LABEL: forall n label (LABEL: List.nth_error aeu2.(AExecUnit.local).(ALocal.labels) n = Some label),
+          Execution.label (tid, n) ex = Some label)
       (ADDR: tid_lift tid aeu2.(AExecUnit.local).(ALocal.addr) ⊆ ex.(Execution.addr))
       (DATA: tid_lift tid aeu2.(AExecUnit.local).(ALocal.data) ⊆ ex.(Execution.data))
       (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl)):
@@ -344,6 +347,18 @@ Proof.
       * admit. (* sim_state after rmap update *)
       * admit. (* sim_local is proper w.r.t. relations *)
   - (* read *)
+    exploit EX.(Valid.RF).
+    { eapply LABEL. rewrite List.nth_error_app2; [|refl].
+      rewrite Nat.sub_diag. ss.
+    }
+    i. des.
+
+    (* TODO:
+     *
+     * get timestamp of eid2.
+     * using the timestamp, construct step and simulation.
+     *
+     *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
       * econs; ss.
@@ -353,8 +368,15 @@ Proof.
   - (* write *)
     admit.
   - (* write_failure *)
-    admit.
-  - destruct b0; eexists (ExecUnit.mk _ _ _).
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs 4; ss.
+    + econs; ss.
+      * admit. (* sim_state after rmap update *)
+      * admit. (* sim_local after clearing fwdbank *)
+  - (* barrier *)
+    destruct b0; eexists (ExecUnit.mk _ _ _).
     + (* isb *)
       esplits.
       * econs; ss.
@@ -362,18 +384,31 @@ Proof.
         { econs 5; ss. }
       * admit. (* sim_eu *)
     + (* dmbst *)
-      admit.
+      esplits.
+      * econs; ss.
+        { econs; ss. }
+        { econs 6; ss. }
+      * admit. (* sim_eu *)
     + (* dmbld *)
-      admit.
+      esplits.
+      * econs; ss.
+        { econs; ss. }
+        { econs 7; ss. }
+      * admit. (* sim_eu *)
     + (* dmbsy *)
-      admit.
+      esplits.
+      * econs; ss.
+        { econs; ss. }
+        { econs 8; ss. }
+      * admit. (* sim_eu *)
   - (* if *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
       * econs; ss.
       * econs; ss.
     + econs; ss.
-      * admit. (* sem_expr calculates the same value *)
+      * econs; eauto.
+        admit. (* sem_expr calculates the same value *)
       * admit. (* sim_local *)
   - (* dowhile *)
     eexists (ExecUnit.mk _ _ _). esplits.
@@ -390,7 +425,7 @@ Lemma sim_eu_rtc_step
       (OB: Permutation ob (Execution.eids ex))
       (SIM: sim_eu tid ex ob aeu1 eu1)
       (STEP: rtc AExecUnit.step aeu1 aeu2)
-      (AEU: IdMap.find tid EX.(Valid.locals) = Some aeu2.(AExecUnit.local)):
+      (LOCAL: IdMap.find tid EX.(Valid.locals) = Some aeu2.(AExecUnit.local)):
   exists eu2,
     <<SIM: sim_eu tid ex ob aeu2 eu2>> /\
     <<STEP: rtc (ExecUnit.step tid) eu1 eu2>>.
@@ -401,22 +436,27 @@ Proof.
   assert (FUTURE: ALocal.future y.(AExecUnit.local) z.(AExecUnit.local)).
   { apply AExecUnit.rtc_step_future. ss. }
   exploit sim_eu_step; eauto.
+  { i. unfold Execution.label. s.
+    rewrite EX.(Valid.LABELS), IdMap.map_spec, LOCAL. s.
+    inv FUTURE. des. rewrite LABELS, List.nth_error_app1; ss.
+    apply List.nth_error_Some. congr.
+  }
   { rewrite EX.(Valid.ADDR).
     ii. destruct x0, y0. inv H0. ss. subst.
     econs; [eauto|eauto|s|s].
-    - rewrite IdMap.map_spec, AEU. ss.
+    - rewrite IdMap.map_spec, LOCAL. ss.
     - apply FUTURE. ss.
   }
   { rewrite EX.(Valid.DATA).
     ii. destruct x0, y0. inv H0. ss. subst.
     econs; [eauto|eauto|s|s].
-    - rewrite IdMap.map_spec, AEU. ss.
+    - rewrite IdMap.map_spec, LOCAL. ss.
     - apply FUTURE. ss.
   }
   { rewrite EX.(Valid.CTRL).
     ii. destruct x0, y0. inv H0. ss. subst.
     econs; [eauto|eauto|s|s].
-    - rewrite IdMap.map_spec, AEU. ss.
+    - rewrite IdMap.map_spec, LOCAL. ss.
     - apply FUTURE. ss.
   }
   i. des.
