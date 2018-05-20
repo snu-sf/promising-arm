@@ -171,29 +171,30 @@ Inductive inverse A (rel:relation A) (codom:A -> Prop) (a:A): Prop :=
     (CODOM: codom a')
 .
 
-Fixpoint view_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): View.t :=
+Fixpoint view_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option View.t :=
   match ob with
-  | [] => 0
+  | [] => None
   | e::ob =>
-    (if match Execution.label e ex with
-        | Some label => Label.is_write label
-        | None => false
-        end
-     then 1
-     else 0) +
-    (if e == eid
-     then 0
-     else view_eid ex ob eid)
+    option_map
+      (Nat.add match Execution.label e ex with
+               | Some label => if Label.is_write label then 1 else 0
+               | None => 0
+               end)
+      (if e == eid
+       then Some 0
+       else view_eid ex ob eid)
   end.
 
 Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:View.t): Prop :=
 | sim_view_bot
     (VIEW: view = bot)
 | sim_view_event
-    eid
+    eid v
     (EID: eids eid)
-    (VIEW: le view (view_eid ex ob eid))
+    (VIEW_EID: view_eid ex ob eid = Some v)
+    (VIEW: le view v)
 .
+Hint Constructors sim_view.
 
 Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t)): Prop :=
 | sim_state_intro
@@ -205,7 +206,6 @@ Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t 
              astate.(State.rmap) state.(State.rmap))
 .
 Hint Constructors sim_state.
-
 
 Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
 | sim_local_intro
@@ -302,14 +302,6 @@ Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (
     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
 .
 Hint Constructors sim_eu.
-
-(* TODO: move *)
-Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
-| tid_lift_intro
-    (TID1: eid1.(fst) = tid)
-    (TID1: eid2.(fst) = tid)
-    (REL: rel eid1.(snd) eid2.(snd))
-.
 
 Lemma sim_eu_step
       p ex ob tid aeu1 eu1 aeu2
@@ -441,23 +433,17 @@ Proof.
     inv FUTURE. des. rewrite LABELS, List.nth_error_app1; ss.
     apply List.nth_error_Some. congr.
   }
-  { rewrite EX.(Valid.ADDR).
-    ii. destruct x0, y0. inv H0. ss. subst.
-    econs; [eauto|eauto|s|s].
+  { rewrite EX.(Valid.ADDR). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - apply FUTURE. ss.
+    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
   }
-  { rewrite EX.(Valid.DATA).
-    ii. destruct x0, y0. inv H0. ss. subst.
-    econs; [eauto|eauto|s|s].
+  { rewrite EX.(Valid.DATA). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - apply FUTURE. ss.
+    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
   }
-  { rewrite EX.(Valid.CTRL).
-    ii. destruct x0, y0. inv H0. ss. subst.
-    econs; [eauto|eauto|s|s].
+  { rewrite EX.(Valid.CTRL). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - apply FUTURE. ss.
+    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
   }
   i. des.
   exploit IHSTEP; eauto. i. des.
@@ -488,7 +474,7 @@ Proof.
   hexploit MEM.
   { apply List.in_app_iff. right. left. eauto. }
   match goal with
-  | [|- context[?f]] => destruct f eqn:FIND
+  | [|- context[(?f <> None) -> _]] => destruct f eqn:FIND
   end; ss.
   intro X. clear X.
   eexists (Machine.mk _ _). esplits.

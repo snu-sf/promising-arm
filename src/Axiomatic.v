@@ -423,13 +423,27 @@ Module Execution.
     ex.(obs) ∪ ex.(dob) ∪ ex.(aob) ∪ ex.(bob).
 End Execution.
 
+Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
+| tid_lift_intro
+    (TID1: eid1.(fst) = tid)
+    (TID1: eid2.(fst) = tid)
+    (REL: rel eid1.(snd) eid2.(snd))
+.
+Hint Constructors tid_lift.
+
+Lemma tid_lift_incl
+      tid rel1 rel2
+      (REL: rel1 ⊆ rel2):
+  tid_lift tid rel1 ⊆ tid_lift tid rel2.
+Proof.
+  ii. inv H. econs; eauto.
+Qed.
+
 Inductive tid_join (rels: IdMap.t (relation nat)) (eid1 eid2:eidT): Prop :=
 | tid_join_intro
     tid rel
-    (TID1: eid1.(fst) = tid)
-    (TID2: eid2.(fst) = tid)
     (RELS: IdMap.find tid rels = Some rel)
-    (REL: rel eid1.(snd) eid2.(snd))
+    (REL: tid_lift tid rel eid1 eid2)
 .
 Hint Constructors tid_join.
 
