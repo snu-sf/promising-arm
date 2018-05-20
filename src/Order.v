@@ -202,6 +202,48 @@ Next Obligation.
   eauto using bot_spec.
 Qed.
 
+Program Instance fun_eq_partialorder A B `{_: orderC B eq}: @PartialOrder (A -> B) eq _ (fun_le (A:=A) (B:=B)) _.
+Next Obligation.
+  econs.
+  - i. subst. econs; refl.
+  - i. funext. i. antisym; apply H1.
+Qed.
+
+Program Instance fun_eq_order A B `{_: orderC B eq}:
+  @orderC
+    (A -> B)
+    eq
+    (fun_le (A:=A) (B:=B))
+    (fun_join (A:=A) (B:=B))
+    (fun_bot (A:=A) (B:=B))
+    eq_equivalence
+    (fun_preorder A B)
+    (fun_eq_partialorder A B).
+Next Obligation.
+  unfold fun_le, fun_join, fun_bot.
+  ii. apply join_l.
+Qed.
+Next Obligation.
+  unfold fun_le, fun_join, fun_bot.
+  ii. apply join_r.
+Qed.
+Next Obligation.
+  unfold fun_le, fun_join, fun_bot.
+  funext. eauto using join_assoc.
+Qed.
+Next Obligation.
+  unfold fun_le, fun_join, fun_bot.
+  funext. eauto using join_comm.
+Qed.
+Next Obligation.
+  unfold fun_le, fun_join.
+  eauto using join_spec.
+Qed.
+Next Obligation.
+  unfold fun_le, fun_join, fun_bot.
+  eauto using bot_spec.
+Qed.
+
 
 Inductive opt_eq X `{_: Equivalence X}: forall (a b: option X), Prop :=
 | opt_eq_None: opt_eq None None

@@ -82,71 +82,91 @@ Module ALocal.
     addr: relation nat;
     data: relation nat;
     ctrl: relation nat;
-    ctrl_src: nat -> Prop;
   }.
   Hint Constructors t.
 
-  Definition init: t := mk [] bot bot bot bot.
+  Definition init: t := mk [] bot bot bot.
 
   Definition next_eid (eu:t): nat :=
     List.length eu.(labels).
 
-  Inductive step (event:Event.t (A:=nat -> Prop)) (ctor1:t) (ctor2:t): Prop :=
+  Inductive step (event:Event.t (A:=nat -> Prop)) (alocal1:t) (alocal2:t): Prop :=
   | step_internal
-      (EVENT: event = Event.internal)
-      (CTOR: ctor2 = ctor1)
+      ctrl_e
+      (EVENT: event = (Event.internal ctrl_e))
+      (ALOCAL: alocal2 =
+               mk
+                 alocal1.(labels)
+                 alocal1.(addr)
+                 alocal1.(data)
+                 (alocal1.(ctrl) ∪ (ctrl_e × (le (next_eid alocal1)))))
   | step_read
       ex ord vloc res
-      (EVENT: event = Event.read ex ord vloc (ValA.mk _ res (eq (next_eid ctor1))))
-      (CTOR: ctor2 =
-             mk
-               (ctor1.(labels) ++ [Label.read ex ord vloc.(ValA.val) res])
-               (ctor1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid ctor1))))
-               ctor1.(data)
-               (ctor1.(ctrl) ∪ (ctor1.(ctrl_src) × (eq (next_eid ctor1))))
-               ctor1.(ctrl_src))
+      (EVENT: event = Event.read ex ord vloc (ValA.mk _ res (eq (next_eid alocal1))))
+      (ALOCAL: alocal2 =
+               mk
+                 (alocal1.(labels) ++ [Label.read ex ord vloc.(ValA.val) res])
+                 (alocal1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid alocal1))))
+                 alocal1.(data)
+                 alocal1.(ctrl))
   | step_write
       ex ord vloc vval
-      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (eq (next_eid ctor1))))
-      (CTOR: ctor2 =
-             mk
-               (ctor1.(labels) ++ [Label.write ex ord vloc.(ValA.val) vval.(ValA.val)])
-               (ctor1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid ctor1))))
-               (ctor1.(data) ∪ (vval.(ValA.annot) × (eq (next_eid ctor1))))
-               (ctor1.(ctrl) ∪ (ctor1.(ctrl_src) × (eq (next_eid ctor1))))
-               ctor1.(ctrl_src))
+      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (eq (next_eid alocal1))))
+      (ALOCAL: alocal2 =
+               mk
+                 (alocal1.(labels) ++ [Label.write ex ord vloc.(ValA.val) vval.(ValA.val)])
+                 (alocal1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid alocal1))))
+                 (alocal1.(data) ∪ (vval.(ValA.annot) × (eq (next_eid alocal1))))
+                 alocal1.(ctrl))
   | step_write_failure
       ord vloc vval
       (EVENT: event = Event.write true ord vloc vval (ValA.mk _ 1 bot))
-      (CTOR: ctor2 =
-             mk
-               ctor1.(labels)
-               ctor1.(addr)
-               ctor1.(data)
-               ctor1.(ctrl)
-               ctor1.(ctrl_src))
+      (ALOCAL: alocal2 =
+               mk
+                 alocal1.(labels)
+                 alocal1.(addr)
+                 alocal1.(data)
+                 alocal1.(ctrl))
   | step_barrier
       b
       (EVENT: event = Event.barrier b)
-      (CTOR: ctor2 =
-             mk
-               (ctor1.(labels) ++ [Label.barrier b])
-               ctor1.(addr)
-               ctor1.(data)
-               ctor1.(ctrl)
-               ctor1.(ctrl_src))
-  | step_ctrl
-      src
-      (EVENT: event = Event.ctrl src)
-      (CTOR: ctor2 =
-             mk
-               ctor1.(labels)
-               ctor1.(addr)
-               ctor1.(data)
-               ctor1.(ctrl)
-               ((ctor1.(ctrl_src)) \1/ (src)))
+      (ALOCAL: alocal2 =
+               mk
+                 (alocal1.(labels) ++ [Label.barrier b])
+                 alocal1.(addr)
+                 alocal1.(data)
+                 alocal1.(ctrl))
   .
   Hint Constructors step.
+
+  Inductive future (alocal1 alocal2:t): Prop :=
+  | future_intro
+      (LABELS: exists l, alocal2.(labels) = alocal1.(labels) ++ l)
+      (ADDR: alocal1.(addr) ⊆ alocal2.(addr))
+      (DATA: alocal1.(data) ⊆ alocal2.(data))
+      (CTRL: alocal1.(ctrl) ⊆ alocal2.(ctrl))
+  .
+
+  Global Program Instance future_preorder: PreOrder future.
+  Next Obligation.
+    ii. econs.
+    all: try by exists []; rewrite List.app_nil_r.
+    all: try by apply inclusion_refl.
+  Qed.
+  Next Obligation.
+    ii. inv H; inv H0. econs.
+    all: try by eapply inclusion_trans; eauto.
+    des. rewrite LABELS0, LABELS. rewrite <- List.app_assoc. eexists; eauto.
+  Qed.
+
+  Lemma step_future e:
+    step e <2= future.
+  Proof.
+    i. inv PR; econs; ss.
+    all: try by eexists; eauto.
+    all: try by exists []; rewrite List.app_nil_r.
+    all: try by apply inclusion_union_r1.
+  Qed.
 End ALocal.
 
 Module AExecUnit.
@@ -162,6 +182,24 @@ Module AExecUnit.
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: ALocal.step e eu1.(local) eu2.(local))
   .
+
+  Lemma step_future
+        eu1 eu2
+        (STEP: step eu1 eu2):
+    ALocal.future eu1.(local) eu2.(local).
+  Proof.
+    inv STEP. eapply ALocal.step_future. eauto.
+  Qed.
+
+  Lemma rtc_step_future
+        eu1 eu2
+        (STEP: rtc step eu1 eu2):
+    ALocal.future eu1.(local) eu2.(local).
+  Proof.
+    induction STEP; eauto.
+    - refl.
+    - etrans; eauto. apply step_future. ss.
+  Qed.
 End AExecUnit.
 
 Definition eidT := (Id.t * nat)%type.
@@ -385,16 +423,15 @@ Module Execution.
     ex.(obs) ∪ ex.(dob) ∪ ex.(aob) ∪ ex.(bob).
 End Execution.
 
-Definition tid_join
-           (rels: IdMap.t (relation nat)):
-  relation eidT :=
-  fun x y =>
-    exists tid rel,
-      <<TID_LHS: x.(fst) = tid>> /\
-      <<TID_RHS: y.(fst) = tid>> /\
-      <<RELS: IdMap.find tid rels = Some rel>> /\
-      <<REL: rel x.(snd) y.(snd)>>.
-Hint Unfold tid_join.
+Inductive tid_join (rels: IdMap.t (relation nat)) (eid1 eid2:eidT): Prop :=
+| tid_join_intro
+    tid rel
+    (TID1: eid1.(fst) = tid)
+    (TID2: eid2.(fst) = tid)
+    (RELS: IdMap.find tid rels = Some rel)
+    (REL: rel eid1.(snd) eid2.(snd))
+.
+Hint Constructors tid_join.
 
 Module Valid.
   Inductive pre_ex (p:program) (ex:Execution.t) := mk_pre_ex {

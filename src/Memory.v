@@ -206,6 +206,23 @@ Module Local.
   .
   Hint Constructors promise.
 
+  Inductive internal (ctrl:View.t) (lc1 lc2:t): Prop :=
+  | internal_intro
+      (LC2: lc2 = 
+            mk
+              lc1.(coh)
+              lc1.(vrp)
+              lc1.(vwp)
+              lc1.(vrm)
+              lc1.(vwm)
+              (join lc1.(vcap) ctrl)
+              lc1.(vrel)
+              lc1.(fwdbank)
+              lc1.(exbank)
+              lc1.(promises))
+  .
+  Hint Constructors internal.
+
   Inductive read (ex:bool) (ord:ordT) (vloc:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       ts loc val view
@@ -356,27 +373,11 @@ Module Local.
   .
   Hint Constructors dmbsy.
 
-  Inductive ctrl (view:View.t) (lc1 lc2:t): Prop :=
-  | ctrl_intro
-      (LC2: lc2 = 
-            mk
-              lc1.(coh)
-              lc1.(vrp)
-              lc1.(vwp)
-              lc1.(vrm)
-              lc1.(vwm)
-              (join lc1.(vcap) view)
-              lc1.(vrel)
-              lc1.(fwdbank)
-              lc1.(exbank)
-              lc1.(promises))
-  .
-  Hint Constructors ctrl.
-
   Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | step_internal
-      (EVENT: event = Event.internal)
-      (LC: lc2 = lc1)
+      ctrl
+      (EVENT: event = (Event.internal ctrl))
+      (LC: internal ctrl lc1 lc2)
       (MEM: mem2 = mem1)
   | step_read
       ex ord vloc res
@@ -407,11 +408,6 @@ Module Local.
   | step_dmbsy
       (EVENT: event = Event.barrier Barrier.dmbsy)
       (STEP: dmbsy lc1 lc2)
-      (MEM: mem2 = mem1)
-  | step_ctrl
-      view
-      (EVENT: event = Event.ctrl view)
-      (STEP: ctrl view lc1 lc2)
       (MEM: mem2 = mem1)
   .
   Hint Constructors step.

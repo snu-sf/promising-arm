@@ -206,8 +206,11 @@ Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t 
 .
 Hint Constructors sim_state.
 
-Inductive sim_local (ex:Execution.t) (ob: list eidT) (eid:eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
+
+Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
 | sim_local_intro
+    eid
+    (EID: eid = (tid, List.length (alocal.(ALocal.labels))))
     (COH: forall loc,
         sim_view
           ex ob
@@ -292,38 +295,131 @@ Inductive sim_local (ex:Execution.t) (ob: list eidT) (eid:eidT) (alocal:ALocal.t
 Hint Constructors sim_local.
 (* TODO: fwdbank, exbank, promises *)
 
-Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (iid:nat) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
+Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
 | sim_eu_intro
     (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state))
-    (LOCAL: sim_local ex ob (tid, iid) aeu.(AExecUnit.local) eu.(ExecUnit.local))
+    (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local))
     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
 .
 Hint Constructors sim_eu.
 
+Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
+| tid_lift_intro
+    (TID1: eid1.(fst) = tid)
+    (TID1: eid2.(fst) = tid)
+    (REL: rel eid1.(snd) eid2.(snd))
+.
+
 Lemma sim_eu_step
-      tid ex ob iid aeu1 eu1 aeu2
-      (SIM: sim_eu tid ex ob iid aeu1 eu1)
-      (STEP: AExecUnit.step aeu1 aeu2):
+      p ex ob tid aeu1 eu1 aeu2
+      (EX: Valid.ex p ex)
+      (OB: Permutation ob (Execution.eids ex))
+      (SIM: sim_eu tid ex ob aeu1 eu1)
+      (STEP: AExecUnit.step aeu1 aeu2)
+      (ADDR: tid_lift tid aeu2.(AExecUnit.local).(ALocal.addr) ⊆ ex.(Execution.addr))
+      (DATA: tid_lift tid aeu2.(AExecUnit.local).(ALocal.data) ⊆ ex.(Execution.data))
+      (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl)):
   exists eu2,
     <<STEP: ExecUnit.step tid eu1 eu2>> /\
-    <<SIM: sim_eu tid ex ob (iid + 1) aeu2 eu2>>.
+    <<SIM: sim_eu tid ex ob aeu2 eu2>>.
 Proof.
-  destruct eu1 as [state1 local1].
-  destruct aeu1 as [astate1 alocal1].
-  destruct aeu2 as [astate2 alocal2].
+  destruct eu1 as [[stmts1 rmap1] local1].
+  destruct aeu1 as [[astmts1 armap1] alocal1].
+  destruct aeu2 as [[astmts2 armap2] alocal2].
+  inv SIM. inv STATE. ss. subst. rename LOCAL into SIM_LOCAL.
+  inv STEP. ss. inv STATE; inv LOCAL; inv EVENT; ss.
+  - (* skip *)
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs; ss.
+    + econs; ss.
+      admit. (* sim_local is proper w.r.t. relations *)
+  - (* assign *)
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs; ss.
+    + econs; ss.
+      * admit. (* sim_state after rmap update *)
+      * admit. (* sim_local is proper w.r.t. relations *)
+  - (* read *)
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs 2; ss.
+        admit. (* Local.read *)
+    + admit. (* sim_eu *)
+  - (* write *)
+    admit.
+  - (* write_failure *)
+    admit.
+  - destruct b0; eexists (ExecUnit.mk _ _ _).
+    + (* isb *)
+      esplits.
+      * econs; ss.
+        { econs; ss. }
+        { econs 5; ss. }
+      * admit. (* sim_eu *)
+    + (* dmbst *)
+      admit.
+    + (* dmbld *)
+      admit.
+    + (* dmbsy *)
+      admit.
+  - (* if *)
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs; ss.
+    + econs; ss.
+      * admit. (* sem_expr calculates the same value *)
+      * admit. (* sim_local *)
+  - (* dowhile *)
+    eexists (ExecUnit.mk _ _ _). esplits.
+    + econs; ss.
+      * econs; ss.
+      * econs; ss.
+    + econs; ss.
+      admit. (* sim_local is proper w.r.t. relations *)
 Admitted.
 
 Lemma sim_eu_rtc_step
-      tid ex ob iid1 aeu1 eu1 aeu2
-      (SIM: sim_eu tid ex ob iid1 aeu1 eu1)
-      (STEP: rtc AExecUnit.step aeu1 aeu2):
-  exists iid2 eu2,
-    <<SIM: sim_eu tid ex ob iid2 aeu2 eu2>> /\
+      p ex ob tid aeu1 eu1 aeu2
+      (EX: Valid.ex p ex)
+      (OB: Permutation ob (Execution.eids ex))
+      (SIM: sim_eu tid ex ob aeu1 eu1)
+      (STEP: rtc AExecUnit.step aeu1 aeu2)
+      (AEU: IdMap.find tid EX.(Valid.locals) = Some aeu2.(AExecUnit.local)):
+  exists eu2,
+    <<SIM: sim_eu tid ex ob aeu2 eu2>> /\
     <<STEP: rtc (ExecUnit.step tid) eu1 eu2>>.
 Proof.
-  revert iid1 eu1 SIM. induction STEP.
+  revert eu1 SIM. induction STEP.
   { esplits; eauto. }
-  i. exploit sim_eu_step; eauto. i. des.
+  i.
+  assert (FUTURE: ALocal.future y.(AExecUnit.local) z.(AExecUnit.local)).
+  { apply AExecUnit.rtc_step_future. ss. }
+  exploit sim_eu_step; eauto.
+  { rewrite EX.(Valid.ADDR).
+    ii. destruct x0, y0. inv H0. ss. subst.
+    econs; [eauto|eauto|s|s].
+    - rewrite IdMap.map_spec, AEU. ss.
+    - apply FUTURE. ss.
+  }
+  { rewrite EX.(Valid.DATA).
+    ii. destruct x0, y0. inv H0. ss. subst.
+    econs; [eauto|eauto|s|s].
+    - rewrite IdMap.map_spec, AEU. ss.
+    - apply FUTURE. ss.
+  }
+  { rewrite EX.(Valid.CTRL).
+    ii. destruct x0, y0. inv H0. ss. subst.
+    econs; [eauto|eauto|s|s].
+    - rewrite IdMap.map_spec, AEU. ss.
+    - apply FUTURE. ss.
+  }
+  i. des.
   exploit IHSTEP; eauto. i. des.
   esplits; eauto.
 Qed.
@@ -491,8 +587,11 @@ Proof.
        (finally we have to prove that (promises_from_mem tid (Machine.mem m)) = (fulfilled promises in local.labels))
    *)
 
-  exploit (@sim_eu_rtc_step tid ex eids 0); eauto.
-  { instantiate (1 := ExecUnit.mk (State.init stmts) (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex eids))) (mem_of_ex ex eids)).
+  exploit (@sim_eu_rtc_step p ex eids tid); eauto.
+  { instantiate (1 := ExecUnit.mk
+                        (State.init stmts)
+                        (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex eids)))
+                        (mem_of_ex ex eids)).
     econs; ss.
     - econs; ss. ii. rewrite ? IdMap.gempty. ss.
     - admit. (* sim_local holds initially. *)
