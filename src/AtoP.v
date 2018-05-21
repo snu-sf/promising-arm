@@ -291,9 +291,13 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
             (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ ex.(Execution.po))
             (eq eid))
          local.(Local.vrel))
+    (EXBANK:
+       opt_rel
+         (fun aexbank exbank => view_eid ex ob (tid, aexbank) = Some exbank)
+         alocal.(ALocal.exbank) local.(Local.exbank))
 .
 Hint Constructors sim_local.
-(* TODO: fwdbank, exbank, promises *)
+(* TODO: fwdbank, promises *)
 
 Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
 | sim_eu_intro
@@ -330,7 +334,9 @@ Proof.
       * econs; ss.
       * econs; ss.
     + econs; ss.
-      admit. (* sim_local is proper w.r.t. relations *)
+      inv SIM_LOCAL; econs; eauto. s.
+      unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
+      exact View.order.
   - (* assign *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
@@ -338,7 +344,9 @@ Proof.
       * econs; ss.
     + econs; ss.
       * admit. (* sim_state after rmap update *)
-      * admit. (* sim_local is proper w.r.t. relations *)
+      * inv SIM_LOCAL; econs; eauto. s.
+        unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
+        exact View.order.
   - (* read *)
     exploit EX.(Valid.RF).
     { eapply LABEL. rewrite List.nth_error_app2; [|refl].
@@ -367,7 +375,7 @@ Proof.
       * econs 4; ss.
     + econs; ss.
       * admit. (* sim_state after rmap update *)
-      * admit. (* sim_local after clearing fwdbank *)
+      * inv SIM_LOCAL; econs; eauto. econs.
   - (* barrier *)
     destruct b0; eexists (ExecUnit.mk _ _ _).
     + (* isb *)
@@ -402,14 +410,17 @@ Proof.
     + econs; ss.
       * econs; eauto.
         admit. (* sem_expr calculates the same value *)
-      * admit. (* sim_local *)
+      * inv SIM_LOCAL; econs; eauto. s.
+        admit. (* sim_local on cap *)
   - (* dowhile *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
       * econs; ss.
       * econs; ss.
     + econs; ss.
-      admit. (* sim_local is proper w.r.t. relations *)
+      inv SIM_LOCAL; econs; eauto. s.
+      unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
+      exact View.order.
 Admitted.
 
 Lemma sim_eu_rtc_step
