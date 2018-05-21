@@ -313,7 +313,8 @@ Lemma sim_eu_step
           Execution.label (tid, n) ex = Some label)
       (ADDR: tid_lift tid aeu2.(AExecUnit.local).(ALocal.addr) ⊆ ex.(Execution.addr))
       (DATA: tid_lift tid aeu2.(AExecUnit.local).(ALocal.data) ⊆ ex.(Execution.data))
-      (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl)):
+      (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl))
+      (RMW: tid_lift tid aeu2.(AExecUnit.local).(ALocal.rmw) ⊆ ex.(Execution.rmw)):
   exists eu2,
     <<STEP: ExecUnit.step tid eu1 eu2>> /\
     <<SIM: sim_eu tid ex ob aeu2 eu2>>.
@@ -442,6 +443,10 @@ Proof.
     - eapply tid_lift_incl; eauto. inv FUTURE; ss.
   }
   { rewrite EX.(Valid.CTRL). ii. econs.
+    - rewrite IdMap.map_spec, LOCAL. ss.
+    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
+  }
+  { rewrite EX.(Valid.RMW). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
     - eapply tid_lift_incl; eauto. inv FUTURE; ss.
   }

@@ -37,6 +37,12 @@ Module Label.
     | _ => false
     end.
 
+  Definition is_reading (loc:Loc.t) (label:t): bool :=
+    match label with
+    | read _ _ loc' _ => loc' == loc
+    | _ => false
+    end.
+
   (* TODO: define AcquirePC ordering *)
   Definition is_acquire_pc (label:t): bool :=
     match label with
@@ -82,10 +88,12 @@ Module ALocal.
     addr: relation nat;
     data: relation nat;
     ctrl: relation nat;
+    rmw: relation nat;
+    exbank: option nat;
   }.
   Hint Constructors t.
 
-  Definition init: t := mk [] bot bot bot.
+  Definition init: t := mk [] bot bot bot bot None.
 
   Definition next_eid (eu:t): nat :=
     List.length eu.(labels).
@@ -99,7 +107,9 @@ Module ALocal.
                  alocal1.(labels)
                  alocal1.(addr)
                  alocal1.(data)
-                 (alocal1.(ctrl) ∪ (ctrl_e × (le (next_eid alocal1)))))
+                 (alocal1.(ctrl) ∪ (ctrl_e × (le (next_eid alocal1))))
+                 alocal1.(rmw)
+                 alocal1.(exbank))
   | step_read
       ex ord vloc res
       (EVENT: event = Event.read ex ord vloc (ValA.mk _ res (eq (next_eid alocal1))))
@@ -108,16 +118,23 @@ Module ALocal.
                  (alocal1.(labels) ++ [Label.read ex ord vloc.(ValA.val) res])
                  (alocal1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid alocal1))))
                  alocal1.(data)
-                 alocal1.(ctrl))
+                 alocal1.(ctrl)
+                 alocal1.(rmw)
+                 (if ex then Some (next_eid alocal1) else alocal1.(exbank)))
   | step_write
       ex ord vloc vval
       (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (eq (next_eid alocal1))))
+      (EX: ex -> exists n,
+           alocal1.(exbank) = Some n /\
+           opt_pred (Label.is_reading vloc.(ValA.val)) (List.nth_error alocal1.(labels) n))
       (ALOCAL: alocal2 =
                mk
                  (alocal1.(labels) ++ [Label.write ex ord vloc.(ValA.val) vval.(ValA.val)])
                  (alocal1.(addr) ∪ (vloc.(ValA.annot) × (eq (next_eid alocal1))))
                  (alocal1.(data) ∪ (vval.(ValA.annot) × (eq (next_eid alocal1))))
-                 alocal1.(ctrl))
+                 alocal1.(ctrl)
+                 (alocal1.(rmw) ∪ (if ex then (fun n => alocal1.(exbank) = Some n) × (eq (next_eid alocal1)) else bot))
+                 (if ex then None else alocal1.(exbank)))
   | step_write_failure
       ord vloc vval
       (EVENT: event = Event.write true ord vloc vval (ValA.mk _ 1 bot))
@@ -126,7 +143,9 @@ Module ALocal.
                  alocal1.(labels)
                  alocal1.(addr)
                  alocal1.(data)
-                 alocal1.(ctrl))
+                 alocal1.(ctrl)
+                 alocal1.(rmw)
+                 None)
   | step_barrier
       b
       (EVENT: event = Event.barrier b)
@@ -135,7 +154,9 @@ Module ALocal.
                  (alocal1.(labels) ++ [Label.barrier b])
                  alocal1.(addr)
                  alocal1.(data)
-                 alocal1.(ctrl))
+                 alocal1.(ctrl)
+                 alocal1.(rmw)
+                 alocal1.(exbank))
   .
   Hint Constructors step.
 
@@ -145,6 +166,7 @@ Module ALocal.
       (ADDR: alocal1.(addr) ⊆ alocal2.(addr))
       (DATA: alocal1.(data) ⊆ alocal2.(data))
       (CTRL: alocal1.(ctrl) ⊆ alocal2.(ctrl))
+      (RMW: alocal1.(rmw) ⊆ alocal2.(rmw))
   .
 
   Global Program Instance future_preorder: PreOrder future.
@@ -464,17 +486,7 @@ Module Valid.
     ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals);
     DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals);
     CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals);
-    RMW: forall eid1 ord1 loc val1
-           (LABEL1: Execution.label eid1 ex = Some (Label.write true ord1 loc val1)),
-        exists eid2 ord2 val2,
-          <<LABEL: Execution.label eid2 ex = Some (Label.read true ord2 loc val2)>> /\
-          <<PO: ex.(Execution.po) eid2 eid1>> /\
-          <<RMW: ex.(Execution.rmw) eid2 eid1>> /\
-          <<BTW: forall eid3 label3
-                   (PO23: ex.(Execution.po) eid2 eid3)
-                   (PO31: ex.(Execution.po) eid3 eid1)
-                   (LABEL3: Execution.label eid3 ex = Some label3),
-              Label.is_ex label3 = false>>;
+    RMW: ex.(Execution.rmw) = tid_join (IdMap.map (fun local => local.(ALocal.rmw)) locals);
   }.
   Hint Constructors pre_ex.
 

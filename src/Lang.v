@@ -12,15 +12,24 @@ Require Import Order.
 Set Implicit Arguments.
 
 (* TODO: move *)
-Inductive opt_pred A B (pred: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
-| opt_pred_None:
-    opt_pred pred None None
-| opt_pred_Some
-    a b
-    (PRED: pred a b):
-    opt_pred pred (Some a) (Some b)
+Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
+| opt_pred_intro
+    a
+    (PRED: pred a):
+    opt_pred pred (Some a)
 .
 Hint Constructors opt_pred.
+
+(* TODO: move *)
+Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
+| opt_rel_None:
+    opt_rel rel None None
+| opt_rel_Some
+    a b
+    (REL: rel a b):
+    opt_rel rel (Some a) (Some b)
+.
+Hint Constructors opt_rel.
 
 Module Id := Pos.
 
@@ -87,11 +96,11 @@ Module IdMap.
   Qed.
 
   Definition Forall2 A B
-             (pred: A -> B -> Prop)
+             (rel: A -> B -> Prop)
              (a: t A)
              (b: t B)
     : Prop :=
-    forall id, opt_pred pred (find id a) (find id b).
+    forall id, opt_rel rel (find id a) (find id b).
 End IdMap.
 
 Module IdSet.
