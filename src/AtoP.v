@@ -66,7 +66,7 @@ Proof.
 
 Definition mem_of_ex
            (ex:Execution.t)
-           (eids:list eidT):
+           (ob:list eidT):
   Memory.t :=
   filter_map
     (fun eid =>
@@ -74,7 +74,7 @@ Definition mem_of_ex
        | Some (Label.write ex ord loc val) => Some (Msg.mk loc val eid.(fst))
        | _ => None
        end)
-    eids.
+    ob.
 
 Definition list_rev_list_rect
            (A:Type)
@@ -158,9 +158,9 @@ Definition Local_init_with_promises
 
 Inductive sim_mem (ex:Execution.t) (mem: Memory.t): Prop :=
 | sim_mem_intro
-    eids
-    (EIDS: Permutation eids (Execution.eids ex))
-    (MEM: mem = mem_of_ex ex eids)
+    ob
+    (EIDS: Permutation ob (Execution.eids ex))
+    (MEM: mem = mem_of_ex ex ob)
 .
 Hint Constructors sim_mem.
 
@@ -345,7 +345,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
        sim_view
          ex ob
          (inverse
-            ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po))) ⨾ (ex.(Execution.po)))
+            (ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po)))
             (eq eid))
          local.(Local.vcap))
     (VREL:
@@ -370,6 +370,43 @@ Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (
     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
 .
 Hint Constructors sim_eu.
+
+Lemma label_write_mem_of_ex
+      eid ex ob exm ord loc val
+      (OB: Permutation ob (Execution.eids ex))
+      (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)):
+  exists view,
+    <<VIEW: view_eid ex ob eid = Some view>> /\
+    <<MSG: Memory.read view loc (mem_of_ex ex ob) = Some val>>.
+Proof.
+  generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0.
+  specialize (LABEL0 eid). rewrite LABEL in LABEL0.
+  inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0.
+  symmetry in OB. exploit Permutation_in; eauto. intro IN.
+  exploit HahnList.Permutation_nodup; eauto. intro NODUP.
+  clear OB IN0 NODUP0. revert IN NODUP. induction ob; ss. i. des.
+  - subst. condtac; [|congr]. s. esplits; eauto.
+    rewrite LABEL. s. unfold Memory.read. s.
+    unfold mem_of_ex. s. rewrite LABEL. s. condtac; [|congr]. ss.
+  - condtac.
+    { inversion e. subst. inv NODUP. congr. }
+    inv NODUP. exploit IHob; eauto. i. des.
+    rewrite VIEW. s. esplits; eauto.
+    unfold mem_of_ex. s.
+    destruct (Execution.label a ex) eqn:ALABEL; ss.
+    destruct t; ss.
+    rewrite <- MSG. unfold Memory.read. s. destruct view; ss.
+    unfold Memory.read in MSG. ss. inv MSG.
+    exfalso. revert IN VIEW LABEL. clear. induction ob; ss. i. des.
+    + subst. revert VIEW. condtac; [|congr]. s. i. inv VIEW.
+      rewrite LABEL in H0. ss.
+    + revert VIEW. condtac.
+      * inversion e. subst. s. i. inv VIEW.
+        rewrite LABEL in H0. ss.
+      * destruct (view_eid ex ob eid) eqn:V; ss. i. inv VIEW.
+        apply plus_is_O in H0. des. subst.
+        apply IHob; ss.
+Qed.
 
 Lemma sim_eu_step
       p ex ob tid aeu1 eu1 aeu2
@@ -417,18 +454,16 @@ Proof.
       rewrite Nat.sub_diag. ss.
     }
     i. des.
-
-    (* TODO:
-     *
-     * get timestamp of eid2.
-     * using the timestamp, construct step and simulation.
-     *
-     *)
+    exploit label_write_mem_of_ex; eauto. i. des.
+    exploit sim_rmap_expr; eauto. instantiate (1 := eloc). intro X. inv X.
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
       * econs; ss.
-      * econs 2; ss.
-        admit. (* Local.read *)
+      * econs 2; ss. econs; eauto.
+        { admit. (* coh *)
+        }
+        { admit. (* latest *)
+        }
     + admit. (* sim_eu *)
   - (* write *)
     admit.
@@ -438,7 +473,7 @@ Proof.
       * econs; ss.
       * econs 4; ss.
     + econs; ss.
-      * admit. (* sim_state after rmap update *)
+      * econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss.
       * inv SIM_LOCAL; econs; eauto. econs.
   - (* barrier *)
     destruct b0; eexists (ExecUnit.mk _ _ _).
@@ -476,7 +511,11 @@ Proof.
         generalize (sim_rmap_expr cond RMAP). intro X. inv X.
         rewrite VAL. ss.
       * inv SIM_LOCAL; econs; eauto. s.
-        admit. (* sim_local on cap *)
+        apply sim_view_join; ss.
+        generalize (sim_rmap_expr cond RMAP). intro X. inv X.
+        (* TODO: maybe verbose? *)
+        eapply sim_view_le; try exact VIEW; eauto. intros [tid' n']. s. i. des. subst.
+        econs; eauto. left. apply CTRL. econs; eauto. s. right. econs; ss.
   - (* dowhile *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
@@ -585,8 +624,8 @@ Proof.
   (* Linearize events and construct memory. *)
   exploit (linearize (Execution.eids ex)).
   { eapply EX.(Valid.EXTERNAL). }
-  i. des. rename l' into eids.
-  remember (mem_of_ex ex eids) as mem eqn:MEM.
+  i. des. rename l' into ob.
+  remember (mem_of_ex ex ob) as mem eqn:MEM.
 
   (* Construct promise steps. *)
   exploit (promise_mem p mem); eauto.
@@ -694,11 +733,11 @@ Proof.
        (finally we have to prove that (promises_from_mem tid (Machine.mem m)) = (fulfilled promises in local.labels))
    *)
 
-  exploit (@sim_eu_rtc_step p ex eids tid); eauto.
+  exploit (@sim_eu_rtc_step p ex ob tid); eauto.
   { instantiate (1 := ExecUnit.mk
                         (State.init stmts)
-                        (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex eids)))
-                        (mem_of_ex ex eids)).
+                        (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex ob)))
+                        (mem_of_ex ex ob)).
     econs; ss.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
     - econs; eauto. s. econs.
