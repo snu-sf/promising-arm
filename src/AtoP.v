@@ -196,16 +196,80 @@ Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:Vi
 .
 Hint Constructors sim_view.
 
+Lemma sim_view_join ex ob pred v1 v2
+      (V1: sim_view ex ob pred v1)
+      (V2: sim_view ex ob pred v2):
+  sim_view ex ob pred (join v1 v2).
+Proof.
+  inv V1.
+  { rewrite join_comm, bot_join; [|exact View.order]. ss. }
+  inv V2.
+  { rewrite bot_join; [|exact View.order]. econs 2; eauto. }
+
+  generalize (View.max_spec_le v1 v2). i. des.
+  - unfold join, View.join. rewrite H0. econs 2; try exact VIEW_EID0; eauto.
+  - unfold join, View.join. rewrite H0. econs 2; try exact VIEW_EID; eauto.
+Qed.
+
+Lemma sim_view_le ex ob pred1 pred2
+      (PRED: pred1 <1= pred2):
+  sim_view ex ob pred1 <1= sim_view ex ob pred2.
+Proof.
+  i. inv PR.
+  - econs 1. ss.
+  - econs 2; eauto.
+Qed.
+
+Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t)): Prop :=
+| sim_val_intro
+    (VAL: avala.(ValA.val) = vala.(ValA.val))
+    (VIEW: sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot))
+.
+Hint Constructors sim_val.
+
+Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t)): Prop :=
+| sim_rmap_intro
+    (RMAP: IdMap.Forall2 (sim_val tid ex ob) armap rmap)
+.
+Hint Constructors sim_rmap.
+
 Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t)): Prop :=
 | sim_state_intro
     (STMTS: astate.(State.stmts) = state.(State.stmts))
-    (RMAP: IdMap.Forall2
-             (fun avala vala =>
-                avala.(ValA.val) = vala.(ValA.val) /\
-                sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot))
-             astate.(State.rmap) state.(State.rmap))
+    (RMAP: sim_rmap tid ex ob astate.(State.rmap) state.(State.rmap))
 .
 Hint Constructors sim_state.
+
+Lemma sim_rmap_add
+      tid ex ob armap rmap reg avala vala
+      (SIM: sim_rmap tid ex ob armap rmap)
+      (VAL: sim_val tid ex ob avala vala):
+  sim_rmap tid ex ob (RMap.add reg avala armap) (RMap.add reg vala rmap).
+Proof.
+  econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
+  inv SIM. condtac; eauto.
+Qed.
+
+Lemma sim_rmap_expr
+      tid ex ob armap rmap e
+      (SIM: sim_rmap tid ex ob armap rmap):
+  sim_val tid ex ob (sem_expr armap e) (sem_expr rmap e).
+Proof.
+  inv SIM. induction e; s.
+  - (* const *)
+    econs; ss. econs 1; ss.
+  - (* reg *)
+    specialize (RMAP reg). unfold RMap.find. inv RMAP; ss.
+    econs; ss. econs 1; ss.
+  - (* op1 *)
+    inv IHe. econs; ss. congr.
+  - (* op2 *)
+    inv IHe1. inv IHe2. econs; ss.
+    + congr.
+    + apply sim_view_join; eapply sim_view_le; eauto.
+      * s. i. des. subst. esplits; eauto. left. ss.
+      * s. i. des. subst. esplits; eauto. right. ss.
+Qed.
 
 Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
 | sim_local_intro
@@ -343,7 +407,7 @@ Proof.
       * econs; ss.
       * econs; ss.
     + econs; ss.
-      * admit. (* sim_state after rmap update *)
+      * econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr; ss.
       * inv SIM_LOCAL; econs; eauto. s.
         unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
         exact View.order.
@@ -408,8 +472,9 @@ Proof.
       * econs; ss.
       * econs; ss.
     + econs; ss.
-      * econs; eauto.
-        admit. (* sem_expr calculates the same value *)
+      * econs; eauto. s.
+        generalize (sim_rmap_expr cond RMAP). intro X. inv X.
+        rewrite VAL. ss.
       * inv SIM_LOCAL; econs; eauto. s.
         admit. (* sim_local on cap *)
   - (* dowhile *)
@@ -635,8 +700,8 @@ Proof.
                         (Local_init_with_promises (promises_from_mem tid (mem_of_ex ex eids)))
                         (mem_of_ex ex eids)).
     econs; ss.
-    - econs; ss. ii. rewrite ? IdMap.gempty. ss.
-    - admit. (* sim_local holds initially. *)
+    - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
+    - econs; eauto. s. econs.
   }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
