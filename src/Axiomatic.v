@@ -239,6 +239,7 @@ Module AExecUnit.
     econs; intro X; inv X. inv H.
   Qed.
 
+  (* TODO: move *)
   Lemma cross_bot_r
         A (pred:A -> Prop):
     pred × bot = bot.
@@ -258,6 +259,7 @@ Module AExecUnit.
     - right. ss.
   Qed.
 
+  (* TODO: move *)
   Lemma union_bot_r
         A (rel: relation A):
     rel ∪ bot = rel.
@@ -523,6 +525,11 @@ Module Execution.
       (N: eid1.(snd) < eid2.(snd))
   .
   Hint Constructors po.
+
+  Global Program Instance po_trans: Transitive po.
+  Next Obligation.
+    ii. destruct x, y, z. inv H. inv H0. ss. subst. econs; ss. lia.
+  Qed.
 
   Inductive po_adj (eid1 eid2:eidT): Prop :=
   | po_adj_intro

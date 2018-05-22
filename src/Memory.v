@@ -310,8 +310,8 @@ Module Local.
       (LC2: lc2 = 
             mk
               lc1.(coh)
-              lc1.(vrp)
-              (join lc1.(vwp) lc1.(vcap))
+              (join lc1.(vrp) lc1.(vcap))
+              lc1.(vwp)
               lc1.(vrm)
               lc1.(vwm)
               lc1.(vcap)
