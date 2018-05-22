@@ -1,6 +1,7 @@
 Require Import PArith.
 Require Import ZArith.
 Require Import FunctionalExtensionality.
+Require Import ClassicalFacts.
 Require Import Relations.
 Require Import RelationClasses.
 Require Import EquivDec.
@@ -24,6 +25,8 @@ Ltac antisym :=
     apply (partial_order_antisym H)
   end.
 Ltac funext := apply functional_extensionality.
+Axiom propext: prop_extensionality.
+Ltac propext := apply propext.
 
 Ltac condtac :=
   match goal with

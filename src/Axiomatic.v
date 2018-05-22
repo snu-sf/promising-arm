@@ -160,11 +160,6 @@ Module ALocal.
   .
   Hint Constructors step.
 
-  Inductive wf (alocal:t): Prop :=
-  | wf_intro
-      (CTRL: forall i j k, alocal.(ctrl) i j -> j < k -> alocal.(ctrl) i k)
-  .
-
   Inductive le (alocal1 alocal2:t): Prop :=
   | le_intro
       (LABELS: exists l, alocal2.(labels) = alocal1.(labels) ++ l)
@@ -185,24 +180,6 @@ Module ALocal.
     all: try by eapply inclusion_trans; eauto.
     des. rewrite LABELS0, LABELS. rewrite <- List.app_assoc. eexists; eauto.
   Qed.
-
-  Lemma step_future
-        e alocal1 alocal2
-        (WF: wf alocal1)
-        (STEP: step e alocal1 alocal2):
-    <<WF: wf alocal2>> /\
-    <<LE: le alocal1 alocal2>>.
-  Proof.
-    splits.
-    - inv WF. inv STEP; econs; ss.
-      i. inv H.
-      + left. eauto.
-      + right. inv H1. econs; ss. unfold Order.le in *. lia.
-    - inv STEP; econs; ss.
-      all: try by eexists; eauto.
-      all: try by exists []; rewrite List.app_nil_r.
-      all: try by apply inclusion_union_r1.
-  Qed.
 End ALocal.
 
 Module AExecUnit.
@@ -219,21 +196,159 @@ Module AExecUnit.
       (LOCAL: ALocal.step e eu1.(local) eu2.(local))
   .
 
+  Definition wf_rmap (rmap: RMap.t (A:=nat -> Prop)) (max:nat): Prop :=
+    forall r n
+      (N: (RMap.find r rmap).(ValA.annot) n),
+      n < max.
+  Hint Unfold wf_rmap.
+
+  Lemma wf_rmap_expr
+        rmap bound e n
+        (WF: wf_rmap rmap bound)
+        (N: (sem_expr rmap e).(ValA.annot) n):
+    n < bound.
+  Proof.
+    revert n N. induction e; ss.
+    - i. eapply WF. eauto.
+    - i. inv N; eauto.
+  Qed.
+
+  Inductive wf (aeu:t): Prop :=
+  | wf_intro
+      (REG: wf_rmap aeu.(state).(State.rmap) (length aeu.(local).(ALocal.labels)))
+      (ADDR: aeu.(local).(ALocal.addr) ⊆ lt)
+      (DATA: aeu.(local).(ALocal.data) ⊆ lt)
+      (CTRL: aeu.(local).(ALocal.ctrl) ⊆ lt)
+      (CTRL_MON: aeu.(local).(ALocal.ctrl) ⨾ lt ⊆ aeu.(local).(ALocal.ctrl))
+  .
+  Hint Constructors wf.
+
+  Lemma wf_init stmts: wf (mk (State.init stmts) ALocal.init).
+  Proof.
+    econs; ss.
+    - ii. unfold RMap.find, RMap.init in *. rewrite IdMap.gempty in *. inv N.
+    - ii. inv H. des. inv H0.
+  Qed.
+
+  (* TODO: move *)
+  Lemma cross_bot_l
+        A (pred:A -> Prop):
+    bot × pred = bot.
+  Proof.
+    funext. i. funext. i. propext.
+    econs; intro X; inv X. inv H.
+  Qed.
+
+  Lemma cross_bot_r
+        A (pred:A -> Prop):
+    pred × bot = bot.
+  Proof.
+    funext. i. funext. i. propext.
+    econs; intro X; inv X. inv H0.
+  Qed.
+
+  (* TODO: move *)
+  Lemma union_bot_l
+        A (rel: relation A):
+    bot ∪ rel = rel.
+  Proof.
+    funext. i. funext. i. propext.
+    econs; intro X.
+    - inv X; ss.
+    - right. ss.
+  Qed.
+
+  Lemma union_bot_r
+        A (rel: relation A):
+    rel ∪ bot = rel.
+  Proof.
+    funext. i. funext. i. propext.
+    econs; intro X.
+    - inv X; ss.
+    - left. ss.
+  Qed.
+
   Lemma step_future
         eu1 eu2
-        (WF: ALocal.wf eu1.(local))
+        (WF: wf eu1)
         (STEP: step eu1 eu2):
-    <<WF: ALocal.wf eu2.(local)>> /\
+    <<WF: wf eu2>> /\
     <<LE: ALocal.le eu1.(local) eu2.(local)>>.
   Proof.
-    inv STEP. eapply ALocal.step_future; eauto.
+    destruct eu1 as [state1 local1].
+    destruct eu2 as [state2 local2].
+    inv STEP. ss.
+    inv STATE; inv LOCAL; inv EVENT; ss;
+      repeat match goal with
+             | [|- context[bot × _]] => rewrite cross_bot_l
+             | [|- context[_ ∪ bot]] => rewrite union_bot_r
+             end.
+    - splits.
+      + inv WF. ss.
+      + destruct local1. refl.
+    - splits.
+      + inv WF. econs; ss.
+        ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac; eauto.
+        inversion e. subst. apply wf_rmap_expr. ss.
+      + destruct local1. refl.
+    - splits.
+      + inv WF. econs; ss.
+        * rewrite List.app_length. s.
+          ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
+          { inversion e. subst. i. inv N.
+            unfold ALocal.next_eid. lia.
+          }
+          { i. exploit REG; eauto. lia. }
+        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+      + econs; ss.
+        * esplits; eauto.
+        * left. ss.
+    - splits.
+      + inv WF. econs; ss.
+        * rewrite List.app_length. s.
+          ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
+          { inversion e. subst. i. inv N.
+            unfold ALocal.next_eid. lia.
+          }
+          { i. exploit REG; eauto. lia. }
+        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+      + econs; ss.
+        * esplits; eauto.
+        * left. ss.
+        * left. ss.
+        * left. ss.
+    - splits.
+      + inv WF. econs; ss.
+        ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac; eauto.
+        inversion e. subst. i. inv N.
+      + econs; ss. eexists. rewrite List.app_nil_r. ss.
+    - splits.
+      + inv WF. econs; ss.
+        rewrite List.app_length. s.
+        ii. exploit REG; eauto. lia.
+      + econs; ss. eexists; eauto.
+    - splits.
+      + inv WF. econs; ss.
+        * ii. inv H; eauto. inv H0.
+          exploit wf_rmap_expr; eauto. i.
+          unfold le, ALocal.next_eid in *. lia.
+        * ii. inv H; eauto. inv H0. inv H.
+          { left. apply CTRL_MON. econs; eauto. }
+          { inv H0. right. econs; ss. unfold le in *. lia. }
+      + econs; ss.
+        * eexists. rewrite List.app_nil_r. ss.
+        * left. ss.
+    - splits.
+      + inv WF. econs; ss.
+      + destruct local1. refl.
   Qed.
 
   Lemma rtc_step_future
         eu1 eu2
-        (WF: ALocal.wf eu1.(local))
+        (WF: wf eu1)
         (STEP: rtc step eu1 eu2):
-    <<WF: ALocal.wf eu2.(local)>> /\
+    <<WF: wf eu2>> /\
     <<LE: ALocal.le eu1.(local) eu2.(local)>>.
   Proof.
     revert WF. induction STEP; eauto.
@@ -417,12 +532,16 @@ Module Execution.
   Hint Constructors po_adj.
 
   Lemma po_case:
-    po ⊆ (po ⨾ po_adj) ∪ po_adj.
+    po = (po ⨾ po_adj) ∪ po_adj.
   Proof.
-    ii. inv H. destruct x, y. ss. subst.
-    inv N.
-    - right. eauto.
-    - left. econs. instantiate (1 := (t1, m)). splits; ss.
+    funext. i. funext. i. propext. econs; i.
+    - inv H. destruct x, x0. ss. subst.
+      inv N.
+      + right. eauto.
+      + left. econs. instantiate (1 := (t1, m)). splits; ss.
+    - inv H.
+      + inv H0. des. inv H. inv H0. destruct x, x0, x1. ss. subst. econs; ss. lia.
+      + inv H0. destruct x, x0. ss. subst. econs; ss.
   Qed.
 
   Inductive i (eid1 eid2:eidT): Prop :=
@@ -558,6 +677,36 @@ Module Valid.
   Hint Constructors ex.
   Coercion PRE: ex >-> pre_ex.
 
+  Lemma inclusion_po
+        p exec (EX: ex p exec):
+    <<ADDR: exec.(Execution.addr) ⊆ Execution.po>> /\
+    <<DATA: exec.(Execution.data) ⊆ Execution.po>> /\
+    <<CTRL: exec.(Execution.ctrl) ⊆ Execution.po>>.
+  Proof.
+    rewrite EX.(ADDR), EX.(DATA), EX.(CTRL). splits.
+    - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
+      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      exploit AExecUnit.rtc_step_future; eauto.
+      { apply AExecUnit.wf_init. }
+      s. i. des. econs; ss.
+      inv WF. apply ADDR0. ss.
+    - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
+      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      exploit AExecUnit.rtc_step_future; eauto.
+      { apply AExecUnit.wf_init. }
+      s. i. des. econs; ss.
+      inv WF. apply DATA0. ss.
+    - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
+      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      exploit AExecUnit.rtc_step_future; eauto.
+      { apply AExecUnit.wf_init. }
+      s. i. des. econs; ss.
+      inv WF. apply CTRL0. ss.
+  Qed.
+
   Lemma ctrl_po
         p exec (EX: ex p exec):
     exec.(Execution.ctrl) ⨾ Execution.po ⊆ exec.(Execution.ctrl).
@@ -569,10 +718,11 @@ Module Valid.
     generalize (EX.(LOCALS) tid). rewrite LOCAL. intro X. inv X. des.
     inv REL. ss. subst.
     exploit AExecUnit.rtc_step_future; eauto.
-    { s. econs. ss. }
-    s. i. des.  econs.
+    { apply AExecUnit.wf_init. }
+    s. i. des. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - inv H1. ss. subst. econs; ss. eapply WF; eauto.
+    - inv H1. ss. subst. econs; ss.
+      inv WF. apply CTRL_MON. econs; eauto.
   Qed.
 End Valid.
 
