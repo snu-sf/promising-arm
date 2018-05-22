@@ -372,95 +372,86 @@ Proof.
       * s. i. des. subst. esplits; eauto. right. ss.
 Qed.
 
-Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop :=
-| sim_local_intro
-    eid
-    (EID: eid = (tid, List.length (alocal.(ALocal.labels))))
-    (COH: forall loc,
+Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop := mk_sim_local {
+  COH: forall loc,
         sim_view
           ex ob
           (inverse
              (⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾
               ex.(Execution.rfe)^? ⨾
-              ex.(Execution.po))
-             (eq eid))
-          (local.(Local.coh) loc))
-    (VRP:
-       sim_view
+              Execution.po)
+             (eq (tid, List.length (alocal.(ALocal.labels)))))
+          (local.(Local.coh) loc);
+  VRP: sim_view
          ex ob
          (inverse
-            ((ex.(Execution.po) ⨾
+            ((Execution.po ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
              (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
-              ex.(Execution.po) ⨾
+              Execution.po ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
-             ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po))) ⨾
+             ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
              (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
-              (ex.(Execution.po))))
-            (eq eid))
-         local.(Local.vrp))
-    (VWP:
-       sim_view
+              (Execution.po)))
+            (eq (tid, List.length (alocal.(ALocal.labels)))))
+         local.(Local.vrp);
+  VWP: sim_view
          ex ob
          (inverse
-            ((ex.(Execution.po) ⨾
+            ((Execution.po ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
              (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
-              ex.(Execution.po) ⨾
+              Execution.po ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
              (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
-              ex.(Execution.po) ⨾
+              Execution.po ⨾
               ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbst))⦘ ⨾
-              (ex.(Execution.po))) ∪
+              (Execution.po)) ∪
 
              (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
-              (ex.(Execution.po))))
-            (eq eid))
-         local.(Local.vwp))
-    (VRM:
+              (Execution.po)))
+            (eq (tid, List.length (alocal.(ALocal.labels)))))
+         local.(Local.vwp);
+  VRM: sim_view
+         ex ob
+         (inverse
+            (⦗ex.(Execution.label_is) (Label.is_read)⦘ ⨾ Execution.po)
+            (eq (tid, List.length (alocal.(ALocal.labels)))))
+         local.(Local.vrm);
+  VWM: sim_view
+         ex ob
+         (inverse
+            (⦗ex.(Execution.label_is) (Label.is_write)⦘ ⨾ Execution.po)
+            (eq (tid, List.length (alocal.(ALocal.labels)))))
+         local.(Local.vwm);
+  VCAP:
        sim_view
          ex ob
          (inverse
-            (⦗ex.(Execution.label_is) (Label.is_read)⦘ ⨾ ex.(Execution.po))
-            (eq eid))
-         local.(Local.vrm))
-    (VWM:
-       sim_view
-         ex ob
-         (inverse
-            (⦗ex.(Execution.label_is) (Label.is_write)⦘ ⨾ ex.(Execution.po))
-            (eq eid))
-         local.(Local.vwm))
-    (VCAP:
-       sim_view
-         ex ob
-         (inverse
-            (ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ ex.(Execution.po)))
-            (eq eid))
-         local.(Local.vcap))
-    (VREL:
-       sim_view
-         ex ob
-         (inverse
-            (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ ex.(Execution.po))
-            (eq eid))
-         local.(Local.vrel))
-    (EXBANK:
-       opt_rel
-         (fun aexbank exbank => view_eid ex ob (tid, aexbank) = Some exbank)
-         alocal.(ALocal.exbank) local.(Local.exbank))
-.
+            (ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po))
+            (eq (tid, List.length (alocal.(ALocal.labels)))))
+         local.(Local.vcap);
+  VREL: sim_view
+          ex ob
+          (inverse
+             (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ Execution.po)
+             (eq (tid, List.length (alocal.(ALocal.labels)))))
+          local.(Local.vrel);
+  EXBANK: opt_rel
+            (fun aexbank exbank => view_eid ex ob (tid, aexbank) = Some exbank)
+            alocal.(ALocal.exbank) local.(Local.exbank);
+}.
 Hint Constructors sim_local.
 (* TODO: fwdbank, promises *)
 
@@ -547,8 +538,8 @@ Proof.
     + econs; ss.
       * econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr; ss.
       * inv SIM_LOCAL; econs; eauto. s.
-        unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
-        exact View.order.
+        unfold join, bot. rewrite (bot_join (A:=View.t)); [|exact View.order].
+        eauto.
   - (* read *)
     exploit EX.(Valid.RF).
     { eapply LABEL. rewrite List.nth_error_app2; [|refl].
@@ -583,25 +574,29 @@ Proof.
       * econs; ss.
         { econs; ss. }
         { econs 5; ss. }
-      * admit. (* sim_eu *)
+      * econs; ss.
+        admit. (* sim_local *)
     + (* dmbst *)
       esplits.
       * econs; ss.
         { econs; ss. }
         { econs 6; ss. }
-      * admit. (* sim_eu *)
+      * econs; ss.
+        admit. (* sim_local *)
     + (* dmbld *)
       esplits.
       * econs; ss.
         { econs; ss. }
         { econs 7; ss. }
-      * admit. (* sim_eu *)
+      * econs; ss.
+        admit. (* sim_local *)
     + (* dmbsy *)
       esplits.
       * econs; ss.
         { econs; ss. }
         { econs 8; ss. }
-      * admit. (* sim_eu *)
+      * econs; ss.
+        admit. (* sim_local *)
   - (* if *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
@@ -633,6 +628,7 @@ Lemma sim_eu_rtc_step
       (EX: Valid.ex p ex)
       (OB: Permutation ob (Execution.eids ex))
       (SIM: sim_eu tid ex ob aeu1 eu1)
+      (WF: ALocal.wf aeu1.(AExecUnit.local))
       (STEP: rtc AExecUnit.step aeu1 aeu2)
       (LOCAL: IdMap.find tid EX.(Valid.locals) = Some aeu2.(AExecUnit.local)):
   exists eu2,
@@ -642,29 +638,29 @@ Proof.
   revert eu1 SIM. induction STEP.
   { esplits; eauto. }
   i.
-  assert (FUTURE: ALocal.future y.(AExecUnit.local) z.(AExecUnit.local)).
-  { apply AExecUnit.rtc_step_future. ss. }
+  exploit AExecUnit.step_future; eauto. i. des.
+  exploit AExecUnit.rtc_step_future; eauto. i. des.
   exploit sim_eu_step; eauto.
   { i. unfold Execution.label. s.
     rewrite EX.(Valid.LABELS), IdMap.map_spec, LOCAL. s.
-    inv FUTURE. des. rewrite LABELS, List.nth_error_app1; ss.
+    inv LE0. des. rewrite LABELS, List.nth_error_app1; ss.
     apply List.nth_error_Some. congr.
   }
   { rewrite EX.(Valid.ADDR). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
+    - eapply tid_lift_incl; eauto. inv LE0; ss.
   }
   { rewrite EX.(Valid.DATA). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
+    - eapply tid_lift_incl; eauto. inv LE0; ss.
   }
   { rewrite EX.(Valid.CTRL). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
+    - eapply tid_lift_incl; eauto. inv LE0; ss.
   }
   { rewrite EX.(Valid.RMW). ii. econs.
     - rewrite IdMap.map_spec, LOCAL. ss.
-    - eapply tid_lift_incl; eauto. inv FUTURE; ss.
+    - eapply tid_lift_incl; eauto. inv LE0; ss.
   }
   i. des.
   exploit IHSTEP; eauto. i. des.
@@ -843,6 +839,7 @@ Proof.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
     - econs; eauto. s. econs.
   }
+  { s. econs. ss. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
   - unfold State.is_terminal in *. inv STATE. congr.

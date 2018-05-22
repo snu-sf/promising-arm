@@ -160,8 +160,13 @@ Module ALocal.
   .
   Hint Constructors step.
 
-  Inductive future (alocal1 alocal2:t): Prop :=
-  | future_intro
+  Inductive wf (alocal:t): Prop :=
+  | wf_intro
+      (CTRL: forall i j k, alocal.(ctrl) i j -> j < k -> alocal.(ctrl) i k)
+  .
+
+  Inductive le (alocal1 alocal2:t): Prop :=
+  | le_intro
       (LABELS: exists l, alocal2.(labels) = alocal1.(labels) ++ l)
       (ADDR: alocal1.(addr) ⊆ alocal2.(addr))
       (DATA: alocal1.(data) ⊆ alocal2.(data))
@@ -169,7 +174,7 @@ Module ALocal.
       (RMW: alocal1.(rmw) ⊆ alocal2.(rmw))
   .
 
-  Global Program Instance future_preorder: PreOrder future.
+  Global Program Instance le_preorder: PreOrder le.
   Next Obligation.
     ii. econs.
     all: try by exists []; rewrite List.app_nil_r.
@@ -181,13 +186,22 @@ Module ALocal.
     des. rewrite LABELS0, LABELS. rewrite <- List.app_assoc. eexists; eauto.
   Qed.
 
-  Lemma step_future e:
-    step e <2= future.
+  Lemma step_future
+        e alocal1 alocal2
+        (WF: wf alocal1)
+        (STEP: step e alocal1 alocal2):
+    <<WF: wf alocal2>> /\
+    <<LE: le alocal1 alocal2>>.
   Proof.
-    i. inv PR; econs; ss.
-    all: try by eexists; eauto.
-    all: try by exists []; rewrite List.app_nil_r.
-    all: try by apply inclusion_union_r1.
+    splits.
+    - inv WF. inv STEP; econs; ss.
+      i. inv H.
+      + left. eauto.
+      + right. inv H1. econs; ss. unfold Order.le in *. lia.
+    - inv STEP; econs; ss.
+      all: try by eexists; eauto.
+      all: try by exists []; rewrite List.app_nil_r.
+      all: try by apply inclusion_union_r1.
   Qed.
 End ALocal.
 
@@ -207,20 +221,26 @@ Module AExecUnit.
 
   Lemma step_future
         eu1 eu2
+        (WF: ALocal.wf eu1.(local))
         (STEP: step eu1 eu2):
-    ALocal.future eu1.(local) eu2.(local).
+    <<WF: ALocal.wf eu2.(local)>> /\
+    <<LE: ALocal.le eu1.(local) eu2.(local)>>.
   Proof.
-    inv STEP. eapply ALocal.step_future. eauto.
+    inv STEP. eapply ALocal.step_future; eauto.
   Qed.
 
   Lemma rtc_step_future
         eu1 eu2
+        (WF: ALocal.wf eu1.(local))
         (STEP: rtc step eu1 eu2):
-    ALocal.future eu1.(local) eu2.(local).
+    <<WF: ALocal.wf eu2.(local)>> /\
+    <<LE: ALocal.le eu1.(local) eu2.(local)>>.
   Proof.
-    induction STEP; eauto.
-    - refl.
-    - etrans; eauto. apply step_future. ss.
+    revert WF. induction STEP; eauto.
+    - esplits; eauto. refl.
+    - i. exploit step_future; eauto. i. des.
+      exploit IHSTEP; eauto. i. des.
+      esplits; ss. etrans; eauto.
   Qed.
 End AExecUnit.
 
@@ -229,7 +249,6 @@ Definition eidT := (Id.t * nat)%type.
 Module Execution.
   Inductive t := mk {
     labels: IdMap.t (list Label.t);
-    po: relation eidT;
     addr: relation eidT;
     data: relation eidT;
     ctrl: relation eidT;
@@ -255,7 +274,7 @@ Module Execution.
         (A B : Type) (eqA : A -> A -> Prop)
         (EQUIV: Equivalence eqA)
         (eqA_dec : forall x y : A, {eqA x y} + {~ eqA x y})
-        (l : list (A * B)) 
+        (l : list (A * B))
         (a : A) (b : B)
         (NODUP: SetoidList.NoDupA (fun p p' : A * B => eqA (fst p) (fst p')) l):
     SetoidList.findA (fun a' : A => if eqA_dec a a' then true else false) l =
@@ -359,7 +378,7 @@ Module Execution.
       loc
       (X: Label.is_accessing loc x)
       (Y: Label.is_accessing loc y)
-  .    
+  .
 
 (* let obs = rfe | fr | co *)
 
@@ -383,13 +402,42 @@ Module Execution.
 (* acyclic ob as external *)
 (* empty rmw & (fre; coe) as atomic *)
 
-  Definition i: relation eidT :=
-    fun x y => x.(fst) = y.(fst).
+  Inductive po (eid1 eid2:eidT): Prop :=
+  | po_intro
+      (TID: eid1.(fst) = eid2.(fst))
+      (N: eid1.(snd) < eid2.(snd))
+  .
+  Hint Constructors po.
 
-  Definition e: relation eidT :=
-    fun x y => x.(fst) <> y.(fst).
+  Inductive po_adj (eid1 eid2:eidT): Prop :=
+  | po_adj_intro
+      (TID: eid1.(fst) = eid2.(fst))
+      (N: eid2.(snd) = S eid1.(snd))
+  .
+  Hint Constructors po_adj.
 
-  Definition po_loc (ex:t): relation eidT := ex.(label_rel) label_loc.
+  Lemma po_case:
+    po ⊆ (po ⨾ po_adj) ∪ po_adj.
+  Proof.
+    ii. inv H. destruct x, y. ss. subst.
+    inv N.
+    - right. eauto.
+    - left. econs. instantiate (1 := (t1, m)). splits; ss.
+  Qed.
+
+  Inductive i (eid1 eid2:eidT): Prop :=
+  | i_intro
+      (TID: eid1.(fst) = eid2.(fst))
+  .
+  Hint Constructors i.
+
+  Inductive e (eid1 eid2:eidT): Prop :=
+  | e_intro
+      (TID: eid1.(fst) <> eid2.(fst))
+  .
+  Hint Constructors e.
+
+  Definition po_loc (ex:t): relation eidT := po ∩ ex.(label_rel) label_loc.
   Definition fr (ex:t): relation eidT := ex.(rf)⁻¹ ⨾ ex.(co).
   Definition rfi (ex:t): relation eidT := ex.(rf) ∩ i.
   Definition rfe (ex:t): relation eidT := ex.(rf) ∩ e.
@@ -403,42 +451,42 @@ Module Execution.
   Definition dob (ex:t): relation eidT :=
     ((ex.(addr) ∪ ex.(data)) ⨾ ex.(rfi)^?) ∪
 
-    ((ex.(ctrl) ∪ (ex.(addr) ⨾ ex.(po))) ⨾
+    ((ex.(ctrl) ∪ (ex.(addr) ⨾ po)) ⨾
      (⦗ex.(label_is) Label.is_write⦘ ∪
-      (⦗ex.(label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾ ex.(po) ⨾ ⦗ex.(label_is) Label.is_read⦘))).
+      (⦗ex.(label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾ po ⨾ ⦗ex.(label_is) Label.is_read⦘))).
 
   Definition aob (ex:t): relation eidT :=
     ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗ex.(label_is) Label.is_acquire_pc⦘.
 
   Definition bob (ex:t): relation eidT :=
     (⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
 
     (⦗ex.(label_is) Label.is_release⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_acquire⦘) ∪
 
     (⦗ex.(label_is) Label.is_read⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
 
     (⦗ex.(label_is) Label.is_acquire_pc⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
 
     (⦗ex.(label_is) Label.is_write⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbst))⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_write⦘) ∪
 
     (⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘ ⨾
-     ex.(po) ⨾
+     po ⨾
      ⦗ex.(label_is) Label.is_release⦘).
 
   Definition ob (ex:t): relation eidT :=
@@ -482,7 +530,6 @@ Module Valid.
                    <<TERMINAL: State.is_terminal state>>)
               p locals;
     LABELS: ex.(Execution.labels) = IdMap.map (fun local => local.(ALocal.labels)) locals;
-    PO: ex.(Execution.po) = (fun eid1 eid2 => eid1.(fst) = eid2.(fst) /\ eid1.(snd) < eid2.(snd));
     ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals);
     DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals);
     CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals);
@@ -509,6 +556,24 @@ Module Valid.
     ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
   }.
   Hint Constructors ex.
+  Coercion PRE: ex >-> pre_ex.
+
+  Lemma ctrl_po
+        p exec (EX: ex p exec):
+    exec.(Execution.ctrl) ⨾ Execution.po ⊆ exec.(Execution.ctrl).
+  Proof.
+    ii. inv H. des. destruct x, y, x0.
+    rewrite EX.(CTRL) in *. des. ss. subst.
+    inv H0. rewrite IdMap.map_spec in RELS.
+    destruct (IdMap.find tid (locals EX)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(LOCALS) tid). rewrite LOCAL. intro X. inv X. des.
+    inv REL. ss. subst.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { s. econs. ss. }
+    s. i. des.  econs.
+    - rewrite IdMap.map_spec, LOCAL. ss.
+    - inv H1. ss. subst. econs; ss. eapply WF; eauto.
+  Qed.
 End Valid.
 
 Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.
