@@ -10,6 +10,7 @@ Require Import EquivDec.
 Require Import sflib.
 Require Import paco.
 Require Import HahnRelationsBasic.
+Require Import Classical.
 
 Require Import Order.
 Require Import Time.
@@ -20,6 +21,45 @@ Require Import Axiomatic.
 
 Set Implicit Arguments.
 
+
+Lemma strong_nat_ind
+      (P: nat -> Prop)
+      (STEP: forall n, (forall m, m < n -> P m) -> P n):
+  forall n, P n.
+Proof.
+  cut (forall n, forall m, m < n -> P m).
+  { i. eapply H. eauto. }
+  induction n; i; [lia|]. apply STEP. i. apply IHn. lia.
+Qed.
+
+Lemma partition A
+      (l: list A)
+      (pred: A -> Prop):
+  exists l1 l2,
+    Permutation (l1 ++ l2) l /\
+    List.Forall pred l1 /\
+    List.Forall (fun a => ~ (pred a)) l2.
+Proof.
+  induction l.
+  { esplits; eauto. s. eauto. }
+  des. destruct (classic (pred a)).
+  - exists (a::l1), l2. esplits; eauto. s. econs. ss.
+  - exists l1, (a::l2). esplits; eauto. rewrite <- Permutation_middle. econs. ss.
+Qed.
+
+(* TODO: move *)
+Lemma rtc_step_tc
+      A a b c
+      (rel:relation A)
+      (AB: rtc rel a b)
+      (BC: rel b c):
+  tc rel a c.
+Proof.
+  revert c BC. induction AB.
+  - i. econs. ss.
+  - i. exploit IHAB; eauto. i.
+    eapply Relation_Operators.t1n_trans; eauto.
+Qed.
 
 Lemma linearize A
       (l: list A)
@@ -33,7 +73,68 @@ Lemma linearize A
              (REL: rel x y),
         i < j>>.
 Proof.
-Admitted.
+  remember (length l) as n eqn:LEN. revert l LEN.
+  induction n using strong_nat_ind. i. subst.
+  destruct l.
+  { esplits; eauto. i. destruct i; ss. }
+  generalize (partition l (fun b => rtc rel b a)). i. des.
+
+  exploit (H (length l1)); ss.
+  { erewrite <- (Permutation_length H0), List.app_length. lia. }
+  i. des.
+
+  exploit (H (length l2)); ss.
+  { erewrite <- (Permutation_length H0), List.app_length. lia. }
+  i. des.
+
+  exists (l' ++ a :: l'0). esplits.
+  { rewrite <- Permutation_middle. econs.
+    rewrite Permutation_app; eauto.
+  }
+  rewrite List.Forall_forall in H1, H2. i.
+  destruct (Nat.compare_spec (length l') i), (Nat.compare_spec (length l') j);
+    repeat (subst;
+            match goal with
+            | [X: List.nth_error (?l ++ _) (length ?l) = Some _ |- _] =>
+              rewrite List.nth_error_app2 in X; ss
+            | [X: List.nth_error (?l ++ _) ?i = Some _,
+                  Y: ?i < length ?l |- _] =>
+              rewrite List.nth_error_app1 in X; [|lia]
+            | [X: List.nth_error (?l ++ _) ?i = Some _,
+                  Y: length ?l < ?i |- _] =>
+              rewrite List.nth_error_app2 in X; [|lia]
+            | [X: List.nth_error (_ :: _) (?i - ?j) = Some _, Y: ?j < ?i |- _] =>
+              let XX := fresh "XX" in
+              hexploit Nat.sub_gt; try exact Y; eauto; i; destruct (i - j) eqn:XX
+            | [X: context[?x - ?x] |- _] => rewrite Nat.sub_diag in X
+            | [X: Some _ = Some _ |- _] => inv X
+            end;
+            ss).
+  - exfalso. eapply ACYCLIC. econs. eauto.
+  - hexploit H1.
+    { eapply Permutation_in; eauto.
+      eapply List.nth_error_In; eauto.
+    }
+    i. exfalso. eapply ACYCLIC. apply clos_t1n_trans.
+    hexploit rtc_step_tc; eauto.
+  - hexploit H2.
+    { eapply Permutation_in; eauto.
+      eapply List.nth_error_In; eauto.
+    }
+    i. contradict H5. econs; eauto.
+  - exploit REL0; try exact REL1; eauto. lia.
+  - hexploit H1.
+    { eapply Permutation_in; eauto.
+      eapply List.nth_error_In; eauto.
+    }
+    hexploit H2.
+    { eapply Permutation_in; eauto.
+      eapply List.nth_error_In; eauto.
+    }
+    i. contradict H6. etrans; eauto.
+  - lia.
+  - exploit REL; try exact REL1; eauto.
+Qed.
 
 Inductive sim_label (tid:Id.t): forall (label:Label.t) (msg:Msg.t), Prop :=
 | sim_label_intro
