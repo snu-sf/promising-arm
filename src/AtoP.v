@@ -468,20 +468,24 @@ Lemma sim_local_coh_internal
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex (Label.is_accessing loc) eid2)
       (COH: sim_local_coh ex loc eid1 eid2):
-  ex.(Execution.internal)⁺ eid1 eid2.
+  <<INTERNAL: ex.(Execution.internal)⁺ eid1 eid2>> /\
+  <<LABEL: Execution.label_is ex (Label.is_writing loc) eid1>>.
 Proof.
   inv COH. des. inv H. inv H0. des. inv EID2. inv H2. destruct l0; ss. inv H.
-  - econs. left. left. left. econs; eauto.
-    econs; eauto. econs; eauto.
-  - inv H1.
-    econs 2; [econs|].
-    { right. eauto. }
-    exploit EX.(Valid.RF). intros [RF1 RF2].
-    exploit RF2.
-    { esplits; eauto. }
-    i. des.
-    econs. left. left. left. econs; eauto.
-    econs; eauto. econs; eauto.
+  - esplits.
+    + econs. left. left. left. econs; eauto.
+      econs; eauto. econs; eauto.
+    + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
+  - inv H1. splits.
+    + econs 2; [econs|].
+      { right. eauto. }
+      exploit EX.(Valid.RF). intros [RF1 RF2].
+      exploit RF2.
+      { esplits; eauto. }
+      i. des.
+      econs. left. left. left. econs; eauto.
+      econs; eauto. econs; eauto.
+    + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
 Qed.
 
 Definition sim_local_vrp ex :=
@@ -737,14 +741,13 @@ Proof.
         rewrite VIEW1. inv EID.
         exploit sim_local_coh_internal; eauto.
         { econs; eauto. ss. eapply Label.read_is_accessing. }
-        i. inv REL. des. inv H. inv H2. destruct l; ss.
-        destruct (equiv_dec loc (ValA.val (sem_expr armap1 eloc))); ss. inv e.
+        i. des. inv LABEL1. apply Label.is_writing_inv in LABEL2. des. subst.
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
         { esplits; [exact LABEL0|exact EID]. }
         i. des.
         { subst. rewrite VIEW in VIEW_EID. inv VIEW_EID. refl. }
         { exfalso. eapply EX.(Valid.INTERNAL). econs 2; eauto.
-          econs. left. left. right. econs. splits; [|exact x1]. apply RF0.
+          econs. left. left. right. econs. splits; [|exact x]. apply RF0.
         }
         { eapply view_eid_ob; eauto. left. left. left. right. ss. }
       * admit. (* external *)
@@ -780,8 +783,7 @@ Proof.
         eapply View.le_lt_trans; eauto. inv EID.
         exploit sim_local_coh_internal; eauto.
         { econs; eauto. apply Label.write_is_accessing. }
-        i. inv REL. des. inv H. inv H2. destruct l; ss.
-        destruct (equiv_dec loc (ValA.val (sem_expr armap1 eloc))); ss. inv e.
+        i. des. inv LABEL0. apply Label.is_writing_inv in LABEL1. des. subst.
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
         { esplits; [exact LABEL_WRITE|exact EID]. }
         i. des.

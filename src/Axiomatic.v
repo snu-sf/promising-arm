@@ -106,6 +106,24 @@ Module Label.
   Proof.
     s. destruct (equiv_dec loc loc); ss. exfalso. apply c. ss.
   Qed.
+
+  Lemma is_writing_inv
+        loc l
+        (WRITING: is_writing loc l):
+    exists ex ord val,
+      l = write ex ord loc val.
+  Proof.
+    destruct l; ss. destruct (equiv_dec loc0 loc); ss. inv e. eauto.
+  Qed.
+
+  Lemma is_reading_inv
+        loc l
+        (WRITING: is_reading loc l):
+    exists ex ord val,
+      l = read ex ord loc val.
+  Proof.
+    destruct l; ss. destruct (equiv_dec loc0 loc); ss. inv e. eauto.
+  Qed.
 End Label.
 
 Module ALocal.
