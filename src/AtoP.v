@@ -463,7 +463,7 @@ Proof.
   refl.
 Qed.
 
-Lemma sim_local_coh_internal
+Lemma sim_local_coh_spec
       p ex loc eid1 eid2
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex (Label.is_accessing loc) eid2)
@@ -625,6 +625,13 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
              (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ Execution.po)
              (eq (tid, List.length (alocal.(ALocal.labels)))))
           local.(Local.vrel);
+  FWDBANK: forall loc fwd (LOC: local.(Local.fwdbank) loc = Some fwd),
+      sim_view
+        ex ob
+        (inverse
+           (ex.(Execution.addr) ∪ ex.(Execution.data) ⨾ Execution.po) (* TODO: last write to loc *)
+           (eq (tid, List.length (alocal.(ALocal.labels)))))
+        fwd.(FwdItem.view);
   EXBANK: opt_rel
             (fun aexbank exbank => view_eid ex ob (tid, aexbank) = Some exbank)
             alocal.(ALocal.exbank) local.(Local.exbank);
@@ -640,6 +647,26 @@ Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (
     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
 .
 Hint Constructors sim_eu.
+
+Lemma label_read_mem_of_ex
+      eid ex ob exm ord loc val
+      (OB: Permutation ob (Execution.eids ex))
+      (LABEL: Execution.label eid ex = Some (Label.read exm ord loc val)):
+  exists view,
+    <<VIEW: view_eid ex ob eid = Some view>>.
+Proof.
+  generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0.
+  specialize (LABEL0 eid). rewrite LABEL in LABEL0.
+  inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0.
+  symmetry in OB. exploit Permutation_in; eauto. intro IN.
+  exploit HahnList.Permutation_nodup; eauto. intro NODUP.
+  clear OB IN0 NODUP0. revert IN NODUP. induction ob; ss. i. des.
+  - subst. condtac; [|congr]. s. esplits; eauto.
+  - condtac.
+    { inversion e. subst. inv NODUP. congr. }
+    inv NODUP. exploit IHob; eauto. i. des.
+    rewrite VIEW. s. esplits; eauto.
+Qed.
 
 Lemma label_write_mem_of_ex_msg
       eid ex ob exm ord loc val
@@ -739,7 +766,7 @@ Proof.
         intro X. inv X.
         { rewrite VIEW1. apply bot_spec. }
         rewrite VIEW1. inv EID.
-        exploit sim_local_coh_internal; eauto.
+        exploit sim_local_coh_spec; eauto.
         { econs; eauto. ss. eapply Label.read_is_accessing. }
         i. des. inv LABEL1. apply Label.is_writing_inv in LABEL2. des. subst.
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
@@ -753,7 +780,42 @@ Proof.
       * admit. (* external *)
     + econs; ss.
       * econs; ss. apply sim_rmap_add; ss. econs; ss.
-        admit. (* sim_view *)
+        exploit label_read_mem_of_ex; eauto. i. des.
+        repeat apply sim_view_join.
+        { econs 2; eauto; ss.
+          inv VIEW0.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. des. subst.
+          eapply view_eid_ob; eauto.
+          left. left. right. left. econs. splits; [|eauto]. left. apply ADDR. econs; ss. right. ss.
+        }
+        { admit. (* sim_local vrp *) }
+        { admit. (* sim_local vrel *) }
+        { econs. ss. }
+        { econs 2; eauto; ss.
+          destruct (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) eqn:FWD.
+          - exploit SIM_LOCAL.(FWDBANK); eauto. i.
+            destruct t. unfold FwdItem.read_view. ss. condtac.
+            + apply Bool.andb_true_iff in X. des.
+              destruct (equiv_dec ts (S n)); ss. inv e.
+              admit. (* forwarding; using x0 *)
+            + eapply view_eid_ob; eauto.
+              destruct eid2. destruct (t == tid); cycle 1.
+              { left. left. left. left. left. econs; ss. }
+              inv e. apply Bool.andb_false_iff in X. des.
+              * admit. (* violating internal: eid -po-> fwd -po-> cur *)
+              * apply Bool.orb_false_iff in X. des.
+                left. right.
+                econs. splits.
+                { admit. (* codom(rmw) *) }
+                econs. splits.
+                { econs; eauto. }
+                econs; eauto. econs; eauto. admit. (* wrong definition of acquirePC *)
+          - eapply view_eid_ob; eauto.
+            destruct eid2. destruct (t == tid); cycle 1.
+            { left. left. left. left. left. econs; ss. }
+            inv e. admit. (* tid cannot be same since fwdbank = None *)
+        }
       * admit. (* sim_local *)
   - (* write *)
     exploit LABEL.
@@ -781,7 +843,7 @@ Proof.
         intro X. inv X.
         { rewrite VIEW2. unfold bot, View.bot. lia. }
         eapply View.le_lt_trans; eauto. inv EID.
-        exploit sim_local_coh_internal; eauto.
+        exploit sim_local_coh_spec; eauto.
         { econs; eauto. apply Label.write_is_accessing. }
         i. des. inv LABEL0. apply Label.is_writing_inv in LABEL1. des. subst.
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
@@ -797,8 +859,7 @@ Proof.
         }
       * admit. (* external *)
     + econs; ss.
-      * econs; ss. apply sim_rmap_add; ss. econs; ss.
-        admit. (* sim_view *)
+      * econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss.
       * admit. (* sim_local *)
   - (* write_failure *)
     eexists (ExecUnit.mk _ _ _). esplits.
@@ -851,6 +912,7 @@ Proof.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
         rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+      * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbst *)
       esplits.
@@ -893,6 +955,7 @@ Proof.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
         rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+      * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbld *)
       esplits.
@@ -942,6 +1005,7 @@ Proof.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
         rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+      * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbsy *)
       esplits.
@@ -1005,6 +1069,7 @@ Proof.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
         rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+      * admit. (* fwdbank *)
       * apply SIM_LOCAL.
   - (* if *)
     eexists (ExecUnit.mk _ _ _). esplits.
@@ -1235,7 +1300,7 @@ Proof.
                         (mem_of_ex ex ob)).
     econs; ss.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
-    - econs; eauto. s. econs.
+    - econs; eauto; ss. econs.
   }
   { apply AExecUnit.wf_init. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.

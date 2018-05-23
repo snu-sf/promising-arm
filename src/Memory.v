@@ -84,7 +84,7 @@ Module FwdItem.
   Hint Constructors t.
 
   Definition read_view (fwd:t) (tsx:Time.t) (ord:ordT): View.t :=
-    if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (ord_le ord pln))
+    if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (ord_le ord pln)) (* TODO: acuqirePC *)
     then fwd.(view)
     else tsx.
 End FwdItem.
