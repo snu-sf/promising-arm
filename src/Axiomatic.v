@@ -10,6 +10,8 @@ Require Import sflib.
 Require Import paco.
 Require Import HahnRelationsBasic.
 
+Require Import Basic.
+Require Import HahnRelationsMore.
 Require Import Order.
 Require Import Time.
 Require Import Lang.
@@ -230,46 +232,6 @@ Module AExecUnit.
     - ii. inv H. des. inv H0.
   Qed.
 
-  (* TODO: move *)
-  Lemma cross_bot_l
-        A (pred:A -> Prop):
-    bot × pred = bot.
-  Proof.
-    funext. i. funext. i. propext.
-    econs; intro X; inv X. inv H.
-  Qed.
-
-  (* TODO: move *)
-  Lemma cross_bot_r
-        A (pred:A -> Prop):
-    pred × bot = bot.
-  Proof.
-    funext. i. funext. i. propext.
-    econs; intro X; inv X. inv H0.
-  Qed.
-
-  (* TODO: move *)
-  Lemma union_bot_l
-        A (rel: relation A):
-    bot ∪ rel = rel.
-  Proof.
-    funext. i. funext. i. propext.
-    econs; intro X.
-    - inv X; ss.
-    - right. ss.
-  Qed.
-
-  (* TODO: move *)
-  Lemma union_bot_r
-        A (rel: relation A):
-    rel ∪ bot = rel.
-  Proof.
-    funext. i. funext. i. propext.
-    econs; intro X.
-    - inv X; ss.
-    - left. ss.
-  Qed.
-
   Lemma step_future
         eu1 eu2
         (WF: wf eu1)
@@ -385,45 +347,6 @@ Module Execution.
       (fun tid local eids => (List.map (fun i => (tid, i)) (List.seq 0 (List.length local))) ++ eids)
       ex.(labels)
       [].
-
-  (* TODO: move *)
-  Lemma SetoidList_findA_rev
-        (A B : Type) (eqA : A -> A -> Prop)
-        (EQUIV: Equivalence eqA)
-        (eqA_dec : forall x y : A, {eqA x y} + {~ eqA x y})
-        (l : list (A * B))
-        (a : A) (b : B)
-        (NODUP: SetoidList.NoDupA (fun p p' : A * B => eqA (fst p) (fst p')) l):
-    SetoidList.findA (fun a' : A => if eqA_dec a a' then true else false) l =
-    SetoidList.findA (fun a' : A => if eqA_dec a a' then true else false) (List.rev l).
-  Proof.
-    hexploit SetoidList.NoDupA_rev; try exact NODUP; [|i].
-    { econs; ii.
-      - refl.
-      - symmetry. ss.
-      - etrans; eauto.
-    }
-
-    match goal with
-    | [|- ?f = _] => destruct f eqn:FIND
-    end.
-    { rewrite <- SetoidList.findA_NoDupA in FIND; ss.
-      rewrite <- SetoidList.InA_rev in FIND.
-      rewrite SetoidList.findA_NoDupA in FIND; ss.
-      eauto.
-    }
-
-    match goal with
-    | [|- _ = ?f] => destruct f eqn:FIND'
-    end.
-    { rewrite <- SetoidList.findA_NoDupA in FIND'; ss.
-      rewrite SetoidList.InA_rev in FIND'.
-      rewrite SetoidList.findA_NoDupA in FIND'; ss.
-      rewrite FIND' in FIND. congr.
-    }
-
-    ss.
-  Qed.
 
   Lemma eids_spec ex:
     <<LABEL: forall eid, label eid ex <> None <-> List.In eid (eids ex)>> /\
@@ -742,6 +665,16 @@ Module Valid.
     - rewrite IdMap.map_spec, LOCAL. ss.
     - inv H1. ss. subst. econs; ss.
       inv WF. apply CTRL_MON. econs; eauto.
+  Qed.
+
+  Lemma cap_po_adj
+        p exec (EX: ex p exec):
+    (exec.(Execution.ctrl) ∪ exec.(Execution.addr) ⨾ Execution.po) ⨾ Execution.po_adj ⊆ (exec.(Execution.ctrl) ∪ exec.(Execution.addr) ⨾ Execution.po).
+  Proof.
+    ii. inv H.
+    - des. inv H0.
+      + left. apply EX.(Valid.ctrl_po). econs. splits; eauto. apply Execution.po_adj_po. ss.
+      + right. inv H. des. econs. splits; eauto. etrans; eauto. apply Execution.po_adj_po. ss.
   Qed.
 End Valid.
 

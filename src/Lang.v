@@ -7,29 +7,10 @@ Require Import FSetPositive.
 Require Import sflib.
 Require Import EquivDec.
 
+Require Import Basic.
 Require Import Order.
 
 Set Implicit Arguments.
-
-(* TODO: move *)
-Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
-| opt_pred_intro
-    a
-    (PRED: pred a):
-    opt_pred pred (Some a)
-.
-Hint Constructors opt_pred.
-
-(* TODO: move *)
-Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
-| opt_rel_None:
-    opt_rel rel None None
-| opt_rel_Some
-    a b
-    (REL: rel a b):
-    opt_rel rel (Some a) (Some b)
-.
-Hint Constructors opt_rel.
 
 Module Id := Pos.
 

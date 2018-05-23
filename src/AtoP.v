@@ -12,6 +12,8 @@ Require Import paco.
 Require Import HahnRelationsBasic.
 Require Import Classical.
 
+Require Import Basic.
+Require Import HahnRelationsMore.
 Require Import Order.
 Require Import Time.
 Require Import Lang.
@@ -45,20 +47,6 @@ Proof.
   des. destruct (classic (pred a)).
   - exists (a::l1), l2. esplits; eauto. s. econs. ss.
   - exists l1, (a::l2). esplits; eauto. rewrite <- Permutation_middle. econs. ss.
-Qed.
-
-(* TODO: move *)
-Lemma rtc_step_tc
-      A a b c
-      (rel:relation A)
-      (AB: rtc rel a b)
-      (BC: rel b c):
-  tc rel a c.
-Proof.
-  revert c BC. induction AB.
-  - i. econs. ss.
-  - i. exploit IHAB; eauto. i.
-    eapply Relation_Operators.t1n_trans; eauto.
 Qed.
 
 Lemma linearize A
@@ -142,28 +130,6 @@ Inductive sim_label (tid:Id.t): forall (label:Label.t) (msg:Msg.t), Prop :=
     sim_label tid (Label.write ex ord loc val) (Msg.mk loc val tid)
 .
 Hint Constructors sim_label.
-
-(* TODO: move *)
-Fixpoint filter_map A B (f: A -> option B) (l: list A): list B :=
-  match l with
-  | [] => []
-  | a::l =>
-    match f a with
-    | None => filter_map f l
-    | Some b => b :: filter_map f l
-    end
-  end.
-
-Lemma in_filter_map_iff A B (f: A -> option B) (l: list A) (b: B):
-  List.In b (filter_map f l) <-> exists a, List.In a l /\ f a = Some b.
-Proof.
-  induction l; ss.
-  { econs; i; des; ss. }
-  destruct (f a) eqn:FA; ss.
-  - rewrite IHl. intuition; des; subst; eauto.
-    rewrite FA in H2. inv H2. auto.
-  - rewrite IHl. intuition; des; subst; eauto. congr.
- Qed.
 
 Definition mem_of_ex
            (ex:Execution.t)
@@ -273,6 +239,23 @@ Inductive inverse A (rel:relation A) (codom:A -> Prop) (a:A): Prop :=
 .
 Hint Constructors inverse.
 
+Lemma inverse_mon A (r1 r2:relation A)
+      (REL: r1 ⊆ r2):
+  inverse r1 <2= inverse r2.
+Proof.
+  i. inv PR. econs; eauto.
+Qed.
+
+Lemma inverse_union A (r1 r2:relation A) s:
+  inverse (r1 ∪ r2) s = inverse r1 s \1/ inverse r2 s.
+Proof.
+  funext. i. propext. econs; i.
+  - inv H. inv REL; eauto.
+  - des; inv H; econs; eauto.
+    + left. ss.
+    + right. ss.
+Qed.
+
 Fixpoint view_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option View.t :=
   match ob with
   | [] => None
@@ -320,6 +303,14 @@ Proof.
   i. inv PR.
   - econs 1. ss.
   - econs 2; eauto.
+Qed.
+
+Lemma sim_view_step
+      ex ob (r:relation eidT) tid n view
+      (SIM: sim_view ex ob (inverse r (eq (tid, n))) view):
+  sim_view ex ob (inverse (r ⨾ Execution.po_adj) (eq (tid, S n))) view.
+Proof.
+  inv SIM; eauto. inv EID. econs 2; eauto. econs; eauto. econs; eauto.
 Qed.
 
 Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t)): Prop :=
@@ -373,75 +364,6 @@ Proof.
       * s. i. des. subst. esplits; eauto. right. ss.
 Qed.
 
-(* TODO: move *)
-Lemma seq_assoc A (r1 r2 r3:relation A):
-  r1 ⨾ (r2 ⨾ r3) = (r1 ⨾ r2) ⨾ r3.
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H. des. inv H1. des. repeat econs; eauto.
-  - inv H. des. inv H0. des. repeat econs; eauto.
-Qed.
-
-(* TODO: move *)
-Lemma seq_union A (r1 r2 r3:relation A):
-  r1 ⨾ (r2 ∪ r3) = (r1 ⨾ r2) ∪ (r1 ⨾ r3).
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H. des. inv H1.
-    + left. econs; eauto.
-    + right. econs; eauto.
-  - inv H; inv H0; des.
-    + econs; esplits; eauto. left. ss.
-    + econs; esplits; eauto. right. ss.
-Qed.
-
-(* TODO: move *)
-Lemma seq_union' A (r2 r3 r1:relation A):
-  r1 ⨾ (r2 ∪ r3) = (r1 ⨾ r2) ∪ (r1 ⨾ r3).
-Proof.
-  apply seq_union.
-Qed.
-
-(* TODO: move *)
-Lemma union_seq A (r1 r2 r3:relation A):
-  (r1 ∪ r2) ⨾ r3 = (r1 ⨾ r3) ∪ (r2 ⨾ r3).
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H. des. inv H0.
-    + left. econs; eauto.
-    + right. econs; eauto.
-  - inv H; inv H0; des.
-    + econs; esplits; eauto. left. ss.
-    + econs; esplits; eauto. right. ss.
-Qed.
-
-(* TODO: move *)
-Lemma union_seq' A (r3 r1 r2:relation A):
-  (r1 ∪ r2) ⨾ r3 = (r1 ⨾ r3) ∪ (r2 ⨾ r3).
-Proof.
-  apply union_seq.
-Qed.
-
-(* TODO: move *)
-Lemma clos_refl_union
-      A (r:relation A):
-  r^? = r ∪ eq.
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H; [right|left]; ss.
-  - inv H; [right|left]; ss.
-Qed.
-
-(* TODO: move *)
-Lemma eq_seq
-      A (r:relation A):
-  eq ⨾ r = r.
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H. des. subst. ss.
-  - econs; eauto.
-Qed.
-
 Definition sim_local_coh ex loc :=
   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾
   ex.(Execution.rfe)^? ⨾
@@ -475,39 +397,6 @@ Definition sim_local_vrp ex :=
 
   (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
    Execution.po).
-
-(* TODO: move *)
-Lemma union_assoc A (r1 r2 r3: relation A):
-  r1 ∪ (r2 ∪ r3) = (r1 ∪ r2) ∪ r3.
-Proof.
-  funext. i. funext. i. propext. econs; i.
-  - inv H; [|inv H0].
-    + left. left. ss.
-    + left. right. ss.
-    + right. ss.
-  - inv H; [inv H0|].
-    + left. ss.
-    + right. left. ss.
-    + right. right. ss.
-Qed.
-
-(* TODO: move *)
-Lemma union_l
-      A
-      (r1 r2: relation A)
-      a b
-      (R1: r1 a b):
-  (r1 ∪ r2) a b.
-Proof. left. ss. Qed.
-
-(* TODO: move *)
-Lemma union_r
-      A
-      (r1 r2: relation A)
-      a b
-      (R2: r2 a b):
-  (r1 ∪ r2) a b.
-Proof. right. ss. Qed.
 
 Lemma sim_local_vrp_step ex:
   sim_local_vrp ex =
@@ -634,7 +523,8 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
             alocal.(ALocal.exbank) local.(Local.exbank);
 }.
 Hint Constructors sim_local.
-(* TODO: fwdbank, promises *)
+(* TODO: fwdbank *)
+(* TODO: promises as (promises_from_mem tid (Machine.mem m)) - (fulfilled promises in local.labels) *)
 
 Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
 | sim_eu_intro
@@ -679,45 +569,6 @@ Proof.
       * destruct (view_eid ex ob eid) eqn:V; ss. i. inv VIEW.
         apply plus_is_O in H0. des. subst.
         apply IHob; ss.
-Qed.
-
-(* TODO: move *)
-Lemma cap_po_adj
-      p exec (EX: Valid.ex p exec):
-  (exec.(Execution.ctrl) ∪ exec.(Execution.addr) ⨾ Execution.po) ⨾ Execution.po_adj ⊆ (exec.(Execution.ctrl) ∪ exec.(Execution.addr) ⨾ Execution.po).
-Proof.
-  ii. inv H.
-  - des. inv H0.
-    + left. apply EX.(Valid.ctrl_po). econs. splits; eauto. apply Execution.po_adj_po. ss.
-    + right. inv H. des. econs. splits; eauto. etrans; eauto. apply Execution.po_adj_po. ss.
-Qed.
-
-(* TODO: move *)
-Lemma inverse_mon A (r1 r2:relation A)
-      (REL: r1 ⊆ r2):
-  inverse r1 <2= inverse r2.
-Proof.
-  i. inv PR. econs; eauto.
-Qed.
-
-(* TODO: move *)
-Lemma inverse_union A (r1 r2:relation A) s:
-  inverse (r1 ∪ r2) s = inverse r1 s \1/ inverse r2 s.
-Proof.
-  funext. i. propext. econs; i.
-  - inv H. inv REL; eauto.
-  - des; inv H; econs; eauto.
-    + left. ss.
-    + right. ss.
-Qed.
-
-(* TODO: move *)
-Lemma sim_view_step
-      ex ob (r:relation eidT) tid n view
-      (SIM: sim_view ex ob (inverse r (eq (tid, n))) view):
-  sim_view ex ob (inverse (r ⨾ Execution.po_adj) (eq (tid, S n))) view.
-Proof.
-  inv SIM; eauto. inv EID. econs 2; eauto. econs; eauto. econs; eauto.
 Qed.
 
 Lemma sim_eu_step
@@ -824,7 +675,7 @@ Proof.
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         eapply sim_view_le; [|exact SIM_LOCAL.(VCAP)]. i. inv PR.
-        eapply inverse_mon; [exact EX.(cap_po_adj)|].
+        eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
@@ -866,7 +717,7 @@ Proof.
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         eapply sim_view_le; [|exact SIM_LOCAL.(VCAP)]. i. inv PR.
-        eapply inverse_mon; [exact EX.(cap_po_adj)|].
+        eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
@@ -915,7 +766,7 @@ Proof.
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         eapply sim_view_le; [|exact SIM_LOCAL.(VCAP)]. i. inv PR.
-        eapply inverse_mon; [exact EX.(cap_po_adj)|].
+        eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
@@ -978,7 +829,7 @@ Proof.
         rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         eapply sim_view_le; [|exact SIM_LOCAL.(VCAP)]. i. inv PR.
-        eapply inverse_mon; [exact EX.(cap_po_adj)|].
+        eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
         rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
@@ -1206,17 +1057,6 @@ Proof.
   (* Execute a thread `tid`. *)
   generalize (EX.(Valid.LOCALS) tid). rewrite FINDP.
   intro X. inv X. des. rename b into local, H into LOCAL. clear FINDP.
-  
-  (* aex: (init stmts, init) -> (state, local)
-   * ->
-   * pex: (init stmts, init w/ promises) -> (state', local')
-   * state ~= state': the same program state
-   * local ~= local': the simulation relation
-     - view: as @cp546 said
-     - promises: (promises_from_mem tid (Machine.mem m)) - (fulfilled promises in local.labels)
-       (finally we have to prove that (promises_from_mem tid (Machine.mem m)) = (fulfilled promises in local.labels))
-   *)
-
   exploit (@sim_eu_rtc_step p ex ob tid); eauto.
   { instantiate (1 := ExecUnit.mk
                         (State.init stmts)
