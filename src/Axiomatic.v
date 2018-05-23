@@ -538,17 +538,29 @@ Module Execution.
   .
   Hint Constructors po_adj.
 
-  Lemma po_case:
-    po = (po ⨾ po_adj) ∪ po_adj.
+  Lemma po_adj_po:
+    po_adj ⊆ po.
+  Proof.
+    ii. destruct x, y. inv H. ss. subst. econs; ss.
+  Qed.
+
+  Lemma po_po_adj:
+    po = po^? ⨾ po_adj.
   Proof.
     funext. i. funext. i. propext. econs; i.
     - inv H. destruct x, x0. ss. subst.
-      inv N.
-      + right. eauto.
-      + left. econs. instantiate (1 := (t1, m)). splits; ss.
-    - inv H.
-      + inv H0. des. inv H. inv H0. destruct x, x0, x1. ss. subst. econs; ss. lia.
-      + inv H0. destruct x, x0. ss. subst. econs; ss.
+      destruct n0; [lia|].
+      exists (t1, n0). splits; ss. inv N; [left|right]; eauto.
+    - inv H. des. inv H0.
+      + apply po_adj_po. ss.
+      + etrans; eauto. apply po_adj_po. ss.
+  Qed.
+
+  Lemma po_po_adj_weak:
+    (Execution.po ⨾ Execution.po_adj) ⊆ Execution.po.
+  Proof.
+    rewrite po_po_adj at 2. apply inclusion_seq_mon; ss.
+    econs 2. ss.
   Qed.
 
   Inductive i (eid1 eid2:eidT): Prop :=
