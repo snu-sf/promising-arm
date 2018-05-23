@@ -260,15 +260,15 @@ Module Local.
       view_loc view_val view_ext
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
-      (VAL: val = vloc.(ValA.val))
-      (VIEW_VAL: view_val = vloc.(ValA.annot))
+      (VAL: val = vval.(ValA.val))
+      (VIEW_VAL: view_val = vval.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwp);
                                 ifc (ord_le ra ord) lc1.(vrm);
                                 ifc (ord_le ra ord) lc1.(vwm)
                              ])
-      (COH: le (lc1.(coh) loc) ts)
-      (EXT: le (lc1.(coh) loc) ts)
+      (COH: lt (lc1.(coh) loc) ts)
+      (EXT: lt view_ext ts)
       (EX: ex -> exists tsx, lc1.(exbank) = Some tsx /\ True) (* TODO: non-blocked(M, l tsx, ts) *)
       (RES: res = ValA.mk _ 0 bot)
       (LC2: lc2 =
