@@ -1,5 +1,6 @@
 Require Import PArith.
 Require Import ZArith.
+Require Import Lia.
 Require Import FunctionalExtensionality.
 Require Import ClassicalFacts.
 Require Import Relations.
@@ -142,3 +143,45 @@ Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), P
     opt_rel rel (Some a) (Some b)
 .
 Hint Constructors opt_rel.
+
+Lemma List_skipn_nil
+      A n:
+  @List.skipn A n [] = [].
+Proof. induction n; ss. Qed.
+
+Lemma List_firstn_le
+      n m (LE: n <= m)
+      A (l:list A):
+  List.firstn m l = List.firstn n l ++ List.firstn (m - n) (List.skipn n l).
+Proof.
+  revert n m LE. induction l.
+  { i. rewrite List_skipn_nil, ? List.firstn_nil. ss. }
+  i. destruct m, n; ss.
+  { lia. }
+  erewrite IHl; ss. lia.
+Qed.
+
+Lemma List_nth_error_skipn
+      A (l:list A) n m a
+      (NTH: List.nth_error l n = Some a)
+      (LE: m <= n):
+  List.nth_error (List.skipn m l) (n - m) = Some a.
+Proof.
+  revert n l a NTH LE. induction m.
+  { i. destruct n; ss. }
+  i. destruct n, l; ss.
+  - lia.
+  - exploit IHm; eauto. lia.
+Qed.
+
+Lemma List_nth_error_firstn
+      A (l:list A) n m a
+      (NTH: List.nth_error l n = Some a)
+      (LE: n < m):
+  List.nth_error (List.firstn m l) n = Some a.
+Proof.
+  revert n l a NTH LE. induction m; destruct n, l; ss.
+  - i. lia.
+  - i. lia.
+  - i. exploit IHm; eauto. lia.
+Qed.

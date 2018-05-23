@@ -82,6 +82,30 @@ Module Label.
     | write _ _ loc' _ => loc' == loc
     | _ => false
     end.
+
+  Lemma read_is_reading ex ord loc val:
+    is_reading loc (read ex ord loc val).
+  Proof.
+    s. destruct (equiv_dec loc loc); ss. exfalso. apply c. ss.
+  Qed.
+
+  Lemma write_is_writing ex ord loc val:
+    is_writing loc (write ex ord loc val).
+  Proof.
+    s. destruct (equiv_dec loc loc); ss. exfalso. apply c. ss.
+  Qed.
+
+  Lemma read_is_accessing ex ord loc val:
+    is_accessing loc (read ex ord loc val).
+  Proof.
+    s. destruct (equiv_dec loc loc); ss. exfalso. apply c. ss.
+  Qed.
+
+  Lemma write_is_accessing ex ord loc val:
+    is_accessing loc (write ex ord loc val).
+  Proof.
+    s. destruct (equiv_dec loc loc); ss. exfalso. apply c. ss.
+  Qed.
 End Label.
 
 Module ALocal.
@@ -600,21 +624,22 @@ Module Valid.
 
   Inductive ex (p:program) (ex:Execution.t) := mk_ex {
     PRE: pre_ex p ex;
-    CO: forall loc
-          eid1 ex1 ord1 val1
-          eid2 ex2 ord2 val2
-          (EID: eid1 <> eid2)
-          (LABEL1: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1))
-          (LABEL2: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)),
-        ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1;
-    RF: forall eid1 ex1 ord1 loc val
-          (LABEL1: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
-        exists eid2 ex2 ord2,
-          <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
-          <<RF: ex.(Execution.rf) eid2 eid1>>;
+    CO: forall eid1 eid2,
+        (exists loc
+           ex1 ord1 val1
+           ex2 ord2 val2,
+            <<LABEL: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1)>> /\
+            <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) <->
+        (eid1 = eid2 \/ ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1);
+    RF: forall eid1 loc val,
+        (exists ex1 ord1,
+            <<LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>>) <->
+        (exists eid2 ex2 ord2,
+            <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
+            <<RF: ex.(Execution.rf) eid2 eid1>>);
     INTERNAL: acyclic ex.(Execution.internal);
     EXTERNAL: acyclic ex.(Execution.ob);
-    ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
+    ATOMIC: ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe)) = bot;
   }.
   Hint Constructors ex.
   Coercion PRE: ex >-> pre_ex.
