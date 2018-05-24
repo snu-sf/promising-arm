@@ -48,19 +48,19 @@ Module Label.
   (* TODO: define AcquirePC ordering *)
   Definition is_acquire_pc (label:t): bool :=
     match label with
-    | read _ ord _ _ => ord_le ra ord
+    | read _ ord _ _ => ord_ge ord ra
     | _ => false
     end.
 
   Definition is_acquire (label:t): bool :=
     match label with
-    | read _ ord _ _ => ord_le ra ord
+    | read _ ord _ _ => ord_ge ord ra
     | _ => false
     end.
 
   Definition is_release (label:t): bool :=
     match label with
-    | write _ ord _ _ => ord_le ra ord
+    | write _ ord _ _ => ord_ge ord ra
     | _ => false
     end.
 
@@ -562,11 +562,9 @@ Module Execution.
     ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗ex.(label_is) Label.is_acquire_pc⦘.
 
   Definition bob (ex:t): relation eidT :=
-    (⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘ ⨾
-     po ⨾
+    (po ⨾
      ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
+     po) ∪
 
     (⦗ex.(label_is) Label.is_release⦘ ⨾
      po ⨾
@@ -575,12 +573,10 @@ Module Execution.
     (⦗ex.(label_is) Label.is_read⦘ ⨾
      po ⨾
      ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
+     po) ∪
 
     (⦗ex.(label_is) Label.is_acquire_pc⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘) ∪
+     po) ∪
 
     (⦗ex.(label_is) Label.is_write⦘ ⨾
      po ⨾
@@ -588,8 +584,7 @@ Module Execution.
      po ⨾
      ⦗ex.(label_is) Label.is_write⦘) ∪
 
-    (⦗ex.(label_is) Label.is_read \1/ ex.(label_is) Label.is_write⦘ ⨾
-     po ⨾
+    (po ⨾
      ⦗ex.(label_is) Label.is_release⦘).
 
   Definition ob (ex:t): relation eidT :=

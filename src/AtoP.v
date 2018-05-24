@@ -502,7 +502,7 @@ Definition sim_local_vrp ex :=
    ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
    Execution.po) ∪
 
-  (⦗ex.(Execution.label_is) (Label.is_acquire)⦘ ⨾
+  (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘ ⨾
    Execution.po).
 
 Lemma sim_local_vrp_step ex:
@@ -534,6 +534,25 @@ Proof.
            | [H: (_ ∪ _) _ _ |- _] => inv H
            end;
       eauto 10 using union_l, union_r.
+Qed.
+
+Lemma sim_local_vrp_spec
+      p ex eid1 eid2
+      (EX: Valid.ex p ex)
+      (EID2: Execution.label_is ex Label.is_read eid2)
+      (VRP: sim_local_vrp ex eid1 eid2):
+  <<OB: ex.(Execution.ob) eid1 eid2>>.
+Proof.
+  inv EID2. destruct l; inv LABEL. unfold sim_local_vrp in VRP.
+  repeat match goal with
+         | [H: (_ ∪ _) _ _ |- _] => inv H
+         end.
+  - right. left. left. left. left. left. ss.
+  - right. left. left. left. right. ss.
+  - left. left. right. right.
+    inv H0. des. econs. splits; eauto.
+    right. rewrite seq_assoc. econs. splits; eauto. econs; ss. econs; eauto.
+  - right. left. left. right. ss.
 Qed.
 
 Definition sim_local_vwp ex :=
@@ -586,6 +605,33 @@ Proof.
       eauto 10 using union_l, union_r.
 Qed.
 
+Definition sim_local_vrel ex :=
+  (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ Execution.po).
+
+Lemma sim_local_vrel_step ex:
+  sim_local_vrel ex =
+  (sim_local_vrel ex ∪ ⦗ex.(Execution.label_is) (Label.is_release)⦘) ⨾
+  Execution.po_adj.
+Proof.
+  unfold sim_local_vrel. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  rewrite Execution.po_po_adj at 1.
+  rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
+  rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
+  refl.
+Qed.
+
+Lemma sim_local_vrel_spec
+      p ex eid1 eid2
+      (EX: Valid.ex p ex)
+      (EID2: Execution.label_is ex Label.is_acquire eid2)
+      (VREL: sim_local_vrel ex eid1 eid2):
+  <<OB: ex.(Execution.ob) eid1 eid2>>.
+Proof.
+  inv EID2. destruct l; inv LABEL. unfold sim_local_vrel in VREL.
+  - right. left. left. left. left. right.
+    rewrite seq_assoc. econs. splits; eauto. econs; eauto. econs; eauto.
+Qed.
+
 Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
@@ -621,9 +667,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
          local.(Local.vcap);
   VREL: sim_view
           ex ob
-          (inverse
-             (⦗ex.(Execution.label_is) (Label.is_release)⦘ ⨾ Execution.po)
-             (eq (tid, List.length (alocal.(ALocal.labels)))))
+          (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
           local.(Local.vrel);
   FWDBANK: forall loc fwd (LOC: local.(Local.fwdbank) loc = Some fwd),
       sim_view
@@ -789,8 +833,24 @@ Proof.
           eapply view_eid_ob; eauto.
           left. left. right. left. econs. splits; [|eauto]. left. apply ADDR. econs; ss. right. ss.
         }
-        { admit. (* sim_local vrp *) }
-        { admit. (* sim_local vrel *) }
+        { econs 2; eauto; ss.
+          generalize SIM_LOCAL.(VRP). intro VRP.
+          inv VRP.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. eapply view_eid_ob; eauto.
+          inv EID. exploit sim_local_vrp_spec; eauto.
+          econs; eauto.
+        }
+        { econs 2; eauto; ss.
+          generalize SIM_LOCAL.(VREL). intro VREL.
+          destruct (ord_ge ord ra) eqn:ORD; ss; cycle 1.
+          { apply bot_spec. }
+          inv VREL.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. eapply view_eid_ob; eauto.
+          inv EID. exploit sim_local_vrel_spec; eauto.
+          econs; eauto.
+        }
         { econs. ss. }
         { econs 2; eauto; ss.
           destruct (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) eqn:FWD.
@@ -909,9 +969,8 @@ Proof.
         eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
-        rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
-        rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
-        rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+        rewrite sim_local_vrel_step. apply sim_view_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto.
       * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbst *)
@@ -952,9 +1011,8 @@ Proof.
         eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
-        rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
-        rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
-        rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+        rewrite sim_local_vrel_step. apply sim_view_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto.
       * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbld *)
@@ -1002,9 +1060,8 @@ Proof.
         eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
-        rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
-        rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
-        rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+        rewrite sim_local_vrel_step. apply sim_view_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto.
       * admit. (* fwdbank *)
       * apply SIM_LOCAL.
     + (* dmbsy *)
@@ -1066,9 +1123,8 @@ Proof.
         eapply inverse_mon; [exact EX.(Valid.cap_po_adj)|].
         econs; eauto. econs. splits; eauto.
       * rewrite List.app_length. s. rewrite Nat.add_1_r.
-        rewrite Execution.po_po_adj, clos_refl_union, union_seq, eq_seq.
-        rewrite seq_union, inverse_union. eapply sim_view_le; [by left; eauto|].
-        rewrite seq_assoc. apply sim_view_step; eauto. apply SIM_LOCAL.
+        rewrite sim_local_vrel_step. apply sim_view_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto.
       * admit. (* fwdbank *)
       * apply SIM_LOCAL.
   - (* if *)

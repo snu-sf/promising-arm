@@ -230,7 +230,7 @@ Module Local.
       view_ext1 view_ext2
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
-      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (ord_le ra ord) lc1.(vrel))])
+      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (ord_ge ord ra) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
       (LATEST: le (Memory.latest mem1 loc view_ext1) ts)
       (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
@@ -242,8 +242,8 @@ Module Local.
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
-              (join lc1.(vrp) (ifc (ord_le ra ord) view_ext2))
-              (join lc1.(vwp) (ifc (ord_le ra ord) view_ext2))
+              (join lc1.(vrp) (ifc (ord_ge ord ra) view_ext2))
+              (join lc1.(vwp) (ifc (ord_ge ord ra) view_ext2))
               (join lc1.(vrm) view_ext2)
               lc1.(vwm)
               (join lc1.(vcap) view)
@@ -264,8 +264,8 @@ Module Local.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwp);
-                                ifc (ord_le ra ord) lc1.(vrm);
-                                ifc (ord_le ra ord) lc1.(vwm)
+                                ifc (ord_ge ord ra) lc1.(vrm);
+                                ifc (ord_ge ord ra) lc1.(vwm)
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext ts)
@@ -279,7 +279,7 @@ Module Local.
               lc1.(vrm)
               (join lc1.(vwm) ts)
               (join lc1.(vcap) view_loc)
-              (join lc1.(vrel) (ifc (ord_le ra ord) ts))
+              (join lc1.(vrel) (ifc (ord_ge ord ra) ts))
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))

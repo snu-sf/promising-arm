@@ -164,7 +164,14 @@ Definition ord_le (a b:ordT): bool :=
   | rlx, rlx => true
   | _, _ => false
   end.
-Hint Unfold ord_le.
+
+Definition ord_ge (a b:ordT): bool :=
+  match a, b with
+  | _, pln => true
+  | ra, _ => true
+  | rlx, rlx => true
+  | _, _ => false
+  end.
 
 Module Barrier.
   Inductive t :=
