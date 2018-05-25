@@ -264,7 +264,10 @@ Module AExecUnit.
       (DATA: aeu.(local).(ALocal.data) ⊆ lt)
       (CTRL: aeu.(local).(ALocal.ctrl) ⊆ lt)
       (CTRL_MON: aeu.(local).(ALocal.ctrl) ⨾ lt ⊆ aeu.(local).(ALocal.ctrl))
-  .
+      (RMW: forall n ord loc val
+              (LABEL: List.nth_error aeu.(local).(ALocal.labels) n = Some (Label.write true ord loc val)),
+          codom_rel aeu.(local).(ALocal.rmw) n)
+  .         
   Hint Constructors wf.
 
   Lemma wf_init stmts: wf (mk (State.init stmts) ALocal.init).
@@ -272,6 +275,7 @@ Module AExecUnit.
     econs; ss.
     - ii. unfold RMap.find, RMap.init in *. rewrite IdMap.gempty in *. inv N.
     - ii. inv H. des. inv H0.
+    - i. apply List.nth_error_In in LABEL. inv LABEL.
   Qed.
 
   Lemma step_future
@@ -306,6 +310,12 @@ Module AExecUnit.
           }
           { i. exploit REG; eauto. lia. }
         * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+        * i. destruct (lt_dec n (length local1.(ALocal.labels))).
+          { rewrite List.nth_error_app1 in LABEL; ss. eauto. }
+          { rewrite List.nth_error_app2 in LABEL; [|lia].
+            destruct ((n - length (ALocal.labels local1))) eqn:N; ss.
+            apply List.nth_error_In in LABEL. inv LABEL.
+          }
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -319,6 +329,17 @@ Module AExecUnit.
           { i. exploit REG; eauto. lia. }
         * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
         * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+        * i. destruct (lt_dec n (length local1.(ALocal.labels))).
+          { rewrite List.nth_error_app1 in LABEL; ss.
+            exploit RMW; eauto. intro X. inv X. econs. left. eauto.
+          }
+          { rewrite List.nth_error_app2 in LABEL; [|lia].
+            destruct ((n - length (ALocal.labels local1))) eqn:N; ss.
+            - inv LABEL. assert (n = length (ALocal.labels local1)) by lia. subst.
+              exploit EX; eauto. i. des.
+              econs. right. econs; eauto. 
+            - apply List.nth_error_In in LABEL. inv LABEL.
+          }
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -331,8 +352,14 @@ Module AExecUnit.
       + econs; ss. eexists. rewrite List.app_nil_r. ss.
     - splits.
       + inv WF. econs; ss.
-        rewrite List.app_length. s.
-        ii. exploit REG; eauto. lia.
+        * rewrite List.app_length. s.
+          ii. exploit REG; eauto. lia.
+        * i. destruct (lt_dec n (length local1.(ALocal.labels))).
+          { rewrite List.nth_error_app1 in LABEL; ss. eauto. }
+          { rewrite List.nth_error_app2 in LABEL; [|lia].
+            destruct ((n - length (ALocal.labels local1))) eqn:N; ss.
+            apply List.nth_error_In in LABEL. inv LABEL.
+          }
       + econs; ss. eexists; eauto.
     - splits.
       + inv WF. econs; ss.
@@ -713,6 +740,25 @@ Module Valid.
     - des. inv H0.
       + left. apply EX.(Valid.ctrl_po). econs. splits; eauto. apply Execution.po_adj_po. ss.
       + right. inv H. des. econs. splits; eauto. etrans; eauto. apply Execution.po_adj_po. ss.
+  Qed.
+
+  Lemma write_ex_codom_rmw
+        p exec eid
+        (EX: ex p exec)
+        (WRITE: exec.(Execution.label_is) (fun l => Label.is_write l /\ Label.is_ex l) eid):
+    codom_rel exec.(Execution.rmw) eid.
+  Proof.
+    destruct eid as [tid n]. rewrite EX.(RMW).
+    inv WRITE. des. destruct l; ss. destruct ex0; ss. revert EID. unfold Execution.label.
+    rewrite EX.(LABELS), IdMap.map_spec. s.
+    destruct (IdMap.find tid (locals EX)) eqn:LOCAL; ss. i.
+    generalize (EX.(LOCALS) tid). rewrite LOCAL. intro X. inv X. des.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { apply AExecUnit.wf_init. }
+    s. i. des. inv WF. exploit RMW0; eauto. intro X. inv X. ss.
+    econs. econs.
+    - rewrite IdMap.map_spec, LOCAL. ss.
+    - instantiate (1 := (_, _)). econs; ss; eauto.
   Qed.
 End Valid.
 
