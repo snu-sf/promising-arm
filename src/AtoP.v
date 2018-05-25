@@ -685,6 +685,17 @@ Proof.
     rewrite seq_assoc. econs. splits; eauto. econs; eauto. econs; eauto.
 Qed.
 
+Definition sim_local_fwd ex (loc:Loc.t) :=
+  ex.(Execution.addr) ∪ ex.(Execution.data) ⨾ Execution.po. (* TODO: last write to loc *)
+
+Lemma sim_local_fwd_step ex loc:
+  sim_local_fwd ex loc =
+  (sim_local_fwd ex loc ⨾ ⦗ex.(Execution.label_is) (fun l => ~ (Label.is_writing loc l))⦘ ∪
+   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘) ⨾
+  Execution.po_adj.
+Proof.
+Admitted.
+
 Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
@@ -719,17 +730,14 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
   FWDBANK: forall loc fwd (LOC: local.(Local.fwdbank) loc = Some fwd),
       sim_view
         ex ob
-        (inverse
-           (ex.(Execution.addr) ∪ ex.(Execution.data) ⨾ Execution.po) (* TODO: last write to loc *)
-           (eq (tid, List.length (alocal.(ALocal.labels)))))
+        (inverse (sim_local_fwd ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))))
         fwd.(FwdItem.view);
   EXBANK: opt_rel
             (fun aexbank exbank => view_eid ex ob (tid, aexbank) = Some exbank)
             alocal.(ALocal.exbank) local.(Local.exbank);
+  PROMISES: True; (* promises = (promises_from_mem tid (Machine.mem m)) - (fulfilled promises in local.labels) *)
 }.
 Hint Constructors sim_local.
-(* TODO: fwdbank *)
-(* TODO: promises as (promises_from_mem tid (Machine.mem m)) - (fulfilled promises in local.labels) *)
 
 Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
 | sim_eu_intro
@@ -966,30 +974,84 @@ Proof.
         }
       * admit. (* external *)
     + econs; ss.
-      * econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss.
-      * econs; ss.
-        { i. rewrite List.app_length, Nat.add_1_r.
-          rewrite sim_local_coh_step. rewrite inverse_step.
-          rewrite inverse_union, fun_add_spec. condtac; ss.
-          - inversion e. subst. econs 2; eauto; [|refl]. right. econs; eauto.
-            econs. splits; eauto. econs; eauto. econs; eauto.
-            rewrite VAL. apply Label.write_is_writing.
-          - eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto.
+      { econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss. }
+      econs; ss.
+      * i. rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_coh_step. rewrite inverse_step.
+        rewrite inverse_union, fun_add_spec. condtac; ss.
+        { inversion e. subst. econs 2; eauto; [|refl]. right. econs; eauto.
+          econs. splits; eauto. econs; eauto. econs; eauto.
+          rewrite VAL. apply Label.write_is_writing.
         }
-        { rewrite List.app_length, Nat.add_1_r.
-          rewrite sim_local_vrp_step. rewrite inverse_step.
-          rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto.
+        { eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto. }
+      * rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_vrp_step. rewrite inverse_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto.
+      * rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_vwp_step. rewrite inverse_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VWP)]. eauto.
+      * rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_vrm_step. rewrite inverse_step.
+        rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VRM)]. eauto.
+      * rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_vwm_step. rewrite inverse_step.
+        rewrite ? inverse_union. apply sim_view_join.
+        { eapply sim_view_le; [|exact SIM_LOCAL.(VWM)]. eauto. }
+        { eapply sim_view_le; [by right; eauto|]. econs 2; eauto.
+          - econs; eauto. econs; eauto. econs; eauto.
+          - refl.
         }
-        { rewrite List.app_length, Nat.add_1_r.
-          rewrite sim_local_vwp_step. rewrite inverse_step.
-          rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VWP)]. eauto.
+      * rewrite List.app_length, Nat.add_1_r. apply sim_view_join.
+        { eapply sim_view_le.
+          { apply inverse_mon. eapply sim_local_vcap_po_adj. eauto. }
+          rewrite inverse_step. apply SIM_LOCAL.
         }
-        { admit. (* sim_local vrm *) }
-        { admit. (* sim_local vwm *) }
-        { admit. (* sim_local vcap *) }
-        { admit. (* sim_local vrel *) }
-        { admit. (* sim_local fwdbank *) }
-        { destruct ex1; ss. apply SIM_LOCAL.(EXBANK). }
+        { eapply sim_view_le; [|by eauto]. s. i. des. subst.
+          econs; eauto. right. econs. instantiate (1 := (fst x0, _)). splits.
+          - apply ADDR. econs; eauto. right. econs; ss.
+          - econs; ss.
+        }
+      * rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_vrel_step. rewrite inverse_step.
+        rewrite ? inverse_union. apply sim_view_join.
+        { eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto. }
+        { destruct (ord_ge ord ra) eqn:ORD; [|by econs].
+          eapply sim_view_le; [by right; eauto|]. econs 2; eauto.
+          - econs; eauto. econs; eauto. econs; eauto.
+          - refl.
+        }
+      * rewrite List.app_length, Nat.add_1_r.
+        i. rewrite fun_add_spec in LOC.
+        rewrite sim_local_fwd_step. rewrite inverse_step. rewrite ? inverse_union.
+        revert LOC. condtac.
+        { inversion e. i. inv LOC. s. apply sim_view_join.
+          - eapply sim_view_le; [by right; eauto|].
+            econs 2; eauto.
+            + econs; eauto. econs; eauto. econs; eauto.
+              rewrite VAL. apply Label.write_is_writing.
+            + inv VIEW0.
+              { rewrite VIEW2. apply bot_spec. }
+              des. subst. rewrite VIEW2.
+              eapply view_eid_ob; eauto.
+              left. left. right. left. econs. splits; eauto. left.
+              apply ADDR. econs; eauto. right. econs; eauto.
+          - eapply sim_view_le; [by right; eauto|].
+            econs 2; eauto.
+            + econs; eauto. econs; eauto. econs; eauto.
+              rewrite VAL. apply Label.write_is_writing.
+            + inv VIEW1.
+              { rewrite VIEW2. apply bot_spec. }
+              des. subst. rewrite VIEW2.
+              eapply view_eid_ob; eauto.
+              left. left. right. left. econs. splits; eauto. right.
+              apply DATA. econs; eauto. right. econs; eauto.
+        }
+        { i. eapply sim_view_le; [|by eapply SIM_LOCAL.(FWDBANK); eauto].
+          i. inv PR. left. econs; eauto. econs. splits; eauto.
+          econs; eauto. econs; eauto. ss.
+          destruct (equiv_dec (ValA.val (sem_expr armap1 eloc)) loc); ss. inv e. congr.
+        }
+      * destruct ex1; ss. apply SIM_LOCAL.(EXBANK).
   - (* write_failure *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
