@@ -88,6 +88,12 @@ Proof.
   - rewrite IHl. intuition; des; subst; eauto. congr.
 Qed.
 
+Lemma filter_map_app A B (f: A -> option B) (l1 l2: list A):
+  filter_map f (l1 ++ l2) = filter_map f l1 ++ filter_map f l2.
+Proof.
+  induction l1; ss. destruct (f a); ss. rewrite IHl1. ss.
+Qed.
+
 Lemma SetoidList_findA_rev
       (A B : Type) (eqA : A -> A -> Prop)
       (EQUIV: Equivalence eqA)

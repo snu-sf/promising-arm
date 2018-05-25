@@ -50,7 +50,7 @@ Module Machine.
       (TERMINAL:
          forall tid st lc
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
-           State.is_terminal st /\ Promises.is_empty lc.(Local.promises))
+           State.is_terminal st /\ Promises.IsEmpty lc.(Local.promises))
   .
   Hint Constructors is_terminal.
 
@@ -68,7 +68,7 @@ Module Machine.
       (PROMISES:
          forall tid st lc
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
-           Promises.is_empty lc.(Local.promises))
+           Promises.IsEmpty lc.(Local.promises))
   .
   Hint Constructors no_promise.
 
@@ -120,5 +120,4 @@ Module Machine.
       + ss.
       + s. rewrite (IdMap.add_add tid (st2, lc2)). eauto.
   Qed.
-  
 End Machine.

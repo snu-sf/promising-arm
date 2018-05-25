@@ -157,6 +157,15 @@ Module Promises.
     - condtac; ss. inversion e. subst.
       rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
   Qed.
+
+  Definition IsEmpty (promises:t) :=
+    forall ts, lookup ts promises = false.
+
+  Lemma lookup_empty view:
+    lookup view empty = false.
+  Proof.
+    unfold lookup. destruct (id_of_time view); ss.
+  Qed.
 End Promises.
 
 Module Local.
