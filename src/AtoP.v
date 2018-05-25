@@ -920,7 +920,29 @@ Proof.
       * admit. (* external *)
     + econs; ss.
       * econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss.
-      * admit. (* sim_local *)
+      * econs; ss.
+        { i. rewrite List.app_length, Nat.add_1_r.
+          rewrite sim_local_coh_step. apply sim_view_step.
+          rewrite inverse_union, fun_add_spec. condtac; ss.
+          - inversion e. subst. econs 2; eauto; [|refl]. right. econs; eauto.
+            econs. splits; eauto. econs; eauto. econs; eauto.
+            rewrite VAL. apply Label.write_is_writing.
+          - eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto.
+        }
+        { rewrite List.app_length, Nat.add_1_r.
+          rewrite sim_local_vrp_step. apply sim_view_step.
+          rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto.
+        }
+        { rewrite List.app_length, Nat.add_1_r.
+          rewrite sim_local_vwp_step. apply sim_view_step.
+          rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VWP)]. eauto.
+        }
+        { admit. (* sim_local vrm *) }
+        { admit. (* sim_local vwm *) }
+        { admit. (* sim_local vcap *) }
+        { admit. (* sim_local vrel *) }
+        { admit. (* sim_local fwdbank *) }
+        { destruct ex1; ss. apply SIM_LOCAL.(EXBANK). }
   - (* write_failure *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs; ss.
