@@ -759,6 +759,24 @@ Module Valid.
     - rewrite IdMap.map_spec, LOCAL. ss.
     - instantiate (1 := (_, _)). econs; ss; eauto.
   Qed.
+
+  Lemma po_label
+        p exec
+        eid1 eid2 label2
+        (EX: ex p exec)
+        (PO: Execution.po eid1 eid2)
+        (LABEL: Execution.label eid2 exec = Some label2):
+    exists label1, <<LABEL: Execution.label eid1 exec = Some label1>>.
+  Proof.
+    destruct eid1, eid2. inv PO. ss. subst.
+    revert LABEL. unfold Execution.label.
+    rewrite EX.(LABELS), ? IdMap.map_spec. s.
+    destruct (IdMap.find t0 EX.(locals)) eqn:LOCAL; ss.
+    generalize (EX.(LOCALS) t0). rewrite LOCAL. intro X. inv X. des.
+    i. exploit List.nth_error_Some. rewrite LABEL. intros [X _]. exploit X; [congr|]. clear X. i.
+    generalize (List.nth_error_Some t.(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
+    destruct (List.nth_error t.(ALocal.labels) n); ss. eauto.
+  Qed.
 End Valid.
 
 Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.

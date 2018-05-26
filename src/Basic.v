@@ -45,6 +45,7 @@ Definition proj_sumbool (P Q: Prop) (a: {P} + {Q}) : bool :=
 Arguments proj_sumbool [P Q].
 Coercion proj_sumbool: sumbool >-> bool.
 
+
 Notation rtc := (clos_refl_trans_1n _). (* reflexive transitive closure *)
 Notation rc := (clos_refl _). (* reflexive transitive closure *)
 Notation tc := (clos_trans_1n _). (* transitive closure *)
@@ -69,6 +70,26 @@ Proof.
   - i. exploit IHAB; eauto. i.
     eapply Relation_Operators.t1n_trans; eauto.
 Qed.
+
+
+Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
+| opt_pred_intro
+    a
+    (PRED: pred a):
+    opt_pred pred (Some a)
+.
+Hint Constructors opt_pred.
+
+Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
+| opt_rel_None:
+    opt_rel rel None None
+| opt_rel_Some
+    a b
+    (REL: rel a b):
+    opt_rel rel (Some a) (Some b)
+.
+Hint Constructors opt_rel.
+
 
 Fixpoint filter_map A B (f: A -> option B) (l: list A): list B :=
   match l with
@@ -95,6 +116,35 @@ Lemma filter_map_app A B (f: A -> option B) (l1 l2: list A):
   filter_map f (l1 ++ l2) = filter_map f l1 ++ filter_map f l2.
 Proof.
   induction l1; ss. destruct (f a); ss. rewrite IHl1. ss.
+Qed.
+
+Lemma filter_map_in_length
+      A B (f:A -> option B) (l:list A)
+      a (IN: List.In a l) (FA: f a <> None):
+  length (filter_map f l) <> 0.
+Proof.
+  revert IN. induction l; ss. i. des.
+  - subst. destruct (f a); ss.
+  - destruct (f a0); eauto. s. lia.
+Qed.
+
+Lemma nth_error_filter_map_inv A B
+      f (l:list A) n (fa:B)
+      (NTH: List.nth_error (filter_map f l) n = Some fa):
+  exists m a,
+    <<NTH: List.nth_error l m = Some a>> /\
+    <<FA: f a = Some fa>> /\
+    <<N: length (filter_map f (List.firstn (S m) l)) = S n>>.
+Proof.
+  revert n fa NTH. induction l; ss.
+  { i. apply List.nth_error_In in NTH. inv NTH. }
+  destruct (f a) eqn:FA.
+  - destruct n; ss.
+    + i. inv NTH. exists 0. esplits; ss.
+    + i. exploit IHl; eauto. i. des.
+      exists (S m). esplits; eauto.
+  - i. exploit IHl; eauto. i. des.
+    exists (S m). esplits; eauto.
 Qed.
 
 Lemma SetoidList_findA_rev
@@ -135,23 +185,27 @@ Proof.
   ss.
 Qed.
 
-Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
-| opt_pred_intro
-    a
-    (PRED: pred a):
-    opt_pred pred (Some a)
-.
-Hint Constructors opt_pred.
+Lemma List_nth_error_firstn
+      A (l:list A) n m a
+      (NTH: List.nth_error l n = Some a)
+      (LE: n < m):
+  List.nth_error (List.firstn m l) n = Some a.
+Proof.
+  revert n l a NTH LE. induction m; destruct n, l; ss.
+  - i. lia.
+  - i. lia.
+  - i. exploit IHm; eauto. lia.
+Qed.
 
-Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
-| opt_rel_None:
-    opt_rel rel None None
-| opt_rel_Some
-    a b
-    (REL: rel a b):
-    opt_rel rel (Some a) (Some b)
-.
-Hint Constructors opt_rel.
+Lemma List_firstn_S A
+      (l:list A) n a
+      (NTH: List.nth_error l n = Some a):
+  List.firstn (S n) l = (List.firstn n l) ++ [a].
+Proof.
+  revert n a NTH. induction l; destruct n; ss.
+  - i. inv NTH. ss.
+  - i. erewrite IHl; ss.
+Qed.
 
 Lemma List_skipn_nil
       A n:
@@ -183,27 +237,63 @@ Proof.
   - exploit IHm; eauto. lia.
 Qed.
 
-Lemma List_nth_error_firstn
-      A (l:list A) n m a
-      (NTH: List.nth_error l n = Some a)
-      (LE: n < m):
-  List.nth_error (List.firstn m l) n = Some a.
+Lemma List_skipn_cons A
+      (l:list A) n a
+      (NTH: List.nth_error l n = Some a):
+  List.skipn n l = a :: (List.skipn (S n) l).
 Proof.
-  revert n l a NTH LE. induction m; destruct n, l; ss.
-  - i. lia.
-  - i. lia.
-  - i. exploit IHm; eauto. lia.
+  revert n a NTH. induction l; destruct n; ss.
+  - i. inv NTH. ss.
+  - i. erewrite IHl; ss.
 Qed.
 
-Lemma List_in_filter_length
-      A (f:A -> bool) (l:list A)
-      a (IN: List.In a l) (FA: f a):
-  length (List.filter f l) <> 0.
+Fixpoint List_find_pos A (pred:A -> bool) (l:list A): option nat :=
+  match l with
+  | [] => None
+  | a::l =>
+    if pred a
+    then Some 0
+    else option_map S (List_find_pos pred l)
+  end.
+
+Lemma List_find_pos_inv A pred (l:list A) n
+      (POS: List_find_pos pred l = Some n):
+  exists a,
+    <<NTH: List.nth_error l n = Some a>> /\
+    <<PRED: pred a>>.
+Proof.
+  revert n POS. induction l; ss.
+  destruct (pred a) eqn:PA.
+  - i. inv POS. esplits; ss.
+  - destruct ((List_find_pos pred l)) eqn:POS; ss. i. inv POS0.
+    exploit IHl; eauto.
+Qed.
+
+Lemma List_in_find_pos A `{_: EqDec A eq} a (l:list A)
+      (IN: List.In a l):
+  exists n, List_find_pos (fun a' => a' == a) l = Some n.
 Proof.
   revert IN. induction l; ss. i. des.
-  - subst. rewrite FA. s. lia.
-  - destruct (f a0); eauto. s. lia.
+  - subst. destruct (equiv_dec a a); [|congr]. s. eauto.
+  - destruct (equiv_dec a0 a); s; eauto.
+    specialize (IHl IN). des. rewrite IHl. s. eauto.
 Qed.
+
+Lemma List_nth_error_find_pos A `{_: EqDec A eq}
+      (l:list A) n a
+      (NTH: List.nth_error l n = Some a)
+      (NODUP: List.NoDup l):
+  List_find_pos (fun a' => a' == a) l = Some n.
+Proof.
+  revert n a NTH NODUP. induction l.
+  { i. apply List.nth_error_In in NTH. inv NTH. }
+  destruct n; s.
+  - i. inv NTH. destruct (equiv_dec a0 a0); [|congr]. ss.
+  - i. inv NODUP. exploit IHl; eauto. i. rewrite x.
+    destruct (equiv_dec a a0); ss. inv e.
+    contradict H2. eapply List.nth_error_In. eauto.
+Qed.
+
 
 Lemma strong_nat_ind
       (P: nat -> Prop)
@@ -310,3 +400,32 @@ Proof.
   - lia.
   - exploit REL; try exact REL1; eauto.
 Qed.
+
+Definition list_rev_list_rect
+           (A:Type)
+           (P:list A -> Type)
+           (INIT: P [])
+	         (STEP: forall (a:A) (l:list A), P (List.rev l) -> P (List.rev (a :: l))):
+	forall l:list A, P (List.rev l).
+Proof.
+  induction l; auto.
+Defined.
+
+Definition list_rev_rect
+           (A:Type)
+           (P:list A -> Type)
+           (INIT: P [])
+           (STEP: forall x l, P l -> P (l ++ [x])):
+  forall l, P l.
+Proof.
+  intros.
+  generalize (List.rev_involutive l).
+  intros E; rewrite <- E.
+  apply (list_rev_list_rect P).
+  auto.
+
+  simpl.
+  intros.
+  apply (STEP a (List.rev l0)).
+  auto.
+Defined.

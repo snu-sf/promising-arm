@@ -186,19 +186,10 @@ Module Local.
   }.
   Hint Constructors t.
 
-            (* mk *)
-            (*   lc1.(coh) *)
-            (*   lc1.(vrp) *)
-            (*   lc1.(vwp) *)
-            (*   lc1.(vrm) *)
-            (*   lc1.(vwm) *)
-            (*   lc1.(vcap) *)
-            (*   lc1.(vrel) *)
-            (*   lc1.(fwd) *)
-            (*   lc1.(ex) *)
-            (*   lc1.(promises)) *)
-
   Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) bot IdSet.empty.
+
+  Definition init_with_promises (promises: Promises.t): Local.t :=
+    mk bot bot bot bot bot bot bot (fun _ => None) bot promises.
 
   Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | promise_intro
