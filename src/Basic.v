@@ -191,3 +191,13 @@ Proof.
   - i. lia.
   - i. exploit IHm; eauto. lia.
 Qed.
+
+Lemma List_in_filter_length
+      A (f:A -> bool) (l:list A)
+      a (IN: List.In a l) (FA: f a):
+  length (List.filter f l) <> 0.
+Proof.
+  revert IN. induction l; ss. i. des.
+  - subst. rewrite FA. s. lia.
+  - destruct (f a0); eauto. s. lia.
+Qed.

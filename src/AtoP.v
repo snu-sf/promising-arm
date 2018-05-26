@@ -332,6 +332,40 @@ Proof.
     destruct (Execution.label a ex); ss. destruct t; ss.
 Qed.
 
+Lemma view_eid_ob_write_write
+      ex ob eid1 eid2 view loc
+      (VIEW1: view_eid ex ob eid1 = Some view)
+      (VIEW2: view_eid ex ob eid2 = Some view)
+      (WRITE1: Execution.label_is ex (Label.is_writing loc) eid1)
+      (WRITE2: Execution.label_is ex (Label.is_writing loc) eid2):
+  eid1 = eid2.
+Proof.
+  exploit view_eid_inv; try exact VIEW1; eauto. i. des.
+  exploit view_eid_inv; try exact VIEW2; eauto. i. des.
+  inv WRITE1. apply Label.is_writing_inv in LABEL. des. subst.
+  inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
+  destruct (Nat.compare_spec n n0).
+  - subst. congr.
+  - exfalso. revert VIEW0.
+    rewrite (@List_firstn_le (S n) (S n0)); [|lia].
+    rewrite HahnList.filter_app, List.app_length, Nat.sub_succ.
+    i. apply plus_minus in VIEW0. rewrite Nat.sub_diag in VIEW0.
+    exploit List_nth_error_skipn; eauto. i.
+    exploit @List_nth_error_firstn; [eauto| |i].
+    { instantiate (1 := (n0 - n)). lia. }
+    exploit List.nth_error_In; eauto. i.
+    eapply List_in_filter_length; eauto. s. rewrite EID0. ss.
+  - exfalso. symmetry in VIEW0. revert VIEW0.
+    rewrite (@List_firstn_le (S n0) (S n)); [|lia].
+    rewrite HahnList.filter_app, List.app_length, Nat.sub_succ.
+    i. apply plus_minus in VIEW0. rewrite Nat.sub_diag in VIEW0.
+    exploit List_nth_error_skipn; try exact N; eauto. i.
+    exploit @List_nth_error_firstn; [eauto| |i].
+    { instantiate (1 := (n - n0)). lia. }
+    exploit List.nth_error_In; eauto. i.
+    eapply List_in_filter_length; eauto. s. rewrite EID. ss.
+Qed.
+
 Lemma view_eid_ob
       ex rel ob eid1 eid2 view1 view2
       (LINEARIZED: linearized rel ob)
@@ -370,17 +404,9 @@ Proof.
   exploit List_nth_error_firstn; [eauto| |i].
   { instantiate (1 := (S n0 - S n)). lia. }
   exploit List.nth_error_In; eauto. i.
-  inv WRITE2.
-  revert A x3. clear N N0 x x1 x2. induction ((List.firstn (S n0 - S n) (List.skipn (S n) ob))); ss.
-  destruct (Execution.label a ex) eqn:X; ss.
-  { destruct (Label.is_write t) eqn:T; ss.
-    i. des.
-    - subst. rewrite EID in X. inv X. destruct t; ss.
-    - exploit IHl0; eauto.
-  }
-  i. des.
-  - subst. rewrite EID in X. inv X.
-  - exploit IHl0; eauto.
+  eapply List_in_filter_length; eauto. s.
+  inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
+  rewrite EID. ss.
 Qed.
 
 Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:View.t): Prop :=
@@ -1095,7 +1121,17 @@ Proof.
           - destruct t. s. i. des. unfold FwdItem.read_view. ss. condtac.
             + apply Bool.andb_true_iff in X. des.
               destruct (equiv_dec ts (S n)); ss. inv e.
-              admit. (* forwarding; using x0 *)
+              assert (eid2 = eid).
+              { eapply view_eid_ob_write_write; eauto.
+                - econs; eauto. apply Label.write_is_writing.
+                - apply WRITE0.
+              }
+              subst. inv VIEW2.
+              { apply bot_spec. }
+              rewrite VIEW3. eapply view_eid_ob; eauto.
+              inv EID. inv WRITE0. inv PO. ss. subst.
+              left. left. right. left.
+              econs. splits; eauto. econs 2. econs; eauto.
             + eapply view_eid_ob; eauto.
               destruct eid2. destruct (t == tid); cycle 1.
               { left. left. left. left. left. econs; ss. }
