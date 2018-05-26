@@ -541,7 +541,7 @@ Lemma sim_local_vrp_step ex:
     ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
      ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘) ∪
 
-    (⦗ex.(Execution.label_is) (Label.is_acquire)⦘))) ⨾
+    (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
   Execution.po_adj.
 Proof.
   unfold sim_local_vrp. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
@@ -1080,7 +1080,7 @@ Proof.
         }
         { econs 2; eauto; ss.
           generalize SIM_LOCAL.(VREL). intro VREL.
-          destruct (ord_ge ord ra) eqn:ORD; ss; cycle 1.
+          destruct (OrdR.ge ord OrdR.acquire) eqn:ORD; ss; cycle 1.
           { apply bot_spec. }
           inv VREL.
           { rewrite VIEW2. apply bot_spec. }
@@ -1141,7 +1141,7 @@ Proof.
         rewrite sim_local_vrp_step. rewrite inverse_step.
         rewrite ? inverse_union. apply sim_view_join.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto. }
-        destruct (ord_ge ord ra) eqn:ORD; ss; eauto. repeat apply sim_view_join.
+        destruct (OrdR.ge ord OrdR.acquire_pc) eqn:ORD; ss; eauto. repeat apply sim_view_join.
         (* TODO: it's view_ext2. need to find a lemma.. *)
         { admit. }
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto. }
@@ -1152,7 +1152,7 @@ Proof.
         rewrite sim_local_vwp_step. rewrite inverse_step.
         rewrite ? inverse_union. apply sim_view_join.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWP)]. eauto. }
-        destruct (ord_ge ord ra) eqn:ORD; ss; eauto. repeat apply sim_view_join.
+        destruct (OrdR.ge ord OrdR.acquire_pc) eqn:ORD; ss; eauto. repeat apply sim_view_join.
         { admit. }
         { admit. }
         { admit. }
@@ -1285,7 +1285,7 @@ Proof.
         rewrite sim_local_vrel_step. rewrite inverse_step.
         rewrite ? inverse_union. apply sim_view_join.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto. }
-        { destruct (ord_ge ord ra) eqn:ORD; [|by econs].
+        { destruct (OrdW.ge ord OrdW.release) eqn:ORD; [|by econs].
           eapply sim_view_le; [by right; eauto|]. econs 2; eauto.
           - econs; eauto. econs; eauto. econs; eauto.
           - refl.

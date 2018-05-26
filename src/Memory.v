@@ -83,8 +83,8 @@ Module FwdItem.
   }.
   Hint Constructors t.
 
-  Definition read_view (fwd:t) (tsx:Time.t) (ord:ordT): View.t :=
-    if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (negb (ord_ge ord ra)))
+  Definition read_view (fwd:t) (tsx:Time.t) (ord:OrdR.t): View.t :=
+    if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (negb (OrdR.ge ord OrdR.acquire_pc)))
     then fwd.(view)
     else tsx.
 End FwdItem.
@@ -233,13 +233,13 @@ Module Local.
   .
   Hint Constructors internal.
 
-  Inductive read (ex:bool) (ord:ordT) (vloc:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive read (ex:bool) (ord:OrdR.t) (vloc:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       ts loc val view
       view_ext1 view_ext2
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
-      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (ord_ge ord ra) lc1.(vrel))])
+      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
       (LATEST: le (Memory.latest mem1 loc view_ext1) ts)
       (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
@@ -251,8 +251,8 @@ Module Local.
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
-              (join lc1.(vrp) (ifc (ord_ge ord ra) view_ext2))
-              (join lc1.(vwp) (ifc (ord_ge ord ra) view_ext2))
+              (join lc1.(vrp) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
+              (join lc1.(vwp) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
               (join lc1.(vrm) view_ext2)
               lc1.(vwm)
               (join lc1.(vcap) view)
@@ -263,7 +263,7 @@ Module Local.
   .
   Hint Constructors read.
 
-  Inductive write (ex:bool) (ord:ordT) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t) (mem2: Memory.t): Prop :=
+  Inductive write (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t) (mem2: Memory.t): Prop :=
   | write_intro
       ts loc val
       view_loc view_val view_ext
@@ -273,8 +273,8 @@ Module Local.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwp);
-                                ifc (ord_ge ord ra) lc1.(vrm);
-                                ifc (ord_ge ord ra) lc1.(vwm)
+                                ifc (OrdW.ge ord OrdW.release) lc1.(vrm);
+                                ifc (OrdW.ge ord OrdW.release) lc1.(vwm)
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext ts)
@@ -288,7 +288,7 @@ Module Local.
               lc1.(vrm)
               (join lc1.(vwm) ts)
               (join lc1.(vcap) view_loc)
-              (join lc1.(vrel) (ifc (ord_ge ord ra) ts))
+              (join lc1.(vrel) (ifc (OrdW.ge ord OrdW.release) ts))
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))

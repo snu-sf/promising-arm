@@ -21,8 +21,8 @@ Set Implicit Arguments.
 
 Module Label.
   Inductive t :=
-  | read (ex:bool) (ord:ordT) (loc:Loc.t) (val:Val.t)
-  | write (ex:bool) (ord:ordT) (loc:Loc.t) (val:Val.t)
+  | read (ex:bool) (ord:OrdR.t) (loc:Loc.t) (val:Val.t)
+  | write (ex:bool) (ord:OrdW.t) (loc:Loc.t) (val:Val.t)
   | barrier (b:Barrier.t)
   .
 
@@ -45,22 +45,21 @@ Module Label.
     | _ => false
     end.
 
-  (* TODO: define AcquirePC ordering *)
   Definition is_acquire_pc (label:t): bool :=
     match label with
-    | read _ ord _ _ => ord_ge ord ra
+    | read _ ord _ _ => OrdR.ge ord OrdR.acquire_pc
     | _ => false
     end.
 
   Definition is_acquire (label:t): bool :=
     match label with
-    | read _ ord _ _ => ord_ge ord ra
+    | read _ ord _ _ => OrdR.ge ord OrdR.acquire
     | _ => false
     end.
 
   Definition is_release (label:t): bool :=
     match label with
-    | write _ ord _ _ => ord_ge ord ra
+    | write _ ord _ _ => OrdW.ge ord OrdW.release
     | _ => false
     end.
 

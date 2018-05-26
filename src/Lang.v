@@ -149,29 +149,38 @@ Hint Constructors exprT.
 Coercion expr_const: Val.t >-> exprT.
 Coercion expr_reg: Id.t >-> exprT.
 
-(* TODO: we need to deal with acquirePC ("[Q]" in the "Simplifying ARM Concurrency" paper). *)
-Inductive ordT :=
-| pln
-| rlx
-| ra
-.
-Hint Constructors ordT.
+Module OrdR.
+  Inductive t :=
+  | pln
+  | acquire_pc
+  | acquire
+  .
+  Hint Constructors t.
 
-Definition ord_le (a b:ordT): bool :=
-  match a, b with
-  | pln, _ => true
-  | _, ra => true
-  | rlx, rlx => true
-  | _, _ => false
-  end.
+  Definition ge (a b:t): bool :=
+    match a, b with
+    | acquire, _ => true
+    | _, acquire => false
+    | acquire_pc, _ => true
+    | _, acquire_pc => false
+    | pln, pln => true
+    end.
+End OrdR.
 
-Definition ord_ge (a b:ordT): bool :=
-  match a, b with
-  | _, pln => true
-  | ra, _ => true
-  | rlx, rlx => true
-  | _, _ => false
-  end.
+Module OrdW.
+  Inductive t :=
+  | pln
+  | release
+  .
+  Hint Constructors t.
+
+  Definition ge (a b:t): bool :=
+    match a, b with
+    | release, _ => true
+    | _, release => false
+    | pln, pln => true
+    end.
+End OrdW.
 
 Module Barrier.
   Inductive t :=
@@ -186,8 +195,8 @@ End Barrier.
 Inductive instrT :=
 | instr_skip
 | instr_assign (lhs:Id.t) (rhs:exprT)
-| instr_load (ex:bool) (ord:ordT) (res:Id.t) (eloc:exprT)
-| instr_store (ex:bool) (ord:ordT) (res:Id.t) (eloc:exprT) (eval:exprT)
+| instr_load (ex:bool) (ord:OrdR.t) (res:Id.t) (eloc:exprT)
+| instr_store (ex:bool) (ord:OrdW.t) (res:Id.t) (eloc:exprT) (eval:exprT)
 | instr_barrier (b:Barrier.t)
 .
 Hint Constructors instrT.
@@ -276,8 +285,8 @@ End SEM.
 Module Event.
   Inductive t A `{_: orderC A} :=
   | internal (ctrl:A)
-  | read (ex:bool) (ord:ordT) (vloc:ValA.t (A:=A)) (res:ValA.t (A:=A))
-  | write (ex:bool) (ord:ordT) (vloc:ValA.t (A:=A)) (vval:ValA.t (A:=A)) (res:ValA.t (A:=A))
+  | read (ex:bool) (ord:OrdR.t) (vloc:ValA.t (A:=A)) (res:ValA.t (A:=A))
+  | write (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=A)) (vval:ValA.t (A:=A)) (res:ValA.t (A:=A))
   | barrier (b:Barrier.t)
   .
 End Event.
