@@ -396,15 +396,12 @@ Proof.
   subst. exploit LINEARIZED; try exact OB; eauto. i.
   erewrite (@List_firstn_le (S n) (S n0)); [|lia].
   rewrite HahnList.filter_app, List.app_length.
-  match goal with
-  | [|- _ < _ + ?a] => destruct a eqn:A; [|lia]
-  end.
-  exfalso.
+  apply Nat.lt_add_pos_r.
   exploit List_nth_error_skipn; eauto. i.
   exploit List_nth_error_firstn; [eauto| |i].
   { instantiate (1 := (S n0 - S n)). lia. }
   exploit List.nth_error_In; eauto. i.
-  eapply List_in_filter_length; eauto. s.
+  apply neq_0_lt. ii. eapply List_in_filter_length; eauto. s.
   inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
   rewrite EID. ss.
 Qed.
@@ -1249,10 +1246,7 @@ Proof.
     + econs; ss.
       { econs; ss. }
       econs 3; ss.
-      econs;
-        try match goal with
-            | [|- _ = _] => refl
-            end.
+      econs; try refl.
       all: cycle 2.
       * i. specialize (EX0 H). des.
         generalize (SIM_LOCAL.(EXBANK)). rewrite EX0. i. inv H0.
