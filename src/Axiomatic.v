@@ -676,6 +676,7 @@ Module Valid.
         (exists eid2 ex2 ord2,
             <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
             <<RF: ex.(Execution.rf) eid2 eid1>>);
+    RF_WF: functional (ex.(Execution.rf))⁻¹;
     INTERNAL: acyclic ex.(Execution.internal);
     EXTERNAL: acyclic ex.(Execution.ob);
     ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
@@ -881,6 +882,19 @@ Module Valid.
       + left. left. left. econs; eauto. econs; eauto.
         econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
       + left. left. right. econs; eauto.
+  Qed.
+
+  Lemma rf_inv_write
+        p exec
+        eid1 eid2 ex1 ord1 loc val
+        (EX: ex p exec)
+        (EID2: Execution.label eid2 exec = Some (Label.read ex1 ord1 loc val))
+        (RF3: exec.(Execution.rf) eid1 eid2):
+    exists ex2 ord2,
+      <<LABEL: Execution.label eid1 exec = Some (Label.write ex2 ord2 loc val)>>.
+  Proof.
+    exploit EX.(RF). intros [RF _]. exploit RF; eauto. clear RF. i. des.
+    exploit EX.(RF_WF); [exact RF3|exact RF0|]. i. subst. eauto.
   Qed.
 End Valid.
 
