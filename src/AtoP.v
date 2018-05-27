@@ -1175,7 +1175,78 @@ Proof.
           - econs; eauto. apply Label.write_is_writing.
         }
       * (* external *)
-        admit.
+        unfold lt. apply le_n_S. s. repeat apply join_spec.
+        { inv VIEW0.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. destruct eid. ss. des. subst.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - left. left. right. left. econs. splits.
+            + instantiate (1 := (tid, _)).  left. apply ADDR. econs; eauto. right. ss.
+            + eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { inv VIEW1.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. destruct eid. ss. des. subst.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - left. left. right. left. econs. splits.
+            + instantiate (1 := (tid, _)).  right. apply DATA. econs; eauto. right. ss.
+            + eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { generalize SIM_LOCAL.(VCAP). intro X. inv X.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. inv EID.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - left. left. right. right. econs. splits; eauto.
+            left. econs; eauto. econs; eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { generalize SIM_LOCAL.(VWP). intro X. inv X.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. inv EID.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - unfold sim_local_vwp in REL.
+            repeat match goal with
+                   | [H: (_ ∪ _) _ _ |- _] => inv H
+                   end.
+            + inv H. des. inv H1. des. inv H.
+              right. left. left. left. left. left. econs. splits; eauto. econs. splits; eauto. econs; eauto.
+            + inv H. des. inv H0. inv H1. des. inv H0. des. inv H1.
+              right. left. left. left. right. econs. splits.
+              { econs; eauto. }
+              econs. splits; eauto. econs. splits; eauto. econs; eauto.
+            + inv H0. des. inv H. inv H0. des. inv H0. des. inv H1.
+              right. left. right. econs. splits.
+              { econs; eauto. }
+              econs. splits; eauto. econs. splits.
+              { econs; eauto. }
+              econs. splits; eauto. econs; eauto. econs; eauto.
+            + inv H. des.
+              right. left. left. right. econs. splits; eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
+          { apply bot_spec. }
+          generalize SIM_LOCAL.(VRM). intro X. inv X.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. inv EID.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - inv REL. des. inv H.
+            right. right. econs. splits; eauto. econs; eauto. econs; eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
+          { apply bot_spec. }
+          generalize SIM_LOCAL.(VWM). intro X. inv X.
+          { rewrite VIEW2. apply bot_spec. }
+          rewrite VIEW2. inv EID.
+          apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
+          - inv REL. des. inv H.
+            right. right. econs. splits; eauto. econs; eauto. econs; eauto.
+          - econs; eauto. apply Label.write_is_writing.
+        }
+        { apply bot_spec. }
       * (* exclusive *)
         i. specialize (EX0 H). des. inv EX1.
         apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
@@ -1401,8 +1472,7 @@ Proof.
       * rewrite List.app_length, Nat.add_1_r. s.
         rewrite sim_local_vrel_step. rewrite inverse_step.
         rewrite ? inverse_union. eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto.
-      * (* TODO: lemma *)
-        rewrite List.app_length, Nat.add_1_r. i.
+      * rewrite List.app_length, Nat.add_1_r. i.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
@@ -1570,7 +1640,7 @@ Proof.
     + econs; ss.
       inv SIM_LOCAL; econs; eauto. s.
       apply sim_view_join; ss. econs. ss.
-Admitted.
+Qed.
 
 Lemma sim_eu_rtc_step
       p ex ob tid aeu1 eu1 aeu2
