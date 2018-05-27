@@ -729,6 +729,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
   EXBANK: opt_rel
             (fun aexbank exbank =>
                (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v exbank) /\
+               exbank <> bot /\
                sim_view
                  ex ob
                  (inverse ex.(Execution.rf) (eq (tid, aexbank)))
@@ -812,14 +813,14 @@ Lemma in_mem_of_ex
       ex ob view msg
       (NODUP: List.NoDup ob)
       (IN: List.nth_error (mem_of_ex ex ob) view = Some msg):
-  exists n,
-    <<LABEL: Execution.label_is ex (Label.is_writing msg.(Msg.loc)) (msg.(Msg.tid), n)>> /\
+  exists n ex1 ord1,
+    <<LABEL: Execution.label (msg.(Msg.tid), n) ex = Some (Label.write ex1 ord1 msg.(Msg.loc) msg.(Msg.val))>> /\
     <<VIEW: view_of_eid ex ob (msg.(Msg.tid), n) = Some (S view)>>.
 Proof.
   unfold mem_of_ex in IN. exploit nth_error_filter_map_inv; eauto. i. des.
   destruct (Execution.label a ex) eqn:LABEL; ss. destruct t; inv FA. destruct a. ss.
   esplits.
-  - econs; eauto. apply Label.write_is_writing.
+  - eauto.
   - unfold view_of_eid.
     erewrite List_nth_error_find_pos; eauto. s. f_equal. ss.
 Qed.
@@ -894,7 +895,14 @@ Proof.
           - rewrite VIEW_OF_EID in VIEW. inv VIEW. refl.
           - eapply view_of_eid_ob; eauto. left. left. left. right. ss.
         }
-      * admit. (* external *)
+      * (* external *)
+        ii.
+        exploit in_mem_of_ex; swap 1 2; eauto.
+        { eapply Permutation_NoDup; [by symmetry; eauto|].
+          eapply Execution.eids_spec; eauto.
+        }
+        i. des. destruct msg. ss. subst.
+        admit.
     + exploit label_read_mem_of_ex; eauto. i. des.
       assert (SIM_LOC: sim_view ex ob
                                 (fun eid : eidT => fst eid = tid /\ ALocal.next_eid alocal1 = snd eid)
@@ -1093,6 +1101,7 @@ Proof.
         { econs. splits.
           - i. exploit EX.(Valid.RF_WF); [exact H|exact RF|]. i. subst.
             rewrite VIEW in H0. inv H0. refl.
+          - ss.
           - econs 2; eauto. refl.
         }
         { apply SIM_LOCAL. }
@@ -1138,7 +1147,7 @@ Proof.
           - econs; eauto. apply Label.write_is_writing.
         }
       * (* external *)
-        admit. 
+        admit.
       * (* exclusive *)
         i. specialize (EX0 H). des. inv EX1.
         apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
@@ -1146,9 +1155,7 @@ Proof.
         exploit List.nth_error_Some. rewrite H1. intros [X _]. exploit X; ss. clear X. intro X.
         exploit LABEL.
         { rewrite List.nth_error_app1; eauto. }
-        intro LABEL_READ. inv REL0.
-        { admit. }
-        inv EID. exploit REL; eauto. i.
+        intro LABEL_READ. inv REL1; ss. inv EID. exploit REL; eauto. i.
         assert (v = b) by (apply View.le_antisymm; ss). subst.
         esplits; eauto. destruct ex1; ss. ii.
         exploit in_mem_of_ex; swap 1 2; eauto.
@@ -1156,10 +1163,9 @@ Proof.
           eapply Execution.eids_spec; eauto.
         }
         i. des. destruct msg. ss. subst.
-        inv LABEL0. apply Label.is_writing_inv in LABEL1. des. subst.
 
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
-        { rewrite EID. rewrite LABEL_LEN. esplits; eauto. f_equal. f_equal. ss. }
+        { rewrite LABEL0. rewrite LABEL_LEN. esplits; eauto. f_equal. f_equal. ss. }
         clear CO. i. des; cycle 2.
         { cut (S n < S ts); [lia|].
           eapply view_of_eid_ob_write; eauto.
@@ -1170,7 +1176,7 @@ Proof.
 
         exploit Valid.rf_inv_write; eauto. i. des.
         exploit EX.(Valid.CO). intros [CO _]. exploit CO.
-        { rewrite EID. rewrite LABEL0. esplits; eauto. f_equal. f_equal. ss. }
+        { rewrite LABEL0. rewrite LABEL1. esplits; eauto. f_equal. f_equal. ss. }
         clear CO. i. des.
         { subst. rewrite VIEW_OF_EID in VIEW3. inv VIEW3. lia. }
         { cut (S ts < b); [lia|].
@@ -1535,8 +1541,7 @@ Proof.
       * econs; ss.
     + econs; ss.
       inv SIM_LOCAL; econs; eauto. s.
-      unfold join, bot. rewrite (bot_join (A:=View.t)); eauto.
-      exact View.order.
+      apply sim_view_join; ss. econs. ss.
 Admitted.
 
 Lemma sim_eu_rtc_step
@@ -1752,7 +1757,7 @@ Proof.
           eapply Execution.eids_spec; eauto.
         }
         s. i. des. esplits; cycle 1; eauto; [|lia].
-        inv LABEL. apply Label.is_writing_inv in LABEL0. des. subst. econs; eauto.
+        econs; eauto.
   }
   { apply AExecUnit.wf_init. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
