@@ -78,7 +78,7 @@ Module Memory.
   Definition no_msgs (from to:nat) (pred:Msg.t -> Prop) (mem:t): Prop :=
     forall ts msg
       (TS1: from < S ts)
-      (TS2: S ts < to)
+      (TS2: S ts <= to)
       (MSG: List.nth_error mem ts = Some msg),
       ~ pred msg.
 End Memory.
