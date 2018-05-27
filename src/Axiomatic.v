@@ -678,7 +678,7 @@ Module Valid.
             <<RF: ex.(Execution.rf) eid2 eid1>>);
     INTERNAL: acyclic ex.(Execution.internal);
     EXTERNAL: acyclic ex.(Execution.ob);
-    ATOMIC: ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe)) = bot;
+    ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
   }.
   Hint Constructors ex.
   Coercion PRE: ex >-> pre_ex.
@@ -776,6 +776,111 @@ Module Valid.
     i. exploit List.nth_error_Some. rewrite LABEL. intros [X _]. exploit X; [congr|]. clear X. i.
     generalize (List.nth_error_Some t.(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
     destruct (List.nth_error t.(ALocal.labels) n); ss. eauto.
+  Qed.
+
+  Lemma coherence_rw
+        p exec
+        eid1 eid2 eid3 loc
+        (EX: ex p exec)
+        (EID1: exec.(Execution.label_is) (Label.is_reading loc) eid1)
+        (EID2: exec.(Execution.label_is) (Label.is_writing loc) eid2)
+        (EID3: exec.(Execution.label_is) (Label.is_writing loc) eid3)
+        (RF1: exec.(Execution.rf) eid3 eid1)
+        (PO: Execution.po eid1 eid2):
+    exec.(Execution.co) eid3 eid2.
+  Proof.
+    inv EID1. apply Label.is_reading_inv in LABEL. des. subst.
+    inv EID2. apply Label.is_writing_inv in LABEL. des. subst.
+    inv EID3. apply Label.is_writing_inv in LABEL. des. subst.
+    generalize EX.(CO). intros [CO _]. rewrite EID0 in CO. rewrite EID1 in CO. exploit CO.
+    { esplits; eauto. }
+    i. des.
+    - subst. exfalso. eapply EX.(INTERNAL). econs 2; econs.
+      + left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      + right. eauto.
+    - exfalso. eapply EX.(INTERNAL). econs 2; [econs|econs 2; econs].
+      + left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      + left. right. eauto.
+      + right. eauto.
+    - ss.
+  Qed.
+
+  Lemma coherence_ww
+        p exec
+        eid1 eid2 loc
+        (EX: ex p exec)
+        (EID1: exec.(Execution.label_is) (Label.is_writing loc) eid1)
+        (EID2: exec.(Execution.label_is) (Label.is_writing loc) eid2)
+        (PO: Execution.po eid1 eid2):
+    exec.(Execution.co) eid1 eid2.
+  Proof.
+    inv EID1. apply Label.is_writing_inv in LABEL. des. subst.
+    inv EID2. apply Label.is_writing_inv in LABEL. des. subst.
+    generalize EX.(CO). intros [CO _]. rewrite EID in CO. rewrite EID0 in CO. exploit CO.
+    { esplits; eauto. }
+    i. des.
+    - subst. inv PO. lia.
+    - ss.
+    - exfalso. eapply EX.(INTERNAL). econs 2; econs.
+      + left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      + left. right. eauto.
+  Qed.
+
+  Lemma coherence_rr
+        p exec
+        eid1 eid2 eid3 eid4 loc
+        (EX: ex p exec)
+        (EID1: exec.(Execution.label_is) (Label.is_reading loc) eid1)
+        (EID2: exec.(Execution.label_is) (Label.is_reading loc) eid2)
+        (EID3: exec.(Execution.label_is) (Label.is_writing loc) eid3)
+        (EID4: exec.(Execution.label_is) (Label.is_writing loc) eid4)
+        (RF1: exec.(Execution.rf) eid3 eid1)
+        (RF2: exec.(Execution.rf) eid4 eid2)
+        (PO: Execution.po eid1 eid2):
+    exec.(Execution.co)^? eid3 eid4.
+  Proof.
+    inv EID1. apply Label.is_reading_inv in LABEL. des. subst.
+    inv EID2. apply Label.is_reading_inv in LABEL. des. subst.
+    inv EID3. apply Label.is_writing_inv in LABEL. des. subst.
+    inv EID4. apply Label.is_writing_inv in LABEL. des. subst.
+    generalize EX.(CO). intros [CO _]. rewrite EID1 in CO. rewrite EID2 in CO. exploit CO.
+    { esplits; eauto. }
+    i. des.
+    - subst. eauto.
+    - econs 2. ss.
+    - exfalso. eapply EX.(INTERNAL). econs 2; [econs|econs 2; econs].
+      + left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      + left. left. right. econs; eauto.
+      + right. ss.
+  Qed.
+
+  Lemma coherence_wr
+        p exec
+        eid1 eid2 eid3 loc
+        (EX: ex p exec)
+        (EID1: exec.(Execution.label_is) (Label.is_writing loc) eid1)
+        (EID2: exec.(Execution.label_is) (Label.is_reading loc) eid2)
+        (EID3: exec.(Execution.label_is) (Label.is_writing loc) eid3)
+        (RF3: exec.(Execution.rf) eid3 eid2)
+        (PO: Execution.po eid1 eid2):
+    exec.(Execution.co)^? eid1 eid3.
+  Proof.
+    inv EID1. apply Label.is_writing_inv in LABEL. des. subst.
+    inv EID2. apply Label.is_reading_inv in LABEL. des. subst.
+    inv EID3. apply Label.is_writing_inv in LABEL. des. subst.
+    generalize EX.(CO). intros [CO _]. rewrite EID in CO. rewrite EID1 in CO. exploit CO.
+    { esplits; eauto. }
+    i. des.
+    - subst. eauto.
+    - econs 2. ss.
+    - exfalso. eapply EX.(INTERNAL). econs 2; econs.
+      + left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      + left. left. right. econs; eauto.
   Qed.
 End Valid.
 

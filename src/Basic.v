@@ -260,13 +260,20 @@ Lemma List_find_pos_inv A pred (l:list A) n
       (POS: List_find_pos pred l = Some n):
   exists a,
     <<NTH: List.nth_error l n = Some a>> /\
-    <<PRED: pred a>>.
+    <<PRED: pred a>> /\
+    <<NPRED: forall m b
+               (M: m < n)
+               (B: List.nth_error l m = Some b),
+    ~ pred b>>.
 Proof.
   revert n POS. induction l; ss.
   destruct (pred a) eqn:PA.
-  - i. inv POS. esplits; ss.
+  - i. inv POS. esplits; ss. i. lia.
   - destruct ((List_find_pos pred l)) eqn:POS; ss. i. inv POS0.
-    exploit IHl; eauto.
+    exploit IHl; eauto. i. des.
+    esplits; eauto. i. destruct m; ss.
+    + inv B. rewrite PA. ss.
+    + eapply NPRED; eauto. lia.
 Qed.
 
 Lemma List_in_find_pos A `{_: EqDec A eq} a (l:list A)

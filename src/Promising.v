@@ -75,7 +75,12 @@ Module Memory.
   Definition append (msg:Msg.t) (mem:t): Time.t * t :=
     (S (length mem), mem ++ [msg]).
 
-  Definition latest (mem:t) (loc:Loc.t) (view:View.t): Time.t := Order.bot. (* TODO *)
+  Definition no_msgs (from to:nat) (pred:Msg.t -> Prop) (mem:t): Prop :=
+    forall ts msg
+      (TS1: from < S ts)
+      (TS2: S ts < to)
+      (MSG: List.nth_error mem ts = Some msg),
+      ~ pred msg.
 End Memory.
 
 Module FwdItem.
@@ -235,12 +240,12 @@ Module Local.
       (VIEW: view = vloc.(ValA.annot))
       (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
-      (LATEST: le (Memory.latest mem1 loc view_ext1) ts)
+      (LATEST: Memory.no_msgs ts view_ext1 (fun msg => msg.(Msg.loc) = loc) mem1)
+      (MSG: Memory.read ts loc mem1 = Some val)
       (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
                                               | None => ts
                                               | Some fwd => fwd.(FwdItem.read_view) ts ord
                                               end))
-      (MSG: Memory.read ts loc mem1 = Some val)
       (RES: res = ValA.mk _ val view_ext2)
       (LC2: lc2 =
             mk
@@ -272,7 +277,10 @@ Module Local.
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext ts)
-      (EX: ex -> exists tsx, lc1.(exbank) = Some tsx /\ True) (* TODO: non-blocked(M, l tsx, ts) *)
+      (EX: ex -> exists tsx,
+           <<TSX: lc1.(exbank) = Some tsx>> /\
+           <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
+               Memory.no_msgs tsx ts (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem1>>)
       (RES: res = ValA.mk _ 0 bot)
       (LC2: lc2 =
             mk
