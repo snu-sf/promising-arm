@@ -617,3 +617,20 @@ Proof.
     esplits; eauto.
   - esplits; cycle 1; eauto.
 Qed.
+
+Theorem init_step_pf_init_step
+        p m
+        (STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m):
+  exists m',
+    <<INIT: Machine.pf_init p m'>> /\
+    <<STEP: rtc (Machine.step ExecUnit.state_step) m' m>>.
+Proof.
+Admitted.
+
+Theorem pf_init_step_init_step
+        p m1 m2
+        (INIT: Machine.pf_init p m1)
+        (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2):
+  rtc (Machine.step ExecUnit.step) (Machine.init p) m2.
+Proof.
+Admitted.
