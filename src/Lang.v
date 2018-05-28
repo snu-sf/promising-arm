@@ -76,6 +76,16 @@ Module IdMap.
     revert m. induction i; destruct m; ss; try congruence.
   Qed.
 
+  Lemma add_add_diff A i j v1 v2 (m:t A) (DIFF: i <> j):
+    add i v1 (add j v2 m) = add j v2 (add i v1 m).
+  Proof.
+    revert j m DIFF. induction i; destruct j, m; ss; try congruence.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+  Qed.
+
   Definition Forall2 A B
              (rel: A -> B -> Prop)
              (a: t A)

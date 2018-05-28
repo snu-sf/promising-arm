@@ -3,8 +3,10 @@ Require Import EquivDec.
 Require Import Equality.
 Require Import List.
 Require Import Bool.
+Require Import Lia.
 Require Import NArith.
 Require Import PArith.
+Require Import ZArith.
 Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import EquivDec.
@@ -421,16 +423,24 @@ Module ExecUnit.
   }.
   Hint Constructors t.
 
-  Inductive step (tid:Id.t) (eu1 eu2:t): Prop :=
-  | step_state
+  Inductive state_step (tid:Id.t) (eu1 eu2:t): Prop :=
+  | state_step_intro
       e
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: Local.step e tid eu1.(local) eu1.(mem) eu2.(local))
       (MEM: eu2.(mem) = eu1.(mem))
-  | step_promise
+  .
+
+  Inductive promise_step (tid:Id.t) (eu1 eu2:t): Prop :=
+  | promise_step_intro
       loc val
       (STATE: eu1.(state) = eu2.(state))
       (LOCAL: Local.promise loc val tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
+  .
+
+  Inductive step (tid:Id.t) (eu1 eu2:t): Prop :=
+  | step_state (STEP: state_step tid eu1 eu2)
+  | step_promise (STEP: promise_step tid eu1 eu2)
   .
 End ExecUnit.
 
@@ -455,15 +465,6 @@ Module Machine.
   .
   Hint Constructors is_terminal.
 
-  Inductive step0 (m1 m2:t): Prop :=
-  | step0_intro
-      tid st1 lc1 st2 lc2
-      (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
-      (STEP: ExecUnit.step tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
-      (ADD: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
-  .
-  Hint Constructors step0.
-
   Inductive no_promise (m:t): Prop :=
   | no_promise_intro
       (PROMISES:
@@ -473,38 +474,61 @@ Module Machine.
   .
   Hint Constructors no_promise.
 
+  Inductive step0 (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m1 m2:t): Prop :=
+  | step0_intro
+      tid st1 lc1 st2 lc2
+      (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
+      (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
+      (ADD: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
+  .
+  Hint Constructors step0.
+
   (* The "global" consistency condition: in certification, machine may take any thread's steps. *)
-  Inductive consistent (m:t): Prop :=
+  Inductive consistent (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m:t): Prop :=
   | consistent_intro
       m'
-      (STEP: rtc step0 m m')
+      (STEP: rtc (step0 eustep) m m')
       (NOPROMISE: no_promise m')
   .
   Hint Constructors consistent.
 
-  Inductive step (m1 m2:t): Prop :=
+  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m1 m2:t): Prop :=
   | step_intro
-      (STEP: step0 m1 m2)
-      (CONSISTENT: consistent m2)
+      (STEP: step0 eustep m1 m2)
+      (CONSISTENT: consistent eustep m2)
   .
   Hint Constructors step.
 
-  Lemma rtc_step0_step m1 m2
-        (STEP: rtc step0 m1 m2)
-        (NOPROMISE: no_promise m2):
-    rtc step m1 m2.
+  Inductive pf_init (p:program) (m:t): Prop :=
+  | init_pf_intro
+      (STEP: rtc (step0 ExecUnit.promise_step) (init p) m)
+      (CONSISTENT: consistent ExecUnit.state_step m)
+  .
+
+  Lemma no_promise_consistent
+        eustep m
+        (NOPROMISE: no_promise m):
+    consistent eustep m.
+  Proof. econs; eauto. Qed.
+        
+  Lemma rtc_step0_step eustep m1 m2
+        (STEP: rtc (step0 eustep) m1 m2)
+        (CONSISTENT: consistent eustep m2):
+    rtc (step eustep) m1 m2.
   Proof.
-    induction STEP; [refl|]. econs; eauto.
+    revert CONSISTENT. induction STEP; [refl|]. i. econs.
+    - econs; eauto. inv CONSISTENT. econs; [|by eauto]. etrans; eauto.
+    - eauto.
   Qed.
 
   Lemma rtc_eu_step_step0
-        tid m st1 lc1 mem1 st2 lc2 mem2
+        eustep tid m st1 lc1 mem1 st2 lc2 mem2
         (FIND: IdMap.find tid m.(tpool) = Some (st1, lc1))
         (MEM: m.(mem) = mem1)
-        (EX: rtc (ExecUnit.step tid)
+        (EX: rtc (eustep tid)
                  (ExecUnit.mk st1 lc1 mem1)
                  (ExecUnit.mk st2 lc2 mem2)):
-    rtc step0
+    rtc (step0 eustep)
         m
         (mk
            (IdMap.add tid (st2, lc2) m.(tpool))
@@ -522,3 +546,74 @@ Module Machine.
       + s. rewrite (IdMap.add_add tid (st2, lc2)). eauto.
   Qed.
 End Machine.
+
+Lemma reorder_state_step_promise_step
+      m1 m2 m3
+      (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
+      (STEP2: Machine.step0 ExecUnit.promise_step m2 m3):
+  exists m2',
+    <<STEP: Machine.step0 ExecUnit.promise_step m1 m2'>> /\
+    <<STEP: Machine.step0 ExecUnit.state_step m2' m3>>.
+Proof.
+  destruct m1 as [tpool1 mem1].
+  destruct m2 as [tpool2 mem2].
+  destruct m3 as [tpool3 mem3].
+  inv STEP1. inv STEP2. ss. subst.
+  revert FIND0. rewrite IdMap.add_spec. condtac.
+  - (* same thread *)
+    inversion e. i. inv FIND0.
+    inv STEP. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
+    eexists (Machine.mk _ _). esplits.
+    + econs; eauto; ss. econs; ss. econs; ss.
+    + econs; ss.
+      * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|congr]. eauto.
+      * econs; eauto; ss.
+        admit.
+      * rewrite ? IdMap.add_add. eauto.
+  - (* diff thread *)
+    inv STEP. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
+    eexists (Machine.mk _ _). esplits.
+    + econs; eauto; ss. econs; ss. econs; ss.
+    + econs; ss.
+      * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|by eauto].
+        inversion e0. subst. congr.
+      * econs; eauto; ss.
+        inv LOCAL.
+        { econs 1; eauto. }
+        { admit. }
+        { admit. }
+        { econs 4; eauto. }
+        { econs 5; eauto. }
+        { econs 6; eauto. }
+        { econs 7; eauto. }
+        { econs 8; eauto. }
+      * apply IdMap.add_add_diff. ss.
+Admitted.
+
+Lemma reorder_state_step_rtc_promise_step
+      m1 m2 m3
+      (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
+      (STEP2: rtc (Machine.step0 ExecUnit.promise_step) m2 m3):
+  exists m2',
+    <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2'>> /\
+    <<STEP: Machine.step0 ExecUnit.state_step m2' m3>>.
+Proof.
+  revert m1 STEP1. induction STEP2; eauto.
+  i. exploit reorder_state_step_promise_step; eauto. i. des.
+  exploit IHSTEP2; eauto. i. des.
+  esplits; cycle 1; eauto.
+Qed.
+
+Lemma split_rtc_step
+      m1 m3
+      (STEP: rtc (Machine.step0 ExecUnit.step) m1 m3):
+  exists m2,
+    <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2>> /\
+    <<STEP: rtc (Machine.step0 ExecUnit.state_step) m2 m3>>.
+Proof.
+  induction STEP; eauto.
+  des. inv H. inv STEP2.
+  - exploit reorder_state_step_rtc_promise_step; eauto. i. des.
+    esplits; eauto.
+  - esplits; cycle 1; eauto.
+Qed.
