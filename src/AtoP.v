@@ -801,12 +801,11 @@ Lemma label_write_mem_of_ex
   exists n,
     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
     <<READ: Memory.read (S n) loc (mem_of_ex ex ob) = Some val>> /\
-    <<WRITE: Memory.write (S n) (Msg.mk loc val eid.(fst)) (mem_of_ex ex ob) = Some (mem_of_ex ex ob)>>.
+    <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val eid.(fst))>>.
 Proof.
   exploit label_write_mem_of_ex_msg; eauto. i. des.
   esplits; eauto.
-  - unfold Memory.read. s. rewrite MSG. s. condtac; [|congr]. ss.
-  - unfold Memory.write. s. rewrite MSG. condtac; [|congr]. ss.
+  unfold Memory.read. s. rewrite MSG. s. condtac; [|congr]. ss.
 Qed.
 
 Lemma in_mem_of_ex
@@ -927,12 +926,12 @@ Proof.
           assert (eid2 = eid).
           { eapply view_of_eid_ob_write_write; eauto.
             - econs; eauto. apply Label.write_is_writing.
-            - apply WRITE0.
+            - apply WRITE.
           }
           subst. inv VIEW2.
           { apply bot_spec. }
           rewrite VIEW3. eapply view_of_eid_ob; eauto.
-          inv EID. inv WRITE0. inv PO. ss. subst.
+          inv EID. inv WRITE. inv PO. ss. subst.
           left. left. right. left.
           econs. splits; eauto. econs 2. econs; eauto.
         + (* not forwarded *)
@@ -944,12 +943,12 @@ Proof.
           { econs; [|apply Label.write_is_writing]. eauto. }
           { econs; [|apply Label.read_is_reading]. eauto. }
           { econs; eauto. }
-          i. exploit sim_local_fwd_functional; [exact WRITE0|exact x0|]. i. subst.
+          i. exploit sim_local_fwd_functional; [exact WRITE|exact x0|]. i. subst.
           rewrite VIEW0 in TS. inv TS.
           apply Bool.andb_false_iff in X. des.
           { unfold Time.t in *. destruct (equiv_dec (S n) (S n)); ss. congr. }
           apply Bool.orb_false_iff in X. des. destruct ex0; ss. apply Bool.negb_false_iff in X0.
-          inv WRITE0. inv WRITE1. apply Label.is_writing_inv in LABEL1. des. subst.
+          inv WRITE. inv WRITE0. apply Label.is_writing_inv in LABEL1. des. subst.
           rewrite EID in LABEL0. inv LABEL0.
           exploit EX0; eauto. clear EX0. intro Y. inv Y. rewrite EID in EID0. inv EID0.
           exploit Valid.write_ex_codom_rmw; eauto.
@@ -1137,7 +1136,7 @@ Proof.
         i. exploit SIM_LOCAL.(PROMISES); eauto. i. des.
         esplits; cycle 1; eauto.
         rewrite List.app_length, Nat.add_1_r. inv N; [|lia].
-        inv WRITE0. destruct l; ss. congr.
+        inv WRITE. destruct l; ss. congr.
   - (* write *)
     exploit LABEL.
     { rewrite List.nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }

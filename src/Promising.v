@@ -61,15 +61,10 @@ Module Memory.
       end
     end.
 
-  Definition write (ts:Time.t) (msg:Msg.t) (mem:t): option t :=
+  Definition get_msg (ts:Time.t) (mem:t): option Msg.t :=
     match Time.pred_opt ts with
     | None => None
-    | Some ts =>
-      if (List.nth_error mem ts) == Some msg
-      then Some mem
-      else if length mem == ts
-           then Some (mem ++ [msg])
-           else None
+    | Some ts => List.nth_error mem ts
     end.
 
   Definition append (msg:Msg.t) (mem:t): Time.t * t :=
@@ -262,8 +257,8 @@ Module Local.
   .
   Hint Constructors read.
 
-  Inductive write (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t) (mem2: Memory.t): Prop :=
-  | write_intro
+  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  | fulfill_intro
       ts loc val
       view_loc view_val view_ext
       (LOC: loc = vloc.(ValA.val))
@@ -281,6 +276,7 @@ Module Local.
            <<TSX: lc1.(exbank) = Some tsx>> /\
            <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
                Memory.no_msgs tsx ts (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem1>>)
+      (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
       (RES: res = ValA.mk _ 0 bot)
       (LC2: lc2 =
             mk
@@ -294,9 +290,8 @@ Module Local.
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))
-      (MEM2: Memory.write ts (Msg.mk loc val tid) mem1 = Some mem2)
   .
-  Hint Constructors write.
+  Hint Constructors fulfill.
 
   Inductive write_failure (ex:bool) (res: ValA.t (A:=View.t)) (lc1:t) (lc2:t): Prop :=
   | write_failure_intro
@@ -385,42 +380,35 @@ Module Local.
   .
   Hint Constructors dmbsy.
 
-  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
+  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t): Prop :=
   | step_internal
       ctrl
       (EVENT: event = (Event.internal ctrl))
       (LC: internal ctrl lc1 lc2)
-      (MEM: mem2 = mem1)
   | step_read
       ex ord vloc res
       (EVENT: event = Event.read ex ord vloc res)
       (STEP: read ex ord vloc res lc1 mem1 lc2)
-      (MEM: mem2 = mem1)
-  | step_write
+  | step_fulfill
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
-      (STEP: write ex ord vloc vval res tid lc1 mem1 lc2 mem2)
+      (STEP: fulfill ex ord vloc vval res tid lc1 mem1 lc2)
   | step_write_failure
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
       (STEP: write_failure ex res lc1 lc2)
-      (MEM: mem2 = mem1)
   | step_isb
       (EVENT: event = Event.barrier Barrier.isb)
       (STEP: isb lc1 lc2)
-      (MEM: mem2 = mem1)
   | step_dmbst
       (EVENT: event = Event.barrier Barrier.dmbst)
       (STEP: dmbst lc1 lc2)
-      (MEM: mem2 = mem1)
   | step_dmbld
       (EVENT: event = Event.barrier Barrier.dmbld)
       (STEP: dmbld lc1 lc2)
-      (MEM: mem2 = mem1)
   | step_dmbsy
       (EVENT: event = Event.barrier Barrier.dmbsy)
       (STEP: dmbsy lc1 lc2)
-      (MEM: mem2 = mem1)
   .
   Hint Constructors step.
 End Local.
@@ -437,7 +425,8 @@ Module ExecUnit.
   | step_state
       e
       (STATE: State.step e eu1.(state) eu2.(state))
-      (LOCAL: Local.step e tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
+      (LOCAL: Local.step e tid eu1.(local) eu1.(mem) eu2.(local))
+      (MEM: eu2.(mem) = eu1.(mem))
   | step_promise
       loc val
       (STATE: eu1.(state) = eu2.(state))
