@@ -953,7 +953,7 @@ Proof.
   - esplits; cycle 1; eauto.
 Qed.
 
-Theorem init_step_pf_init_step
+Theorem promising_to_pf_promising
         p m
         (STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m)
         (NOPROMISE: Machine.no_promise m):
@@ -976,7 +976,7 @@ Proof.
   - apply Machine.rtc_step0_step; ss. econs; eauto.
 Qed.
 
-Theorem pf_init_step_init_step
+Theorem pf_promising_to_promising
         p m1 m2
         (INIT: Machine.pf_init p m1)
         (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2)

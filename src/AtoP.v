@@ -1733,7 +1733,7 @@ Proof.
   - ss.
 Qed.
 
-Theorem axiomatic_to_promising
+Theorem axiomatic_to_pf_promising
       p ex
       (EX: Valid.ex p ex):
   exists (m1 m2: Machine.t),
