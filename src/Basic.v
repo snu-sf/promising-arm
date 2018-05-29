@@ -71,6 +71,12 @@ Proof.
     eapply Relation_Operators.t1n_trans; eauto.
 Qed.
 
+Lemma rtc_mon
+      A (r1 r2:relation A)
+      (LE: forall x y, r1 x y -> r2 x y):
+  forall x y, rtc r1 x y -> rtc r2 x y.
+Proof. i. induction H; eauto. Qed.
+
 
 Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
 | opt_pred_intro

@@ -78,6 +78,26 @@ Module Memory.
       (TS2: S ts <= to)
       (MSG: List.nth_error mem ts = Some msg),
       ~ pred msg.
+
+  Lemma read_mon ts loc val mem1 mem2
+        (READ: Memory.read ts loc mem1 = Some val):
+    Memory.read ts loc (mem1 ++ mem2) = Some val.
+  Proof.
+    revert READ. unfold Memory.read. destruct (Time.pred_opt ts); ss.
+    destruct (nth_error mem1 t0) eqn:NTH; ss.
+    rewrite List.nth_error_app1, NTH; ss.
+    apply List.nth_error_Some. congr.
+  Qed.
+
+  Lemma get_msg_mon ts msg mem1 mem2
+        (READ: Memory.get_msg ts mem1 = Some msg):
+    Memory.get_msg ts (mem1 ++ mem2) = Some msg.
+  Proof.
+    revert READ. unfold Memory.get_msg. destruct (Time.pred_opt ts); ss.
+    destruct (nth_error mem1 t0) eqn:NTH; ss.
+    rewrite List.nth_error_app1, NTH; ss.
+    apply List.nth_error_Some. congr.
+  Qed.
 End Memory.
 
 Module FwdItem.
@@ -214,7 +234,7 @@ Module Local.
 
   Inductive internal (ctrl:View.t) (lc1 lc2:t): Prop :=
   | internal_intro
-      (LC2: lc2 = 
+      (LC2: lc2 =
             mk
               lc1.(coh)
               lc1.(vrp)
@@ -316,7 +336,7 @@ Module Local.
 
   Inductive isb (lc1 lc2:t): Prop :=
   | isb_intro
-      (LC2: lc2 = 
+      (LC2: lc2 =
             mk
               lc1.(coh)
               (join lc1.(vrp) lc1.(vcap))
@@ -333,7 +353,7 @@ Module Local.
 
   Inductive dmbst (lc1 lc2:t): Prop :=
   | dmbst_intro
-      (LC2: lc2 = 
+      (LC2: lc2 =
             mk
               lc1.(coh)
               lc1.(vrp)
@@ -350,7 +370,7 @@ Module Local.
 
   Inductive dmbld (lc1 lc2:t): Prop :=
   | dmbld_intro
-      (LC2: lc2 = 
+      (LC2: lc2 =
             mk
               lc1.(coh)
               (join lc1.(vrp) lc1.(vrm))
@@ -367,7 +387,7 @@ Module Local.
 
   Inductive dmbsy (lc1 lc2:t): Prop :=
   | dmbsy_intro
-      (LC2: lc2 = 
+      (LC2: lc2 =
             mk
               lc1.(coh)
               (joins [lc1.(vrp); lc1.(vrm); lc1.(vwm)])
@@ -382,7 +402,7 @@ Module Local.
   .
   Hint Constructors dmbsy.
 
-  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t): Prop :=
+  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
   | step_internal
       ctrl
       (EVENT: event = (Event.internal ctrl))
@@ -390,11 +410,11 @@ Module Local.
   | step_read
       ex ord vloc res
       (EVENT: event = Event.read ex ord vloc res)
-      (STEP: read ex ord vloc res lc1 mem1 lc2)
+      (STEP: read ex ord vloc res lc1 mem lc2)
   | step_fulfill
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
-      (STEP: fulfill ex ord vloc vval res tid lc1 mem1 lc2)
+      (STEP: fulfill ex ord vloc vval res tid lc1 mem lc2)
   | step_write_failure
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
@@ -413,6 +433,29 @@ Module Local.
       (STEP: dmbsy lc1 lc2)
   .
   Hint Constructors step.
+
+  Inductive wf (mem:Memory.t) (lc:t): Prop :=
+  | wf_intro
+      (COH: forall loc, lc.(coh) loc <= List.length mem)
+      (VRP: lc.(vrp) <= List.length mem)
+      (VWP: lc.(vwp) <= List.length mem)
+      (VRM: lc.(vrm) <= List.length mem)
+      (VWM: lc.(vwm) <= List.length mem)
+      (VCAP: lc.(vcap) <= List.length mem)
+      (VREL: lc.(vrel) <= List.length mem)
+      (FWDBANK: forall loc fwd,
+          lc.(fwdbank) loc = Some fwd ->
+          fwd.(FwdItem.ts) <= List.length mem /\
+          fwd.(FwdItem.view) <= List.length mem)
+      (EXBANK: forall ts, lc.(exbank) = Some ts -> ts <= List.length mem)
+      (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
+  .
+
+  Lemma init_wf mem: wf mem init.
+  Proof.
+    econs; ss; i; try by apply bot_spec.
+    rewrite Promises.lookup_empty in IN. ss.
+  Qed.
 End Local.
 
 Module ExecUnit.
@@ -427,7 +470,7 @@ Module ExecUnit.
   | state_step_intro
       e
       (STATE: State.step e eu1.(state) eu2.(state))
-      (LOCAL: Local.step e tid eu1.(local) eu1.(mem) eu2.(local))
+      (LOCAL: Local.step e tid eu1.(mem) eu1.(local) eu2.(local))
       (MEM: eu2.(mem) = eu1.(mem))
   .
 
@@ -442,6 +485,157 @@ Module ExecUnit.
   | step_state (STEP: state_step tid eu1 eu2)
   | step_promise (STEP: promise_step tid eu1 eu2)
   .
+
+  Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t)): Prop :=
+  | rmap_wf_intro
+      (RMAP: forall r, (RMap.find r rmap).(ValA.annot) <= List.length mem)
+  .
+
+  Inductive wf (eu:t): Prop :=
+  | wf_intro
+      (STATE: rmap_wf eu.(mem) eu.(state).(State.rmap))
+      (LOCAL: Local.wf eu.(mem) eu.(local))
+  .
+
+  Ltac tac :=
+    repeat
+      (try match goal with
+           | [|- join _ _ <= _] => apply join_spec
+           | [|- bot <= _] => apply bot_spec
+           | [|- View.join _ _ <= _] => apply join_spec
+           | [|- View.bot <= _] => apply bot_spec
+           | [|- ifc ?c _ <= _] => destruct c; s
+           end;
+       ss; eauto).
+
+  Lemma rmap_add_wf
+        mem rmap loc val
+        (WF: rmap_wf mem rmap)
+        (VAL: val.(ValA.annot) <= List.length mem):
+    rmap_wf mem (RMap.add loc val rmap).
+  Proof.
+    inv WF. econs. i. unfold RMap.find, RMap.add. rewrite IdMap.add_spec.
+    condtac; tac.
+  Qed.
+
+  Lemma expr_wf
+        mem rmap e
+        (RMAP: rmap_wf mem rmap):
+    (sem_expr rmap e).(ValA.annot) <= List.length mem.
+  Proof.
+    induction e; tac. apply RMAP.
+  Qed.
+
+  Lemma read_wf
+        ts loc val mem
+        (READ: Memory.read ts loc mem = Some val):
+    ts <= List.length mem.
+  Proof.
+    revert READ. unfold Memory.read. destruct ts; [lia|]. s.
+    destruct (nth_error mem ts) eqn:NTH; ss. condtac; ss.
+    i. eapply List.nth_error_Some. congr.
+  Qed.
+
+  Lemma get_msg_wf
+        ts msg mem
+        (READ: Memory.get_msg ts mem = Some msg):
+    ts <= List.length mem.
+  Proof.
+    revert READ. unfold Memory.get_msg. destruct ts; [lia|]. s.
+    destruct (nth_error mem ts) eqn:NTH; ss. i. inv READ.
+    eapply List.nth_error_Some. congr.
+  Qed.
+
+  Lemma state_step_wf tid eu1 eu2
+        (STEP: state_step tid eu1 eu2)
+        (WF: wf eu1):
+    wf eu2.
+  Proof.
+    destruct eu1 as [state1 local1 mem1].
+    destruct eu2 as [state2 local2 mem2].
+    inv WF. inv STEP. ss. subst.
+
+    assert (FWD:
+              forall loc ord ts,
+                ts <= List.length mem1 ->
+                match Local.fwdbank local1 loc with
+                | Some fwd => FwdItem.read_view fwd ts ord
+                | None => ts
+                end <= length mem1).
+    { inv LOCAL. i. destruct (Local.fwdbank local1 loc) eqn:FWD; ss.
+      exploit FWDBANK; eauto. i. des.
+      unfold FwdItem.read_view. condtac; ss.
+    }
+
+    inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
+    - inv LC. econs; ss. econs; tac.
+    - inv LC. econs; ss.
+      + eauto using rmap_add_wf, expr_wf.
+      + econs; tac.
+    - inv STEP. econs; ss.
+      + apply rmap_add_wf; tac.
+        * eauto using expr_wf.
+        * apply FWD. eauto using read_wf.
+      + econs; tac; eauto using expr_wf.
+        * i. rewrite fun_add_spec. condtac; tac.
+          eapply read_wf. eauto.
+        * apply FWD. eauto using read_wf.
+        * apply FWD. eauto using read_wf.
+        * apply FWD. eauto using read_wf.
+        * destruct ex0; ss. i. inv H. eapply read_wf. eauto.
+    - inv STEP. econs; ss.
+      + apply rmap_add_wf; tac.
+      + econs; tac; eauto using get_msg_wf, expr_wf.
+        * i. rewrite fun_add_spec. condtac; tac.
+          eapply get_msg_wf. eauto.
+        * i. revert H. rewrite fun_add_spec. condtac; tac.
+          i. inv H. s. splits; tac; eauto using get_msg_wf, expr_wf.
+        * destruct ex0; ss.
+        * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
+    - inv STEP. econs; ss. apply rmap_add_wf; tac.
+    - inv STEP. econs; ss. econs; tac.
+    - inv STEP. econs; ss. econs; tac.
+    - inv STEP. econs; ss. econs; tac.
+    - inv STEP. econs; ss. econs; tac.
+    - inv LC. econs; ss. econs; tac. eauto using expr_wf.
+    - inv LC. econs; ss. econs; tac.
+  Qed.
+
+  Lemma rmap_append_wf
+        mem msg rmap
+        (WF: rmap_wf mem rmap):
+    rmap_wf (mem ++ [msg]) rmap.
+  Proof.
+    inv WF. econs. i. rewrite RMAP. rewrite List.app_length. lia.
+  Qed.
+
+  Lemma promise_step_wf tid eu1 eu2
+        (STEP: promise_step tid eu1 eu2)
+        (WF: wf eu1):
+    wf eu2.
+  Proof.
+    destruct eu1 as [state1 local1 mem1].
+    destruct eu2 as [state2 local2 mem2].
+    inv WF. inv STEP. ss. subst.
+    inv LOCAL. inv LOCAL0. inv MEM2. econs; ss.
+    - apply rmap_append_wf. ss.
+    - econs.
+      all: rewrite List.app_length; s; try lia.
+      + i. rewrite COH. lia.
+      + i. exploit FWDBANK; eauto. i. des. lia.
+      + i. rewrite EXBANK; ss. lia.
+      + i. revert IN. rewrite Promises.set_o. condtac.
+        * inversion e. i. inv IN. lia.
+        * i. exploit PROMISES; eauto. lia.
+  Qed.
+
+  Lemma step_wf tid eu1 eu2
+        (STEP: step tid eu1 eu2)
+        (WF: wf eu1):
+    wf eu2.
+  Proof.
+    inv STEP; eauto using state_step_wf, promise_step_wf.
+  Qed.
 End ExecUnit.
 
 Module Machine.
@@ -510,14 +704,21 @@ Module Machine.
         (NOPROMISE: no_promise m):
     consistent eustep m.
   Proof. econs; eauto. Qed.
-        
+
+  Lemma step0_consistent
+        eustep m1 m2
+        (STEP: rtc (step0 eustep) m1 m2)
+        (CONSISTENT: consistent eustep m2):
+    consistent eustep m1.
+  Proof. inv CONSISTENT. econs; [|by eauto]. etrans; eauto. Qed.
+
   Lemma rtc_step0_step eustep m1 m2
         (STEP: rtc (step0 eustep) m1 m2)
         (CONSISTENT: consistent eustep m2):
     rtc (step eustep) m1 m2.
   Proof.
     revert CONSISTENT. induction STEP; [refl|]. i. econs.
-    - econs; eauto. inv CONSISTENT. econs; [|by eauto]. etrans; eauto.
+    - econs; eauto. eapply step0_consistent; eauto.
     - eauto.
   Qed.
 
@@ -545,10 +746,121 @@ Module Machine.
       + ss.
       + s. rewrite (IdMap.add_add tid (st2, lc2)). eauto.
   Qed.
+
+  Inductive wf (m:t): Prop :=
+  | wf_intro
+      (WF: forall tid st lc
+             (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
+          ExecUnit.wf (ExecUnit.mk st lc m.(mem)))
+  .
+
+  Lemma init_wf p:
+    wf (init p).
+  Proof.
+    econs. i. ss.
+    rewrite IdMap.map_spec in FIND. destruct (IdMap.find tid p); inv FIND.
+    econs; ss.
+    - econs. i. unfold RMap.find, RMap.init. rewrite IdMap.gempty. ss.
+    - apply Local.init_wf.
+  Qed.
+
+  Lemma init_consistent eustep p:
+    consistent eustep (init p).
+  Proof.
+    econs; eauto. econs. s. i.
+    revert FIND. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss. i. inv FIND.
+    s. ii. apply Promises.lookup_empty.
+  Qed.
+
+  Lemma step0_state_step_wf
+        m1 m2
+        (STEP: step0 ExecUnit.state_step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    destruct m1 as [tpool1 mem1].
+    destruct m2 as [tpool2 mem2].
+    inv STEP. inv STEP0. inv WF. econs. ss. subst.
+    i. revert FIND0. rewrite IdMap.add_spec. condtac.
+    - inversion e0. i. inv FIND0.
+      eapply ExecUnit.state_step_wf; eauto. econs; eauto.
+    - i. exploit WF0; eauto.
+  Qed.
+
+  Lemma step0_promise_step_wf
+        m1 m2
+        (STEP: step0 ExecUnit.promise_step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    destruct m1 as [tpool1 mem1].
+    destruct m2 as [tpool2 mem2].
+    inv STEP. inv STEP0. inv LOCAL. inv MEM2. inv WF. econs. ss. subst.
+    i. revert FIND0. rewrite IdMap.add_spec. condtac.
+    - inversion e. i. inv FIND0.
+      eapply ExecUnit.promise_step_wf; eauto. econs; eauto. econs; eauto.
+      + econs; eauto.
+      + refl.
+    - i. exploit WF0; eauto. i. inv x. ss. econs; ss.
+      + apply ExecUnit.rmap_append_wf. ss.
+      + inv LOCAL. econs.
+        all: rewrite List.app_length; s; try lia.
+        * i. rewrite COH. lia.
+        * i. exploit FWDBANK; eauto. i. des. lia.
+        * i. rewrite EXBANK; ss. lia.
+        * i. exploit PROMISES; eauto. lia.
+  Qed.
+
+  Lemma step0_step_wf
+        m1 m2
+        (STEP: step0 ExecUnit.step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    inv STEP. inv STEP0.
+    - eapply step0_state_step_wf; eauto.
+    - eapply step0_promise_step_wf; eauto.
+  Qed.
+
+  Lemma pf_init_wf p m
+        (INIT: pf_init p m):
+    wf m.
+  Proof.
+    inv INIT. clear CONSISTENT.
+    generalize (init_wf p). induction STEP; ss.
+    i. apply IHSTEP. eapply step0_promise_step_wf; eauto.
+  Qed.
+
+  Lemma step0_mon
+        (eustep1 eustep2: _ -> _ -> _ -> Prop)
+        (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
+    forall m1 m2, step0 eustep1 m1 m2 -> step0 eustep2 m1 m2.
+  Proof.
+    i. inv H. econs; eauto.
+  Qed.
+
+  Lemma rtc_step0_mon
+        (eustep1 eustep2: _ -> _ -> _ -> Prop)
+        (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
+    forall m1 m2, rtc (step0 eustep1) m1 m2 -> rtc (step0 eustep2) m1 m2.
+  Proof.
+    i. induction H; eauto. econs; eauto. eapply step0_mon; eauto.
+  Qed.
+
+  Lemma rtc_step_consistent
+        eustep m1 m2
+        (STEP: rtc (Machine.step eustep) m1 m2)
+        (CONSISTENT: Machine.consistent eustep m1):
+    Machine.consistent eustep m2.
+  Proof.
+    revert CONSISTENT. induction STEP; ss.
+    i. apply IHSTEP. apply H.
+  Qed.
 End Machine.
 
 Lemma reorder_state_step_promise_step
       m1 m2 m3
+      (WF: Machine.wf m1)
       (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
       (STEP2: Machine.step0 ExecUnit.promise_step m2 m3):
   exists m2',
@@ -580,8 +892,26 @@ Proof.
       * econs; eauto; ss.
         inv LOCAL.
         { econs 1; eauto. }
-        { admit. }
-        { admit. }
+        { econs 2; eauto. inv STEP. econs; eauto.
+          - ii. eapply LATEST; eauto.
+            destruct (lt_dec ts0 (length mem1)).
+            { rewrite List.nth_error_app1 in MSG0; ss. }
+            contradict n.
+            eapply View.lt_le_trans; [apply TS2|].
+            inv WF. exploit WF0; try exact FIND; eauto. i. inv x. inv LOCAL. ss.
+            repeat apply join_spec; ExecUnit.tac.
+            inv STATE. apply ExecUnit.expr_wf. ss.
+          - apply Memory.read_mon. ss.
+        }
+        { econs 3; eauto. inv STEP. econs; eauto.
+          - i. exploit EX; eauto. i. des. esplits; eauto.
+            exploit ExecUnit.get_msg_wf; eauto. i.
+            ii. des. rewrite List.nth_error_app1 in MSG0; [|lia].
+            eapply LATEST; eauto.
+            rewrite <- READ. unfold Memory.read. destruct tsx; ss.
+            rewrite nth_error_app1; ss. lia.
+          - apply Memory.get_msg_mon. ss.
+        }
         { econs 4; eauto. }
         { econs 5; eauto. }
         { econs 6; eauto. }
@@ -592,45 +922,76 @@ Admitted.
 
 Lemma reorder_state_step_rtc_promise_step
       m1 m2 m3
+      (WF: Machine.wf m1)
       (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
       (STEP2: rtc (Machine.step0 ExecUnit.promise_step) m2 m3):
   exists m2',
     <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2'>> /\
     <<STEP: Machine.step0 ExecUnit.state_step m2' m3>>.
 Proof.
-  revert m1 STEP1. induction STEP2; eauto.
+  revert m1 WF STEP1. induction STEP2; eauto.
   i. exploit reorder_state_step_promise_step; eauto. i. des.
+  exploit Machine.step0_promise_step_wf; eauto. i.
   exploit IHSTEP2; eauto. i. des.
   esplits; cycle 1; eauto.
 Qed.
 
-Lemma split_rtc_step
+Lemma split_rtc_step0
       m1 m3
+      (WF: Machine.wf m1)
       (STEP: rtc (Machine.step0 ExecUnit.step) m1 m3):
   exists m2,
     <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2>> /\
     <<STEP: rtc (Machine.step0 ExecUnit.state_step) m2 m3>>.
 Proof.
-  induction STEP; eauto.
-  des. inv H. inv STEP2.
-  - exploit reorder_state_step_rtc_promise_step; eauto. i. des.
+  revert WF. induction STEP; eauto. i.
+  exploit Machine.step0_step_wf; eauto. i.
+  exploit IHSTEP; eauto. i. des.
+  inv H. inv STEP2.
+  - exploit reorder_state_step_rtc_promise_step; try exact WF; eauto. i. des.
     esplits; eauto.
   - esplits; cycle 1; eauto.
 Qed.
 
 Theorem init_step_pf_init_step
         p m
-        (STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m):
+        (STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m)
+        (NOPROMISE: Machine.no_promise m):
   exists m',
     <<INIT: Machine.pf_init p m'>> /\
     <<STEP: rtc (Machine.step ExecUnit.state_step) m' m>>.
 Proof.
-Admitted.
+  generalize (Machine.init_wf p). intro WF.
+  generalize (Machine.init_consistent ExecUnit.step p). intro CONSISTENT.
+  exploit Machine.rtc_step_consistent; eauto. i.
+  exploit rtc_mon.
+  { instantiate (1 := Machine.step0 ExecUnit.step).
+    instantiate (1 := Machine.step ExecUnit.step).
+    i. inv H. ss.
+  }
+  { eauto. }
+  i. exploit split_rtc_step0; eauto. i. des.
+  esplits.
+  - econs; eauto.
+  - apply Machine.rtc_step0_step; ss. econs; eauto.
+Qed.
 
 Theorem pf_init_step_init_step
         p m1 m2
         (INIT: Machine.pf_init p m1)
-        (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2):
+        (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2)
+        (NOPROMISE: Machine.no_promise m2):
   rtc (Machine.step ExecUnit.step) (Machine.init p) m2.
 Proof.
-Admitted.
+  inv INIT.
+  exploit Machine.rtc_step_consistent; try exact STEP; eauto. i.
+  apply Machine.rtc_step0_step; cycle 1.
+  { econs; eauto. }
+  etrans.
+  - eapply rtc_mon; cycle 1; eauto.
+    i. eapply Machine.step0_mon; cycle 1; eauto.
+    econs 2; eauto.
+  - eapply rtc_mon; cycle 1; eauto.
+    i. inv H. exploit Machine.step0_mon; cycle 1; eauto.
+    econs 1; eauto.
+Qed.
