@@ -85,7 +85,7 @@ Module Memory.
   Proof.
     revert READ. unfold Memory.read. destruct (Time.pred_opt ts); ss.
     destruct (nth_error mem1 t0) eqn:NTH; ss.
-    rewrite List.nth_error_app1, NTH; ss.
+    rewrite nth_error_app1, NTH; ss.
     apply List.nth_error_Some. congr.
   Qed.
 
@@ -95,7 +95,7 @@ Module Memory.
   Proof.
     revert READ. unfold Memory.get_msg. destruct (Time.pred_opt ts); ss.
     destruct (nth_error mem1 t0) eqn:NTH; ss.
-    rewrite List.nth_error_app1, NTH; ss.
+    rewrite nth_error_app1, NTH; ss.
     apply List.nth_error_Some. congr.
   Qed.
 End Memory.
@@ -121,7 +121,7 @@ Definition exBankT := option Time.t.
 Definition cohT := Loc.t -> Time.t.
 
 Module Promises.
-  Include IdSet.
+  Definition t := Id.t -> bool.
 
   Definition id_of_time (ts:Time.t): option positive :=
     option_map Pos.of_succ_nat (Time.pred_opt ts).
@@ -138,13 +138,13 @@ Module Promises.
   Definition lookup (ts:Time.t) (promises:t): bool :=
     match id_of_time ts with
     | None => false
-    | Some ts => mem ts promises
+    | Some ts => promises ts
     end.
 
   Definition set (ts:Time.t) (promises:t): t :=
     match id_of_time ts with
     | None => promises
-    | Some ts => add ts promises
+    | Some ts => fun_add ts true promises
     end.
 
   Lemma set_o ts' ts promises:
@@ -156,8 +156,8 @@ Module Promises.
     unfold lookup, set.
     destruct (id_of_time ts') eqn:X', (id_of_time ts) eqn:X, (equiv_dec ts' ts); ss;
       destruct ts, ts'; ss;
-      try rewrite add_o in *.
-    - inv e. rewrite X in X'. inv X'. condtac; intuition.
+      try rewrite fun_add_spec in *.
+    - inv e. rewrite X in X'. inv X'. condtac; ss. congr.
     - condtac; ss. inversion e. subst.
       rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
   Qed.
@@ -165,7 +165,7 @@ Module Promises.
   Definition unset (ts:Time.t) (promises:t): t :=
     match id_of_time ts with
     | None => promises
-    | Some ts => IdSet.remove ts promises
+    | Some ts => fun_add ts false promises
     end.
 
   Lemma unset_o ts' ts promises:
@@ -177,19 +177,43 @@ Module Promises.
     unfold lookup, unset.
     destruct (id_of_time ts') eqn:X', (id_of_time ts) eqn:X, (equiv_dec ts' ts); ss;
       destruct ts, ts'; ss;
-      try rewrite remove_o in *.
+      try rewrite fun_add_spec in *.
     - inv e. rewrite X in X'. inv X'. condtac; intuition.
     - condtac; ss. inversion e. subst.
       rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
   Qed.
 
-  Definition IsEmpty (promises:t) :=
-    forall ts, lookup ts promises = false.
+  Lemma set_unset a b promises
+        (DIFF: a <> b):
+    set a (unset b promises) = unset b (set a promises).
+  Proof.
+    funext. i. unfold set, unset.
+    destruct a, b; ss.
+    rewrite ? fun_add_spec. repeat condtac; ss.
+    inversion e. inversion e0. subst.
+    apply SuccNat2Pos.inj in H0. congr.
+  Qed.
 
-  Lemma lookup_empty view:
-    lookup view empty = false.
+  Lemma lookup_bot view:
+    lookup view bot = false.
   Proof.
     unfold lookup. destruct (id_of_time view); ss.
+  Qed.
+
+  Lemma ext p1 p2
+        (EQ: forall i, lookup i p1 = lookup i p2):
+    p1 = p2.
+  Proof.
+    funext. i. specialize (EQ (Pos.to_nat x)).
+    unfold lookup, id_of_time in *.
+    destruct (Id.eq_dec 1 x).
+    { subst. ss. }
+    exploit (Pos2Nat.inj_pred x); [lia|].
+    destruct (Pos.to_nat x) eqn:NAT; ss.
+    - destruct x; ss. destruct x; ss.
+    - i. subst. rewrite Pos2SuccNat.id_succ in *.
+      generalize (Pos.succ_pred_or x). i. des; [congr|].
+      rewrite H in *. ss.
   Qed.
 End Promises.
 
@@ -208,7 +232,7 @@ Module Local.
   }.
   Hint Constructors t.
 
-  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) bot IdSet.empty.
+  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) bot bot.
 
   Definition init_with_promises (promises: Promises.t): Local.t :=
     mk bot bot bot bot bot bot bot (fun _ => None) bot promises.
@@ -454,7 +478,7 @@ Module Local.
   Lemma init_wf mem: wf mem init.
   Proof.
     econs; ss; i; try by apply bot_spec.
-    rewrite Promises.lookup_empty in IN. ss.
+    rewrite Promises.lookup_bot in IN. ss.
   Qed.
 End Local.
 
@@ -655,7 +679,7 @@ Module Machine.
       (TERMINAL:
          forall tid st lc
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
-           State.is_terminal st /\ Promises.IsEmpty lc.(Local.promises))
+           State.is_terminal st /\ lc.(Local.promises) = bot)
   .
   Hint Constructors is_terminal.
 
@@ -664,7 +688,7 @@ Module Machine.
       (PROMISES:
          forall tid st lc
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
-           Promises.IsEmpty lc.(Local.promises))
+           lc.(Local.promises) = bot)
   .
   Hint Constructors no_promise.
 
@@ -769,7 +793,7 @@ Module Machine.
   Proof.
     econs; eauto. econs. s. i.
     revert FIND. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss. i. inv FIND.
-    s. ii. apply Promises.lookup_empty.
+    ss.
   Qed.
 
   Lemma step0_state_step_wf
@@ -880,7 +904,50 @@ Proof.
     + econs; ss.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|congr]. eauto.
       * econs; eauto; ss.
-        admit.
+        instantiate (1 :=
+                       Local.mk
+                         lc0.(Local.coh)
+                         lc0.(Local.vrp)
+                         lc0.(Local.vwp)
+                         lc0.(Local.vrm)
+                         lc0.(Local.vwm)
+                         lc0.(Local.vcap)
+                         lc0.(Local.vrel)
+                         lc0.(Local.fwdbank)
+                         lc0.(Local.exbank)
+                         (Promises.set (S (length mem1)) lc0.(Local.promises))).
+        inv LOCAL.
+        { econs 1; eauto. inv LC. econs; ss. }
+        { econs 2; eauto. inv STEP. ss.
+          exploit ExecUnit.read_wf; try exact MSG. i.
+          econs; eauto; ss.
+          - ii. eapply LATEST; eauto.
+            rewrite nth_error_app1 in MSG0; ss.
+            eapply lt_le_trans; eauto.
+            inv WF. exploit WF0; eauto. i. inv x. ss. inv LOCAL.
+            repeat apply join_spec; ExecUnit.tac.
+            inv STATE. apply ExecUnit.expr_wf. ss.
+          - apply Memory.read_mon. ss.
+        }
+        { econs 3; eauto. inv STEP. ss.
+          exploit ExecUnit.get_msg_wf; try exact MSG. i.
+          econs; eauto; ss.
+          - i. exploit EX; eauto. i. des.
+            esplits; eauto. ii.
+            rewrite nth_error_app1 in MSG0; [|lia].
+            eapply LATEST; eauto.
+            rewrite <- READ. unfold Memory.read. destruct tsx; ss.
+            rewrite nth_error_app1; [|lia]. ss.
+          - rewrite <- MSG. unfold Memory.get_msg. destruct ts; ss.
+            rewrite nth_error_app1; [|lia]. ss.
+          - f_equal. apply Promises.set_unset.
+            ii. subst. lia.
+        }
+        { econs 4; eauto. inv STEP. econs; eauto. }
+        { econs 5; eauto. inv STEP. econs; eauto. }
+        { econs 6; eauto. inv STEP. econs; eauto. }
+        { econs 7; eauto. inv STEP. econs; eauto. }
+        { econs 8; eauto. inv STEP. econs; eauto. }
       * rewrite ? IdMap.add_add. eauto.
   - (* diff thread *)
     inv STEP. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
@@ -895,7 +962,7 @@ Proof.
         { econs 2; eauto. inv STEP. econs; eauto.
           - ii. eapply LATEST; eauto.
             destruct (lt_dec ts0 (length mem1)).
-            { rewrite List.nth_error_app1 in MSG0; ss. }
+            { rewrite nth_error_app1 in MSG0; ss. }
             contradict n.
             eapply View.lt_le_trans; [apply TS2|].
             inv WF. exploit WF0; try exact FIND; eauto. i. inv x. inv LOCAL. ss.
@@ -906,7 +973,7 @@ Proof.
         { econs 3; eauto. inv STEP. econs; eauto.
           - i. exploit EX; eauto. i. des. esplits; eauto.
             exploit ExecUnit.get_msg_wf; eauto. i.
-            ii. des. rewrite List.nth_error_app1 in MSG0; [|lia].
+            ii. des. rewrite nth_error_app1 in MSG0; [|lia].
             eapply LATEST; eauto.
             rewrite <- READ. unfold Memory.read. destruct tsx; ss.
             rewrite nth_error_app1; ss. lia.
@@ -918,7 +985,7 @@ Proof.
         { econs 7; eauto. }
         { econs 8; eauto. }
       * apply IdMap.add_add_diff. ss.
-Admitted.
+Qed.
 
 Lemma reorder_state_step_rtc_promise_step
       m1 m2 m3

@@ -1624,7 +1624,7 @@ Definition promises_from_mem
            (tid:Id.t) (mem: Memory.t): Promises.t.
 Proof.
   induction mem using list_rev_rect.
-  - apply Promises.empty.
+  - exact bot.
   - destruct x.
     apply (if tid0 == tid
            then Promises.set (S (List.length (List.rev mem))) IHmem
@@ -1632,7 +1632,7 @@ Proof.
 Defined.
 
 Lemma promises_from_mem_nil tid:
-  promises_from_mem tid Memory.empty = Promises.empty.
+  promises_from_mem tid Memory.empty = bot.
 Proof.
   unfold promises_from_mem, list_rev_rect, eq_rect. ss.
   match goal with
@@ -1670,7 +1670,7 @@ Lemma promises_from_mem_inv
   exists loc val, List.nth_error mem ts = Some (Msg.mk loc val tid).
 Proof.
   revert LOOKUP. induction mem using List.rev_ind.
-  { rewrite promises_from_mem_nil, Promises.lookup_empty. ss. }
+  { rewrite promises_from_mem_nil, Promises.lookup_bot. ss. }
   rewrite promises_from_mem_snoc. condtac.
   { rewrite Promises.set_o. condtac.
     - inversion e. inversion e0. subst.
@@ -1788,7 +1788,7 @@ Proof.
   assert (OUT: forall tid st lc
                  (FIND1: IdMap.find tid p = None)
                  (FIND2: IdMap.find tid m.(Machine.tpool) = Some (st, lc)),
-             State.is_terminal st /\ Promises.IsEmpty lc.(Local.promises)).
+             State.is_terminal st /\ lc.(Local.promises) = bot).
   { i. rewrite TPOOL, FIND1 in FIND2. ss. }
   assert (P: forall tid stmts
                (FIND1: IdMap.find tid p = Some stmts),
@@ -1815,7 +1815,7 @@ Proof.
                          (Local.init_with_promises (promises_from_mem tid (Machine.mem m)))
                          (Machine.mem m))
                       (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
-          <<TERMINAL: State.is_terminal st2 /\ Promises.IsEmpty lc2.(Local.promises)>>).
+          <<TERMINAL: State.is_terminal st2 /\ lc2.(Local.promises) = bot>>).
   { i. des. subst.
     exploit Machine.rtc_eu_step_step0; try exact STEP; eauto. i.
     assert (NOTIN: SetoidList.findA (fun id' : IdMap.key => if equiv_dec tid id' then true else false) ps = None).
@@ -1870,7 +1870,8 @@ Proof.
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
   - unfold State.is_terminal in *. inv STATE. congr.
-  - ii. destruct (Promises.lookup ts (Local.promises local2)) eqn:L; ss.
+  - apply Promises.ext. i. destruct (Promises.lookup i (Local.promises local2)) eqn:L; ss; cycle 1.
+    { rewrite Promises.lookup_bot. ss. }
     exploit LOCAL0.(PROMISES); eauto. i. des.
     exploit view_of_eid_inv; eauto. i. des. subst.
     inv WRITE. unfold Execution.label in EID. ss.

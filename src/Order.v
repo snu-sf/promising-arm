@@ -295,58 +295,104 @@ Next Obligation.
 Qed.
 
 
-Definition prop_eq (a b:Prop): Prop := a <-> b.
-
 Definition prop_le (a b:Prop): Prop := a -> b.
 
 Definition prop_join (a b:Prop): Prop := a \/ b.
 
 Definition prop_bot: Prop := False.
 
-Program Instance prop_equiv: Equivalence prop_eq.
-
 Program Instance prop_preorder: PreOrder prop_le.
 Next Obligation. ii. ss. Qed.
 Next Obligation. ii. auto. Qed.
 
-Program Instance prop_partialorder: PartialOrder iff prop_le.
+Program Instance prop_partialorder: PartialOrder eq prop_le.
 Next Obligation.
   econs.
   - i. inv H. econs; ss.
-  - i. inv H. econs; ss.
+  - i. inv H. propext. econs; eauto.
 Qed.
 
 Program Instance prop_order:
   @orderC
     Prop
-    prop_eq
+    eq
     prop_le
     prop_join
     prop_bot
-    prop_equiv
+    eq_equivalence
     prop_preorder
     prop_partialorder.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  unfold prop_le, prop_join, prop_bot in *.
   intuition.
 Qed.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  unfold prop_le, prop_join, prop_bot in *.
   intuition.
 Qed.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  unfold prop_le, prop_join, prop_bot in *.
+  propext. intuition.
+Qed.
+Next Obligation.
+  unfold prop_le, prop_join, prop_bot in *.
+  propext. intuition.
+Qed.
+Next Obligation.
+  unfold prop_le, prop_join, prop_bot in *.
   intuition.
 Qed.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
+  unfold prop_le, prop_join, prop_bot in *.
   intuition.
 Qed.
+
+
+Definition bool_le (a b:bool): Prop := a -> b.
+
+Definition bool_join (a b:bool): bool := a || b.
+
+Definition bool_bot: bool := false.
+
+Program Instance bool_preorder: PreOrder bool_le.
+Next Obligation. ii. ss. Qed.
+Next Obligation. ii. auto. Qed.
+
+Program Instance bool_partialorder: PartialOrder eq bool_le.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
-  intuition.
+  unfold bool_le in *.
+  econs.
+  - i. inv H. econs; ss.
+  - i. inv H. destruct x, x0; intuition.
+Qed.
+
+Program Instance bool_order:
+  @orderC
+    bool
+    eq
+    bool_le
+    bool_join
+    bool_bot
+    eq_equivalence
+    bool_preorder
+    bool_partialorder.
+Next Obligation.
+  unfold bool_le, bool_join, bool_bot in *.
+  destruct a, b; intuition.
 Qed.
 Next Obligation.
-  unfold prop_eq, prop_le, prop_join, prop_bot in *.
-  intuition.
+  unfold bool_le, bool_join, bool_bot in *.
+  destruct a, b; intuition.
+Qed.
+Next Obligation.
+  unfold bool_le, bool_join, bool_bot in *.
+  destruct a, b, c; intuition.
+Qed.
+Next Obligation.
+  unfold bool_le, bool_join, bool_bot in *.
+  destruct a, b; intuition.
+Qed.
+Next Obligation.
+  unfold bool_le, bool_join, bool_bot in *.
+  destruct a, b, c; intuition.
 Qed.
