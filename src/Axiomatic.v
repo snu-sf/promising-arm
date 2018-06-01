@@ -643,21 +643,19 @@ Hint Constructors tid_join.
 
 Module Valid.
   Inductive pre_ex (p:program) (ex:Execution.t) := mk_pre_ex {
-    locals: IdMap.t ALocal.t;
+    aeus: IdMap.t AExecUnit.t;
 
-    LOCALS: IdMap.Forall2
-              (fun stmts local =>
-                 exists state,
-                   <<STEP: rtc AExecUnit.step
-                               (AExecUnit.mk (State.init stmts) ALocal.init)
-                               (AExecUnit.mk state local)>> /\
-                   <<TERMINAL: State.is_terminal state>>)
-              p locals;
-    LABELS: ex.(Execution.labels) = IdMap.map (fun local => local.(ALocal.labels)) locals;
-    ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun local => local.(ALocal.addr)) locals);
-    DATA: ex.(Execution.data) = tid_join (IdMap.map (fun local => local.(ALocal.data)) locals);
-    CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun local => local.(ALocal.ctrl)) locals);
-    RMW: ex.(Execution.rmw) = tid_join (IdMap.map (fun local => local.(ALocal.rmw)) locals);
+    AEUS: IdMap.Forall2
+            (fun stmts aeu =>
+               rtc AExecUnit.step
+                   (AExecUnit.mk (State.init stmts) ALocal.init)
+                   aeu)
+            p aeus;
+    LABELS: ex.(Execution.labels) = IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.labels)) aeus;
+    ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.addr)) aeus);
+    DATA: ex.(Execution.data) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.data)) aeus);
+    CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.ctrl)) aeus);
+    RMW: ex.(Execution.rmw) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.rmw)) aeus);
   }.
   Hint Constructors pre_ex.
 
@@ -684,6 +682,11 @@ Module Valid.
   Hint Constructors ex.
   Coercion PRE: ex >-> pre_ex.
 
+  Definition is_terminal
+             p ex (EX: pre_ex p ex): Prop :=
+    forall tid aeu (FIND: IdMap.find tid EX.(aeus) = Some aeu),
+      State.is_terminal aeu.(AExecUnit.state).
+
   Lemma inclusion_po
         p exec (EX: ex p exec):
     <<ADDR: exec.(Execution.addr) ⊆ Execution.po>> /\
@@ -692,22 +695,22 @@ Module Valid.
   Proof.
     rewrite EX.(ADDR), EX.(DATA), EX.(CTRL). splits.
     - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
-      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
-      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      destruct (IdMap.find t EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(AEUS) t). rewrite LOCAL. intro X. inv X. des.
       exploit AExecUnit.rtc_step_future; eauto.
       { apply AExecUnit.wf_init. }
       s. i. des. econs; ss.
       inv WF. apply ADDR0. ss.
     - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
-      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
-      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      destruct (IdMap.find t EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(AEUS) t). rewrite LOCAL. intro X. inv X. des.
       exploit AExecUnit.rtc_step_future; eauto.
       { apply AExecUnit.wf_init. }
       s. i. des. econs; ss.
       inv WF. apply DATA0. ss.
     - ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
-      destruct (IdMap.find t (locals EX)) eqn:LOCAL; ss. inv RELS.
-      generalize (EX.(LOCALS) t). rewrite LOCAL. intro X. inv X. des.
+      destruct (IdMap.find t EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+      generalize (EX.(AEUS) t). rewrite LOCAL. intro X. inv X. des.
       exploit AExecUnit.rtc_step_future; eauto.
       { apply AExecUnit.wf_init. }
       s. i. des. econs; ss.
@@ -721,8 +724,8 @@ Module Valid.
     ii. inv H. des. destruct x, y, x0.
     rewrite EX.(CTRL) in *. des. ss. subst.
     inv H0. rewrite IdMap.map_spec in RELS.
-    destruct (IdMap.find tid (locals EX)) eqn:LOCAL; ss. inv RELS.
-    generalize (EX.(LOCALS) tid). rewrite LOCAL. intro X. inv X. des.
+    destruct (IdMap.find tid EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(AEUS) tid). rewrite LOCAL. intro X. inv X. des.
     inv REL. ss. subst.
     exploit AExecUnit.rtc_step_future; eauto.
     { apply AExecUnit.wf_init. }
@@ -751,8 +754,8 @@ Module Valid.
     destruct eid as [tid n]. rewrite EX.(RMW).
     inv WRITE. des. destruct l; ss. destruct ex0; ss. revert EID. unfold Execution.label.
     rewrite EX.(LABELS), IdMap.map_spec. s.
-    destruct (IdMap.find tid (locals EX)) eqn:LOCAL; ss. i.
-    generalize (EX.(LOCALS) tid). rewrite LOCAL. intro X. inv X. des.
+    destruct (IdMap.find tid EX.(aeus)) eqn:LOCAL; ss. i.
+    generalize (EX.(AEUS) tid). rewrite LOCAL. intro X. inv X. des.
     exploit AExecUnit.rtc_step_future; eauto.
     { apply AExecUnit.wf_init. }
     s. i. des. inv WF. exploit RMW0; eauto. intro X. inv X. ss.
@@ -772,11 +775,11 @@ Module Valid.
     destruct eid1, eid2. inv PO. ss. subst.
     revert LABEL. unfold Execution.label.
     rewrite EX.(LABELS), ? IdMap.map_spec. s.
-    destruct (IdMap.find t0 EX.(locals)) eqn:LOCAL; ss.
-    generalize (EX.(LOCALS) t0). rewrite LOCAL. intro X. inv X. des.
+    destruct (IdMap.find t0 EX.(aeus)) eqn:LOCAL; ss.
+    generalize (EX.(AEUS) t0). rewrite LOCAL. intro X. inv X. des.
     i. exploit List.nth_error_Some. rewrite LABEL. intros [X _]. exploit X; [congr|]. clear X. i.
-    generalize (List.nth_error_Some t.(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
-    destruct (List.nth_error t.(ALocal.labels) n); ss. eauto.
+    generalize (List.nth_error_Some t.(AExecUnit.local).(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
+    destruct (List.nth_error t.(AExecUnit.local).(ALocal.labels) n); ss. eauto.
   Qed.
 
   Lemma coherence_rw
