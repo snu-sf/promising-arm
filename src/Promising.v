@@ -474,6 +474,7 @@ Module Local.
       (EXBANK: forall ts, lc.(exbank) = Some ts -> ts <= List.length mem)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
   .
+  Hint Constructors wf.
 
   Lemma init_wf mem: wf mem init.
   Proof.
@@ -497,6 +498,7 @@ Module ExecUnit.
       (LOCAL: Local.step e tid eu1.(mem) eu1.(local) eu2.(local))
       (MEM: eu2.(mem) = eu1.(mem))
   .
+  Hint Constructors state_step.
 
   Inductive promise_step (tid:Id.t) (eu1 eu2:t): Prop :=
   | promise_step_intro
@@ -504,22 +506,26 @@ Module ExecUnit.
       (STATE: eu1.(state) = eu2.(state))
       (LOCAL: Local.promise loc val tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
   .
+  Hint Constructors promise_step.
 
   Inductive step (tid:Id.t) (eu1 eu2:t): Prop :=
   | step_state (STEP: state_step tid eu1 eu2)
   | step_promise (STEP: promise_step tid eu1 eu2)
   .
+  Hint Constructors step.
 
   Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t)): Prop :=
   | rmap_wf_intro
       (RMAP: forall r, (RMap.find r rmap).(ValA.annot) <= List.length mem)
   .
+  Hint Constructors rmap_wf.
 
   Inductive wf (eu:t): Prop :=
   | wf_intro
       (STATE: rmap_wf eu.(mem) eu.(state).(State.rmap))
       (LOCAL: Local.wf eu.(mem) eu.(local))
   .
+  Hint Constructors wf.
 
   Ltac tac :=
     repeat
@@ -779,6 +785,7 @@ Module Machine.
              (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
           ExecUnit.wf (ExecUnit.mk st lc m.(mem)))
   .
+  Hint Constructors wf.
 
   Lemma init_wf p:
     wf (init p).
@@ -881,4 +888,5 @@ Module Machine.
       (STEP2: rtc (step0 ExecUnit.state_step) m1 m)
       (NOPROMISE: no_promise m)
   .
+  Hint Constructors pf_exec.
 End Machine.

@@ -85,10 +85,6 @@ Definition join (A:Type) `{_: orderC A} := join.
 Definition bot (A:Type) `{_: orderC A} := bot.
 
 
-Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
-Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
-
-
 Definition fun_add A B `{_: EqDec A} (a:A) (b:B) (f:A -> B): A -> B :=
   fun x => if a == x then b else f x.
 Hint Unfold fun_add.

@@ -25,6 +25,7 @@ Module Label.
   | write (ex:bool) (ord:OrdW.t) (loc:Loc.t) (val:Val.t)
   | barrier (b:Barrier.t)
   .
+  Hint Constructors t.
 
   Definition is_ex (label:t): bool :=
     match label with
@@ -211,6 +212,7 @@ Module ALocal.
       (CTRL: alocal1.(ctrl) ⊆ alocal2.(ctrl))
       (RMW: alocal1.(rmw) ⊆ alocal2.(rmw))
   .
+  Hint Constructors le.
 
   Global Program Instance le_preorder: PreOrder le.
   Next Obligation.
@@ -238,6 +240,7 @@ Module AExecUnit.
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: ALocal.step e eu1.(local) eu2.(local))
   .
+  Hint Constructors step.
 
   Definition wf_rmap (rmap: RMap.t (A:=nat -> Prop)) (max:nat): Prop :=
     forall r n
@@ -403,6 +406,7 @@ Module Execution.
     co: relation eidT;
     rf: relation eidT;
   }.
+  Hint Constructors t.
 
   Definition label (eid:eidT) (ex:t): option Label.t :=
     match IdMap.find eid.(fst) ex.(labels) with
@@ -472,6 +476,7 @@ Module Execution.
       (EID: label eid ex = Some l)
       (LABEL: pred l)
   .
+  Hint Constructors label_is.
 
   Inductive label_rel (ex:t) (rel:relation Label.t) (eid1 eid2:eidT): Prop :=
   | label_rel_intro
@@ -480,6 +485,7 @@ Module Execution.
       (EID2: label eid2 ex = Some l2)
       (LABEL: rel l1 l2)
   .
+  Hint Constructors label_rel.
 
   Inductive label_loc (x y:Label.t): Prop :=
   | label_loc_intro
@@ -487,6 +493,7 @@ Module Execution.
       (X: Label.is_accessing loc x)
       (Y: Label.is_accessing loc y)
   .
+  Hint Constructors label_loc.
 
 (* let obs = rfe | fr | co *)
 
@@ -646,7 +653,7 @@ Module Valid.
     aeus: IdMap.t AExecUnit.t;
 
     AEUS: IdMap.Forall2
-            (fun stmts aeu =>
+            (fun tid stmts aeu =>
                rtc AExecUnit.step
                    (AExecUnit.mk (State.init stmts) ALocal.init)
                    aeu)

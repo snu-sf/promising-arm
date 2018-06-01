@@ -129,7 +129,7 @@ Proof.
     exploit @List_nth_error_firstn; [eauto| |i].
     { instantiate (1 := (n0 - n)). lia. }
     exploit List.nth_error_In; eauto. i.
-    exfalso. eapply mem_of_ex_in_length; eauto. econs; eauto.
+    exfalso. eapply mem_of_ex_in_length; eauto.
   - symmetry in VIEW0.
     rewrite (@List_firstn_le (S n0) (S n)) in VIEW0; [|lia].
     rewrite mem_of_ex_app, List.app_length in VIEW0.
@@ -138,7 +138,7 @@ Proof.
     exploit @List_nth_error_firstn; [eauto| |i].
     { instantiate (1 := (n - n0)). lia. }
     exploit List.nth_error_In; eauto. i.
-    exfalso. eapply mem_of_ex_in_length; eauto. econs; eauto.
+    exfalso. eapply mem_of_ex_in_length; eauto.
 Qed.
 
 Lemma view_of_eid_ob
@@ -223,7 +223,7 @@ Hint Constructors sim_val.
 
 Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t)): Prop :=
 | sim_rmap_intro
-    (RMAP: IdMap.Forall2 (sim_val tid ex ob) armap rmap)
+    (RMAP: IdMap.Forall2 (fun reg => sim_val tid ex ob) armap rmap)
 .
 Hint Constructors sim_rmap.
 
@@ -293,7 +293,6 @@ Proof.
   inv COH. des. inv H. inv H0. des. inv EID2. inv H2. destruct l0; ss. inv H.
   - esplits.
     + econs. left. left. left. econs; eauto.
-      econs; eauto. econs; eauto.
     + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
   - inv H1. splits.
     + econs 2; [econs|].
@@ -303,7 +302,6 @@ Proof.
       { esplits; eauto. }
       i. des.
       econs. left. left. left. econs; eauto.
-      econs; eauto. econs; eauto.
     + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
 Qed.
 
@@ -500,7 +498,7 @@ Lemma sim_local_vrel_spec
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vrel in VREL.
   - right. left. left. left. left. right.
-    rewrite seq_assoc. econs. splits; eauto. econs; eauto. econs; eauto.
+    rewrite seq_assoc. econs. splits; eauto. econs; eauto.
 Qed.
 
 Inductive sim_local_fwd ex (loc:Loc.t) (eid1 eid2:eidT): Prop :=
@@ -535,7 +533,7 @@ Proof.
       econs; eauto.
       * etrans; eauto.
       * i. rewrite Execution.po_po_adj in PO1. inv PO1. des. inv H0. destruct x0. ss. inv N.
-        inv H; eauto. econs; eauto.
+        inv H; eauto.
     + inv H. inv H1. apply Label.is_writing_inv in LABEL. des. subst.
       econs; eauto.
       * econs; eauto. apply Label.write_is_writing.
@@ -826,7 +824,6 @@ Proof.
       { rewrite VIEW2. apply bot_spec. }
       rewrite VIEW2. eapply view_of_eid_ob; eauto.
       inv EID. exploit sim_local_vrp_spec; eauto.
-      econs; eauto.
     }
 
     assert (SIM_VREL: sim_view ex ob
@@ -840,7 +837,6 @@ Proof.
       { rewrite VIEW2. apply bot_spec. }
       rewrite VIEW2. eapply view_of_eid_ob; eauto.
       inv EID. exploit sim_local_vrel_spec; eauto.
-      econs; eauto.
     }
 
     assert (SIM_FWD: sim_view ex ob
@@ -886,12 +882,11 @@ Proof.
           rewrite EID in LABEL0. inv LABEL0.
           exploit EX0; eauto. clear EX0. intro Y. inv Y. rewrite EID in EID0. inv EID0.
           exploit Valid.write_ex_codom_rmw; eauto.
-          { econs; eauto. }
           intro Y. inv Y. left. right. econs. splits.
           { econs; eauto. econs; eauto. }
           econs. splits.
           * econs; eauto.
-          * econs; eauto. econs; eauto.
+          * econs; eauto.
       - (* fwdbank = None *)
         i. eapply view_of_eid_ob; eauto.
         destruct eid2. destruct (t == tid); cycle 1.
@@ -1010,7 +1005,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRP)]. eauto. }
         destruct (OrdR.ge ord OrdR.acquire_pc) eqn:ORD; ss; eauto.
         eapply sim_view_le; [|exact SIM_EXT2].
-        destruct x0. s. i. des. subst. right. right. econs; eauto. econs; eauto. econs; eauto.
+        destruct x0. s. i. des. subst. right. right. econs; eauto. econs; eauto.
       * (* sim_local vwp *)
         rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_vwp_step. rewrite inverse_step.
@@ -1018,14 +1013,14 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWP)]. eauto. }
         destruct (OrdR.ge ord OrdR.acquire_pc) eqn:ORD; ss; eauto.
         eapply sim_view_le; [|exact SIM_EXT2].
-        destruct x0. s. i. des. subst. right. right. econs; eauto. econs; eauto. econs; eauto.
+        destruct x0. s. i. des. subst. right. right. econs; eauto. econs; eauto.
       * (* sim_local vrm *)
         rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_vrm_step. rewrite inverse_step.
         rewrite ? inverse_union. apply sim_view_join; eauto.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRM)]. eauto. }
         eapply sim_view_le; [|exact SIM_EXT2].
-        destruct x0. s. i. des. subst. right. econs; eauto. econs; eauto. econs; eauto.
+        destruct x0. s. i. des. subst. right. econs; eauto. econs; eauto.
       * (* sim_local vwm *)
         rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_vwm_step. rewrite inverse_step.
@@ -1050,7 +1045,7 @@ Proof.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
-          left. econs. splits; eauto. econs; eauto. econs; eauto.
+          left. econs. splits; eauto. econs; eauto.
         }
         { ii. inv H0. inv REL. inv H0. rewrite Execution.po_po_adj in H2. inv H2. des.
           inv H2. destruct x0. ss. inv N. inv H0.
@@ -1132,7 +1127,7 @@ Proof.
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - left. left. right. right. econs. splits; eauto.
-            left. econs; eauto. econs; eauto.
+            left. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
         { generalize SIM_LOCAL.(VWP). intro X. inv X.
@@ -1154,7 +1149,7 @@ Proof.
               { econs; eauto. }
               econs. splits; eauto. econs. splits.
               { econs; eauto. }
-              econs. splits; eauto. econs; eauto. econs; eauto.
+              econs. splits; eauto. econs; eauto.
             + inv H. des.
               right. left. left. right. econs. splits; eauto.
           - econs; eauto. apply Label.write_is_writing.
@@ -1166,7 +1161,7 @@ Proof.
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - inv REL. des. inv H.
-            right. right. econs. splits; eauto. econs; eauto. econs; eauto.
+            right. right. econs. splits; eauto. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
         { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
@@ -1176,7 +1171,7 @@ Proof.
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - inv REL. des. inv H.
-            right. right. econs. splits; eauto. econs; eauto. econs; eauto.
+            right. right. econs. splits; eauto. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
         { apply bot_spec. }
@@ -1250,7 +1245,7 @@ Proof.
         rewrite ? inverse_union. apply sim_view_join.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWM)]. eauto. }
         { eapply sim_view_le; [by right; eauto|]. econs 2; eauto.
-          - econs; eauto. econs; eauto. econs; eauto.
+          - econs; eauto. econs; eauto.
           - refl.
         }
       * rewrite List.app_length, Nat.add_1_r. apply sim_view_join.
@@ -1269,7 +1264,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VREL)]. eauto. }
         { destruct (OrdW.ge ord OrdW.release) eqn:ORD; [|by econs].
           eapply sim_view_le; [by right; eauto|]. econs 2; eauto.
-          - econs; eauto. econs; eauto. econs; eauto.
+          - econs; eauto. econs; eauto.
           - refl.
         }
       * rewrite List.app_length, Nat.add_1_r. i.
@@ -1334,7 +1329,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VCAP)].
           right. left. right.
           inv PR. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
       * rewrite List.app_length, Nat.add_1_r. s.
         rewrite sim_local_vwp_step. rewrite inverse_step.
@@ -1356,7 +1351,7 @@ Proof.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
-          left. econs. splits; eauto. econs; eauto. econs; eauto.
+          left. econs. splits; eauto. econs; eauto.
         }
         { ii. inv H0. inv REL. inv H0. rewrite Execution.po_po_adj in H2. inv H2. des.
           destruct x, x0. inv H2. ss. inv N. inv H0.
@@ -1390,7 +1385,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWM)].
           right. left. right. rewrite seq_assoc.
           inv PR. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
       * rewrite List.app_length, Nat.add_1_r. s.
         rewrite sim_local_vrm_step. rewrite inverse_step.
@@ -1409,7 +1404,7 @@ Proof.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
-          left. econs. splits; eauto. econs; eauto. econs; eauto.
+          left. econs. splits; eauto. econs; eauto.
         }
         { ii. inv H0. inv REL. inv H0. rewrite Execution.po_po_adj in H2. inv H2. des.
           destruct x, x0. inv H2. ss. inv N. inv H0.
@@ -1440,7 +1435,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRM)].
           right. left. left. right. rewrite seq_assoc.
           inv PR. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
       * rewrite List.app_length, Nat.add_1_r. s.
         rewrite sim_local_vwp_step. rewrite inverse_step.
@@ -1449,7 +1444,7 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRM)].
           right. left. left. right. rewrite seq_assoc.
           inv PR. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
       * rewrite List.app_length, Nat.add_1_r. s.
         rewrite sim_local_vrm_step. rewrite inverse_step.
@@ -1468,7 +1463,7 @@ Proof.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
-          left. econs. splits; eauto. econs; eauto. econs; eauto.
+          left. econs. splits; eauto. econs; eauto.
         }
         { ii. inv H0. inv REL. inv H0. rewrite Execution.po_po_adj in H2. inv H2. des.
           destruct x, x0. inv H2. ss. inv N. inv H0.
@@ -1499,12 +1494,12 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRM)].
           right. left. left. left.
           inv PR. inv REL. des. inv H. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWM)].
           right. left. left. left.
           inv PR. inv REL. des. inv H. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
         { econs. ss. }
       * rewrite List.app_length, Nat.add_1_r. s.
@@ -1514,12 +1509,12 @@ Proof.
         { eapply sim_view_le; [|exact SIM_LOCAL.(VRM)].
           right. left. left. left.
           inv PR. inv REL. des. inv H. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
         { eapply sim_view_le; [|exact SIM_LOCAL.(VWM)].
           right. left. left. left.
           inv PR. inv REL. des. inv H. econs; eauto. econs; splits; eauto.
-          econs; eauto. econs; eauto.
+          econs; eauto.
         }
         { econs. ss. }
       * rewrite List.app_length, Nat.add_1_r. s.
@@ -1539,7 +1534,7 @@ Proof.
         generalize (SIM_LOCAL.(FWDBANK) loc). destruct (Local.fwdbank local1 loc) eqn:FWD.
         { i. des. rewrite sim_local_fwd_step. esplits; eauto.
           econs. instantiate (1 := (_, _)). splits; [|econs; ss].
-          left. econs. splits; eauto. econs; eauto. econs; eauto.
+          left. econs. splits; eauto. econs; eauto.
         }
         { ii. inv H0. inv REL. inv H0. rewrite Execution.po_po_adj in H2. inv H2. des.
           destruct x, x0. inv H2. ss. inv N. inv H0.
@@ -1767,7 +1762,7 @@ Proof.
           <<NOPROMISE: Machine.no_promise m0>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m0>> /\
           <<MEM: sim_mem ex (Machine.mem m0)>>).
-  { i. des. esplits; eauto. econs; eauto. }
+  { i. des. esplits; eauto. }
   clear STEP.
 
   (* Execute threads one-by-one (induction). *)
@@ -1859,8 +1854,7 @@ Proof.
         { eapply Permutation_NoDup; [by symmetry; eauto|].
           eapply Execution.eids_spec; eauto.
         }
-        s. i. des. esplits; cycle 1; eauto; [|lia].
-        econs; eauto.
+        s. i. des. esplits; cycle 1; eauto. lia.
   }
   { apply AExecUnit.wf_init. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.

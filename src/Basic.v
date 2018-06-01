@@ -10,6 +10,8 @@ Require Import EquivDec.
 Require Import List.
 Require Import SetoidList.
 Require Import Permutation.
+Require Import FMapPositive.
+Require Import FSetPositive.
 Require Import sflib.
 Require Import HahnRelationsBasic.
 
@@ -442,3 +444,141 @@ Proof.
   apply (STEP a (List.rev l0)).
   auto.
 Defined.
+
+Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
+Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
+
+Module Id := Pos.
+
+Module IdMap.
+  Include PositiveMap.
+
+  Lemma add_spec
+        A id' id (a:A) am:
+    find id' (add id a am) =
+    if id' == id
+    then Some a
+    else find id' am.
+  Proof.
+    erewrite PositiveMapAdditionalFacts.gsspec; eauto.
+    repeat condtac; ss.
+  Qed.
+
+  Lemma map_spec
+        A B (f: A -> B) am id:
+    find id (map f am) = option_map f (find id am).
+  Proof.
+    destruct (find id am) eqn:FIND; s.
+    - eapply map_1 in FIND; eauto.
+    - destruct (find id (map f am)) eqn:FIND'; ss.
+      exploit map_2; [by econs; eauto|].
+      intro X. inv X. congr.
+  Qed.
+
+  Lemma mapi_spec
+        A B (f: key -> A -> B) am id:
+    find id (mapi f am) = option_map (f id) (find id am).
+  Proof.
+    destruct (find id am) eqn:FIND; s.
+    - eapply mapi_1 in FIND; eauto. des.
+      inv FIND. inv FIND0. eauto.
+    - destruct (find id (mapi f am)) eqn:FIND'; ss.
+      exploit mapi_2; [by econs; eauto|].
+      intro X. inv X. congr.
+  Qed.
+
+  Lemma elements_spec A id (am:t A):
+    find id am = SetoidList.findA (fun id' => if id == id' then true else false) (elements am).
+  Proof.
+    generalize (elements_3w am).
+    destruct (find id am) eqn:FIND.
+    - apply elements_correct in FIND. revert FIND.
+      induction (elements am); ss. i. des.
+      + subst. destruct (equiv_dec id id); ss. congr.
+      + destruct a0; ss. inv H. rewrite <- IHl; eauto.
+        destruct (equiv_dec id k); ss. inv e.
+        exfalso. apply H2. apply SetoidList.InA_alt. esplits; eauto. econs.
+    - match goal with
+      | [|- context[_ = ?f]] => destruct f eqn:FIND'
+      end; ss.
+      i. eapply SetoidList.findA_NoDupA in FIND'; eauto; cycle 1.
+      { apply eq_equivalence. }
+      apply elements_2 in FIND'. congr.
+  Qed.
+
+  Lemma add_add A i v1 v2 (m:t A):
+    add i v1 (add i v2 m) = add i v1 m.
+  Proof.
+    revert m. induction i; destruct m; ss; try congruence.
+  Qed.
+
+  Lemma add_add_diff A i j v1 v2 (m:t A) (DIFF: i <> j):
+    add i v1 (add j v2 m) = add j v2 (add i v1 m).
+  Proof.
+    revert j m DIFF. induction i; destruct j, m; ss; try congruence.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+    - i. f_equal. apply IHi. contradict DIFF. congr.
+  Qed.
+
+  Definition Forall2 A B
+             (rel: Id.t -> A -> B -> Prop)
+             (a: t A)
+             (b: t B)
+    : Prop :=
+    forall id, opt_rel (rel id) (find id a) (find id b).
+
+  Definition Forall A
+             (pred: Id.t -> A -> Prop)
+             (m: t A)
+    : Prop :=
+    forall id a (FIND: find id m = Some a),
+      pred id a.
+
+  Inductive interleaving A (m:t (list A)): forall (l:list A), Prop :=
+  | interleaving_nil
+      (NIL: Forall (fun _ l => l = []) m):
+      interleaving m []
+  | interleaving_cons
+      id a l res
+      (FIND: find id m = Some (a::l))
+      (INTERLEAVING: interleaving (add id l m) res):
+      interleaving m (a::res)
+  .
+End IdMap.
+
+Module IdSet.
+  Include PositiveSet.
+
+  Lemma add_o x' x s:
+    mem x' (add x s) =
+    if x' == x
+    then true
+    else mem x' s.
+  Proof.
+    destruct (equiv_dec x' x).
+    - inv e. apply mem_1. apply add_spec. intuition.
+    - destruct (mem x' s) eqn:MEM.
+      + apply mem_1. apply add_spec. intuition.
+      + destruct (mem x' (add x s)) eqn:MEM'; ss.
+        apply mem_1 in MEM'. apply add_spec in MEM'. des; intuition.
+        apply mem_1 in MEM'. eauto.
+  Qed.
+
+  Lemma remove_o x' x s:
+    mem x' (remove x s) =
+    if x' == x
+    then false
+    else mem x' s.
+  Proof.
+    destruct (equiv_dec x' x).
+    - inv e. destruct (mem x (remove x s)) eqn:MEM; ss.
+      apply remove_spec in MEM. des; ss.
+    - destruct (mem x' s) eqn:MEM.
+      + apply mem_1. apply remove_spec. intuition.
+      + destruct (mem x' (remove x s)) eqn:MEM'; ss.
+        apply mem_1 in MEM'. apply remove_spec in MEM'. des.
+        apply mem_1 in MEM'0. eauto.
+  Qed.
+End IdSet.
