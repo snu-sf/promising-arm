@@ -399,7 +399,7 @@ Section Local.
            <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
                Memory.no_msgs tsx ts (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem1>>)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
-      (RES: res = ValA.mk _ 0 bot)
+      (RES: res = ValA.mk _ 0 (View.mk bot view_ext.(View.annot)))
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
