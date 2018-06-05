@@ -34,5 +34,3 @@ Module Time.
 
   Global Instance eqdec: EqDec t eq := nat_eq_eqdec.
 End Time.
-
-Module View := Time.

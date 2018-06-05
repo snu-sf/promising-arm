@@ -64,7 +64,7 @@ Proof.
             rewrite nth_error_app1 in MSG0; ss.
             eapply lt_le_trans; eauto.
             inv WF. exploit WF0; eauto. i. inv x. ss. inv LOCAL.
-            repeat apply join_spec; ExecUnit.tac.
+            repeat apply join_spec; viewtac.
             inv STATE. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }
@@ -103,9 +103,9 @@ Proof.
             destruct (lt_dec ts0 (length mem1)).
             { rewrite nth_error_app1 in MSG0; ss. }
             contradict n.
-            eapply View.lt_le_trans; [apply TS2|].
+            eapply Time.lt_le_trans; [apply TS2|].
             inv WF. exploit WF0; try exact FIND; eauto. i. inv x. inv LOCAL. ss.
-            repeat apply join_spec; ExecUnit.tac.
+            repeat apply join_spec; viewtac.
             inv STATE. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }

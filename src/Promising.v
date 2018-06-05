@@ -100,25 +100,98 @@ Module Memory.
   Qed.
 End Memory.
 
-Module FwdItem.
+Module View.
+Section View.
+  Context `{A: Type, _: orderC A eq}.
+
   Inductive t := mk {
     ts: Time.t;
-    view: View.t;
+    annot: A;
+  }.
+  Hint Constructors t.
+
+  Inductive _le (a b:t): Prop :=
+  | _le_intro
+      (TS: le a.(ts) b.(ts))
+      (ANNOT: le a.(annot) b.(annot))
+  .
+
+  Definition _join (a b:t): t :=
+    mk (join a.(ts) b.(ts)) (join a.(annot) b.(annot)).
+
+  Definition _bot: t := mk bot bot.
+
+  Global Program Instance preorder: PreOrder _le.
+  Next Obligation. ii. econs; refl. Qed.
+  Next Obligation. ii. inv H1. inv H2. econs; etrans; eauto. Qed.
+
+  Global Program Instance partialorder: PartialOrder eq _le.
+  Next Obligation.
+    ii. econs.
+    - i. subst. econs; refl.
+    - i. destruct x, x0. inv H1. inv H2. inv H3. ss. f_equal.
+      + intuition.
+      + antisym; ss.
+  Qed.
+
+  Global Program Instance order:
+    @orderC
+      t
+      eq
+      _le
+      _join
+      _bot
+      _ _ _.
+  Next Obligation.
+    unfold _join. destruct a, b; ss. econs; s; apply join_l.
+  Qed.
+  Next Obligation.
+    unfold _join. destruct a, b; ss. econs; s; apply join_r.
+  Qed.
+  Next Obligation.
+    unfold _join. destruct a, b, c; ss. f_equal; apply join_assoc.
+  Qed.
+  Next Obligation.
+    unfold _join. destruct a, b; ss. f_equal; apply join_comm.
+  Qed.
+  Next Obligation.
+    inv AC. inv BC. econs; s; apply join_spec; ss.
+  Qed.
+  Next Obligation.
+    econs; apply bot_spec.
+  Qed.
+
+  Lemma ts_join a b:
+    (join a b).(View.ts) = join (a.(View.ts)) (b.(View.ts)).
+  Proof. destruct a, b; ss. Qed.
+
+  Lemma ts_ifc a b:
+    (ifc a b).(View.ts) = ifc a b.(View.ts).
+  Proof. destruct a; ss. Qed.
+
+  Lemma ts_bot:
+    bot.(View.ts) = bot.
+  Proof. ss. Qed.
+End View.
+End View.
+
+Module FwdItem.
+Section FwdItem.
+  Context `{A: Type, _: orderC A eq}.
+
+  Inductive t := mk {
+    ts: Time.t;
+    view: View.t (A:=A);
     ex: bool;
   }.
   Hint Constructors t.
 
-  Definition read_view (fwd:t) (tsx:Time.t) (ord:OrdR.t): View.t :=
+  Definition read_view (fwd:t) (tsx:Time.t) (ord:OrdR.t): View.t (A:=A) :=
     if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (negb (OrdR.ge ord OrdR.acquire_pc)))
     then fwd.(view)
-    else tsx.
+    else View.mk tsx bot.
 End FwdItem.
-
-Definition fwdBankT := Loc.t -> option FwdItem.t.
-
-Definition exBankT := option Time.t.
-
-Definition cohT := Loc.t -> Time.t.
+End FwdItem.
 
 Module Promises.
   Definition t := Id.t -> bool.
@@ -218,16 +291,19 @@ Module Promises.
 End Promises.
 
 Module Local.
+Section Local.
+  Context `{A: Type, _: orderC A eq}.
+
   Inductive t := mk {
-    coh: cohT;
-    vrp: View.t;
-    vwp: View.t;
-    vrm: View.t;
-    vwm: View.t;
-    vcap: View.t;
-    vrel: View.t;
-    fwdbank: fwdBankT;
-    exbank: exBankT;
+    coh: Loc.t -> Time.t;
+    vrp: View.t (A:=A);
+    vwp: View.t (A:=A);
+    vrm: View.t (A:=A);
+    vwm: View.t (A:=A);
+    vcap: View.t (A:=A);
+    vrel: View.t (A:=A);
+    fwdbank: Loc.t -> option (FwdItem.t (A:=A));
+    exbank: option Time.t;
     promises: Promises.t;
   }.
   Hint Constructors t.
@@ -281,10 +357,10 @@ Module Local.
       (VIEW: view = vloc.(ValA.annot))
       (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
-      (LATEST: Memory.no_msgs ts view_ext1 (fun msg => msg.(Msg.loc) = loc) mem1)
+      (LATEST: Memory.no_msgs ts view_ext1.(View.ts) (fun msg => msg.(Msg.loc) = loc) mem1)
       (MSG: Memory.read ts loc mem1 = Some val)
       (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
-                                              | None => ts
+                                              | None => View.mk ts bot
                                               | Some fwd => fwd.(FwdItem.read_view) ts ord
                                               end))
       (RES: res = ValA.mk _ val view_ext2)
@@ -317,7 +393,7 @@ Module Local.
                                 ifc (OrdW.ge ord OrdW.release) lc1.(vwm)
                              ])
       (COH: lt (lc1.(coh) loc) ts)
-      (EXT: lt view_ext ts)
+      (EXT: lt view_ext.(View.ts) ts)
       (EX: ex -> exists tsx,
            <<TSX: lc1.(exbank) = Some tsx>> /\
            <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
@@ -330,9 +406,9 @@ Module Local.
               lc1.(vrp)
               lc1.(vwp)
               lc1.(vrm)
-              (join lc1.(vwm) ts)
+              (join lc1.(vwm) (View.mk ts bot))
               (join lc1.(vcap) view_loc)
-              (join lc1.(vrel) (ifc (OrdW.ge ord OrdW.release) ts))
+              (join lc1.(vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
               (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))
@@ -461,16 +537,16 @@ Module Local.
   Inductive wf (mem:Memory.t) (lc:t): Prop :=
   | wf_intro
       (COH: forall loc, lc.(coh) loc <= List.length mem)
-      (VRP: lc.(vrp) <= List.length mem)
-      (VWP: lc.(vwp) <= List.length mem)
-      (VRM: lc.(vrm) <= List.length mem)
-      (VWM: lc.(vwm) <= List.length mem)
-      (VCAP: lc.(vcap) <= List.length mem)
-      (VREL: lc.(vrel) <= List.length mem)
+      (VRP: lc.(vrp).(View.ts) <= List.length mem)
+      (VWP: lc.(vwp).(View.ts) <= List.length mem)
+      (VRM: lc.(vrm).(View.ts) <= List.length mem)
+      (VWM: lc.(vwm).(View.ts) <= List.length mem)
+      (VCAP: lc.(vcap).(View.ts) <= List.length mem)
+      (VREL: lc.(vrel).(View.ts) <= List.length mem)
       (FWDBANK: forall loc fwd,
           lc.(fwdbank) loc = Some fwd ->
           fwd.(FwdItem.ts) <= List.length mem /\
-          fwd.(FwdItem.view) <= List.length mem)
+          fwd.(FwdItem.view).(View.ts) <= List.length mem)
       (EXBANK: forall ts, lc.(exbank) = Some ts -> ts <= List.length mem)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
   .
@@ -482,11 +558,31 @@ Module Local.
     rewrite Promises.lookup_bot in IN. ss.
   Qed.
 End Local.
+End Local.
+
+Ltac viewtac :=
+  repeat
+    (try match goal with
+         | [|- join _ _ <= _] => apply join_spec
+         | [|- bot <= _] => apply bot_spec
+         | [|- ifc ?c _ <= _] => destruct c; s
+
+         | [|- Time.join _ _ <= _] => apply join_spec
+         | [|- Time.bot <= _] => apply bot_spec
+
+         | [|- context[View.ts (join _ _)]] => rewrite View.ts_join
+         | [|- context[View.ts bot]] => rewrite View.ts_bot
+         | [|- context[View.ts (ifc _ _)]] => rewrite View.ts_ifc
+         end;
+     ss; eauto).
 
 Module ExecUnit.
+Section ExecUnit.
+  Context `{A: Type, _: orderC A eq}.
+
   Inductive t := mk {
-    state: State.t (A:=View.t);
-    local: Local.t;
+    state: State.t (A:=View.t (A:=A));
+    local: Local.t (A:=A);
     mem: Memory.t;
   }.
   Hint Constructors t.
@@ -516,7 +612,7 @@ Module ExecUnit.
 
   Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t)): Prop :=
   | rmap_wf_intro
-      (RMAP: forall r, (RMap.find r rmap).(ValA.annot) <= List.length mem)
+      (RMAP: forall r, (RMap.find r rmap).(ValA.annot).(View.ts) <= List.length mem)
   .
   Hint Constructors rmap_wf.
 
@@ -527,33 +623,22 @@ Module ExecUnit.
   .
   Hint Constructors wf.
 
-  Ltac tac :=
-    repeat
-      (try match goal with
-           | [|- join _ _ <= _] => apply join_spec
-           | [|- bot <= _] => apply bot_spec
-           | [|- View.join _ _ <= _] => apply join_spec
-           | [|- View.bot <= _] => apply bot_spec
-           | [|- ifc ?c _ <= _] => destruct c; s
-           end;
-       ss; eauto).
-
   Lemma rmap_add_wf
         mem rmap loc val
         (WF: rmap_wf mem rmap)
-        (VAL: val.(ValA.annot) <= List.length mem):
+        (VAL: val.(ValA.annot).(View.ts) <= List.length mem):
     rmap_wf mem (RMap.add loc val rmap).
   Proof.
     inv WF. econs. i. unfold RMap.find, RMap.add. rewrite IdMap.add_spec.
-    condtac; tac.
+    condtac; viewtac.
   Qed.
 
   Lemma expr_wf
         mem rmap e
         (RMAP: rmap_wf mem rmap):
-    (sem_expr rmap e).(ValA.annot) <= List.length mem.
+    (sem_expr rmap e).(ValA.annot).(View.ts) <= List.length mem.
   Proof.
-    induction e; tac. apply RMAP.
+    induction e; viewtac. apply RMAP.
   Qed.
 
   Lemma read_wf
@@ -588,47 +673,47 @@ Module ExecUnit.
     assert (FWD:
               forall loc ord ts,
                 ts <= List.length mem1 ->
-                match Local.fwdbank local1 loc with
-                | Some fwd => FwdItem.read_view fwd ts ord
-                | None => ts
-                end <= length mem1).
+                (match Local.fwdbank local1 loc with
+                 | Some fwd => FwdItem.read_view fwd ts ord
+                 | None => View.mk ts bot
+                 end).(View.ts) <= length mem1).
     { inv LOCAL. i. destruct (Local.fwdbank local1 loc) eqn:FWD; ss.
       exploit FWDBANK; eauto. i. des.
       unfold FwdItem.read_view. condtac; ss.
     }
 
     inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
-    - inv LC. econs; ss. econs; tac.
+    - inv LC. econs; ss. econs; viewtac.
     - inv LC. econs; ss.
       + eauto using rmap_add_wf, expr_wf.
-      + econs; tac.
+      + econs; viewtac.
     - inv STEP. econs; ss.
-      + apply rmap_add_wf; tac.
+      + apply rmap_add_wf; viewtac.
         * eauto using expr_wf.
         * apply FWD. eauto using read_wf.
-      + econs; tac; eauto using expr_wf.
-        * i. rewrite fun_add_spec. condtac; tac.
+      + econs; viewtac; eauto using expr_wf.
+        * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
         * apply FWD. eauto using read_wf.
         * apply FWD. eauto using read_wf.
         * apply FWD. eauto using read_wf.
-        * destruct ex0; ss. i. inv H. eapply read_wf. eauto.
+        * destruct ex0; ss. i. inv H1. eapply read_wf. eauto.
     - inv STEP. econs; ss.
-      + apply rmap_add_wf; tac.
-      + econs; tac; eauto using get_msg_wf, expr_wf.
-        * i. rewrite fun_add_spec. condtac; tac.
+      + apply rmap_add_wf; viewtac.
+      + econs; viewtac; eauto using get_msg_wf, expr_wf.
+        * i. rewrite fun_add_spec. condtac; viewtac.
           eapply get_msg_wf. eauto.
-        * i. revert H. rewrite fun_add_spec. condtac; tac.
-          i. inv H. s. splits; tac; eauto using get_msg_wf, expr_wf.
+        * i. revert H1. rewrite fun_add_spec. condtac; viewtac.
+          i. inv H1. s. splits; viewtac; eauto using get_msg_wf, expr_wf.
         * destruct ex0; ss.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
-    - inv STEP. econs; ss. apply rmap_add_wf; tac.
-    - inv STEP. econs; ss. econs; tac.
-    - inv STEP. econs; ss. econs; tac.
-    - inv STEP. econs; ss. econs; tac.
-    - inv STEP. econs; ss. econs; tac.
-    - inv LC. econs; ss. econs; tac. eauto using expr_wf.
-    - inv LC. econs; ss. econs; tac.
+    - inv STEP. econs; ss. apply rmap_add_wf; viewtac.
+    - inv STEP. econs; ss. econs; viewtac.
+    - inv STEP. econs; ss. econs; viewtac.
+    - inv STEP. econs; ss. econs; viewtac.
+    - inv STEP. econs; ss. econs; viewtac.
+    - inv LC. econs; ss. econs; viewtac. eauto using expr_wf.
+    - inv LC. econs; ss. econs; viewtac.
   Qed.
 
   Lemma rmap_append_wf
@@ -667,10 +752,11 @@ Module ExecUnit.
     inv STEP; eauto using state_step_wf, promise_step_wf.
   Qed.
 End ExecUnit.
+End ExecUnit.
 
 Module Machine.
   Inductive t := mk {
-    tpool: IdMap.t (State.t (A:=View.t) * Local.t);
+    tpool: IdMap.t (State.t (A:=View.t (A:=unit)) * Local.t (A:=unit));
     mem: Memory.t;
   }.
   Hint Constructors t.
@@ -706,7 +792,7 @@ Module Machine.
     econs. i. eapply TERMINAL. eauto.
   Qed.
 
-  Inductive step0 (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m1 m2:t): Prop :=
+  Inductive step0 (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
   | step0_intro
       tid st1 lc1 st2 lc2
       (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
@@ -716,7 +802,7 @@ Module Machine.
   Hint Constructors step0.
 
   (* The "global" consistency condition: in certification, machine may take any thread's steps. *)
-  Inductive consistent (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m:t): Prop :=
+  Inductive consistent (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m:t): Prop :=
   | consistent_intro
       m'
       (STEP: rtc (step0 eustep) m m')
@@ -724,7 +810,7 @@ Module Machine.
   .
   Hint Constructors consistent.
 
-  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t), Prop) (m1 m2:t): Prop :=
+  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
   | step_intro
       (STEP: step0 eustep m1 m2)
       (CONSISTENT: consistent eustep m2)

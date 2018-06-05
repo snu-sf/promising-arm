@@ -392,3 +392,41 @@ Next Obligation.
   unfold bool_le, bool_join, bool_bot in *.
   destruct a, b, c; intuition.
 Qed.
+
+
+Definition unit_le (a b:unit): Prop := True.
+
+Definition unit_join (a b:unit): unit := tt.
+
+Definition unit_bot: unit := tt.
+
+Program Instance unit_preorder: PreOrder unit_le.
+Next Obligation. ii. ss. Qed.
+
+Program Instance unit_partialorder: PartialOrder eq unit_le.
+Next Obligation.
+  ii. econs; ss. destruct x, x0; ss.
+Qed.
+
+Program Instance unit_order:
+  @orderC
+    unit
+    eq
+    unit_le
+    unit_join
+    unit_bot
+    eq_equivalence
+    unit_preorder
+    unit_partialorder.
+Next Obligation.
+  unfold unit_le, unit_join, unit_bot in *.
+  destruct a, b; intuition.
+Qed.
+Next Obligation.
+  unfold unit_le, unit_join, unit_bot in *.
+  destruct a, b; intuition.
+Qed.
+Next Obligation.
+  unfold unit_le, unit_join, unit_bot in *.
+  ss.
+Qed.

@@ -90,7 +90,7 @@ Proof.
   - inv H. econs; eauto. econs; eauto.
 Qed.
 
-Definition view_of_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option View.t :=
+Definition view_of_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option Time.t :=
   option_map
     (fun n => length (mem_of_ex ex (List.firstn (S n) ob)))
     (List_find_pos (fun eid' => eid' == eid) ob).
@@ -179,7 +179,7 @@ Proof.
   econs; eauto.
 Qed.
 
-Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:View.t): Prop :=
+Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:Time.t): Prop :=
 | sim_view_bot
     (VIEW: view = bot)
 | sim_view_event
@@ -196,13 +196,13 @@ Lemma sim_view_join ex ob pred v1 v2
   sim_view ex ob pred (join v1 v2).
 Proof.
   inv V1.
-  { rewrite join_comm, bot_join; [|exact View.order]. ss. }
+  { rewrite join_comm, bot_join; [|exact Time.order]. ss. }
   inv V2.
-  { rewrite bot_join; [|exact View.order]. econs 2; eauto. }
+  { rewrite bot_join; [|exact Time.order]. econs 2; eauto. }
 
-  generalize (View.max_spec_le v1 v2). i. des.
-  - unfold join, View.join. rewrite H0. econs 2; try exact VIEW_OF_EID0; eauto.
-  - unfold join, View.join. rewrite H0. econs 2; try exact VIEW_OF_EID; eauto.
+  generalize (Time.max_spec_le v1 v2). i. des.
+  - unfold join, Time.join. rewrite H0. econs 2; try exact VIEW_OF_EID0; eauto.
+  - unfold join, Time.join. rewrite H0. econs 2; try exact VIEW_OF_EID; eauto.
 Qed.
 
 Lemma sim_view_le ex ob pred1 pred2
@@ -214,20 +214,20 @@ Proof.
   - econs 2; eauto.
 Qed.
 
-Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t)): Prop :=
+Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t (A:=unit))): Prop :=
 | sim_val_intro
     (VAL: avala.(ValA.val) = vala.(ValA.val))
-    (VIEW: sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot))
+    (VIEW: sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot).(View.ts))
 .
 Hint Constructors sim_val.
 
-Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t)): Prop :=
+Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t (A:=unit))): Prop :=
 | sim_rmap_intro
     (RMAP: IdMap.Forall2 (fun reg => sim_val tid ex ob) armap rmap)
 .
 Hint Constructors sim_rmap.
 
-Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t)): Prop :=
+Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t (A:=unit))): Prop :=
 | sim_state_intro
     (STMTS: astate.(State.stmts) = state.(State.stmts))
     (RMAP: sim_rmap tid ex ob astate.(State.rmap) state.(State.rmap))
@@ -613,7 +613,7 @@ Proof.
   refl.
 Qed.
 
-Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t): Prop := mk_sim_local {
+Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t (A:=unit)): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
           ex ob
@@ -622,28 +622,28 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
   VRP: sim_view
          ex ob
          (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vrp);
+         local.(Local.vrp).(View.ts);
   VWP: sim_view
          ex ob
          (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vwp);
+         local.(Local.vwp).(View.ts);
   VRM: sim_view
          ex ob
          (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vrm);
+         local.(Local.vrm).(View.ts);
   VWM: sim_view
          ex ob
          (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vwm);
+         local.(Local.vwm).(View.ts);
   VCAP:
        sim_view
          ex ob
          (inverse (sim_local_vcap ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vcap);
+         local.(Local.vcap).(View.ts);
   VREL: sim_view
           ex ob
           (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-          local.(Local.vrel);
+          local.(Local.vrel).(View.ts);
   FWDBANK: forall loc,
       match local.(Local.fwdbank) loc with
       | Some fwd =>
@@ -653,7 +653,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         <<VIEW: sim_view
                   ex ob
                   (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))
-                  fwd.(FwdItem.view)>> /\
+                  fwd.(FwdItem.view).(View.ts)>> /\
         <<EX: fwd.(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>
       | None =>
         forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)
@@ -675,7 +675,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
 }.
 Hint Constructors sim_local.
 
-Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t): Prop :=
+Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
     (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state))
     (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local))
@@ -806,7 +806,7 @@ Proof.
 
     assert (SIM_LOC: sim_view ex ob
                               (fun eid : eidT => fst eid = tid /\ ALocal.next_eid alocal1 = snd eid)
-                              (ValA.annot (sem_expr rmap1 eloc))).
+                              (ValA.annot (sem_expr rmap1 eloc)).(View.ts)).
     { econs 2; eauto; ss.
       inv VIEW.
       { rewrite VIEW2. apply bot_spec. }
@@ -817,7 +817,7 @@ Proof.
 
     assert (SIM_VRP: sim_view ex ob
                               (fun eid : eidT => fst eid = tid /\ ALocal.next_eid alocal1 = snd eid)
-                              local1.(Local.vrp)).
+                              local1.(Local.vrp).(View.ts)).
     { econs 2; eauto; ss.
       generalize SIM_LOCAL.(VRP). intro VRP.
       inv VRP.
@@ -828,7 +828,7 @@ Proof.
 
     assert (SIM_VREL: sim_view ex ob
                                (fun eid : eidT => fst eid = tid /\ ALocal.next_eid alocal1 = snd eid)
-                               (ifc (OrdR.ge ord OrdR.acquire) (Local.vrel local1))).
+                               (ifc (OrdR.ge ord OrdR.acquire) (Local.vrel local1)).(View.ts)).
     { econs 2; eauto; ss.
       generalize SIM_LOCAL.(VREL). intro VREL.
       destruct (OrdR.ge ord OrdR.acquire) eqn:ORD; ss; cycle 1.
@@ -841,10 +841,10 @@ Proof.
 
     assert (SIM_FWD: sim_view ex ob
                               (fun eid : eidT => fst eid = tid /\ ALocal.next_eid alocal1 = snd eid)
-                              match Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc)) with
-                              | Some fwd => FwdItem.read_view fwd (S n) ord
-                              | None => S n
-                              end).
+                              (match Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc)) with
+                               | Some fwd => FwdItem.read_view fwd (S n) ord
+                               | None => View.mk (S n) bot
+                               end).(View.ts)).
     { econs 2; eauto; ss.
       generalize (SIM_LOCAL.(FWDBANK) (ValA.val (sem_expr armap1 eloc))).
       destruct (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) eqn:FWD.
@@ -859,7 +859,7 @@ Proof.
             - apply WRITE.
           }
           subst. inv VIEW2.
-          { apply bot_spec. }
+          { rewrite VIEW3. apply bot_spec. }
           rewrite VIEW3. eapply view_of_eid_ob; eauto.
           inv EID. inv WRITE. inv PO. ss. subst.
           left. left. right. left.
@@ -906,7 +906,7 @@ Proof.
                                     (ValA.annot (sem_expr rmap1 eloc));
                                     local1.(Local.vrp);
                                     (ifc (OrdR.ge ord OrdR.acquire) (Local.vrel local1))
-                                ])).
+                                ]).(View.ts)).
     { repeat apply sim_view_join; ss. econs; ss. }
 
     assert (SIM_EXT2: sim_view ex ob
@@ -919,8 +919,8 @@ Proof.
                                    ])
                                   match Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc)) with
                                   | Some fwd => FwdItem.read_view fwd (S n) ord
-                                  | None => S n
-                                  end)).
+                                  | None => View.mk (S n) bot
+                                  end).(View.ts)).
     { apply sim_view_join; ss. }
 
     eexists (ExecUnit.mk _ _ _). esplits.
@@ -969,7 +969,7 @@ Proof.
           - econs; eauto. apply Label.write_is_writing.
         }
         inv SIM_EXT1.
-        { rewrite VIEW3 in TS2. unfold bot, View.bot in TS2. lia. }
+        { rewrite VIEW3 in TS2. unfold bot, Time.bot in TS2. lia. }
         destruct eid. ss. des. subst.
         unfold ALocal.next_eid in VIEW_OF_EID. rewrite VIEW_OF_EID in VIEW1. inv VIEW1.
         unfold le in VIEW3. lia.
@@ -1084,8 +1084,8 @@ Proof.
         rewrite <- VAL.
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))).
         intro X. inv X.
-        { rewrite VIEW2. unfold bot, View.bot. lia. }
-        eapply View.le_lt_trans; eauto. inv EID. inv REL. inv H. inv H0.
+        { rewrite VIEW2. unfold bot, Time.bot. lia. }
+        eapply Time.le_lt_trans; eauto. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
         inv H1. des. inv H.
         { exploit Valid.coherence_ww; try exact H0; eauto.
@@ -1183,7 +1183,7 @@ Proof.
         exploit LABEL.
         { rewrite List.nth_error_app1; eauto. }
         intro LABEL_READ. inv REL1; ss. inv EID. exploit REL; eauto. i.
-        assert (v = b) by (apply View.le_antisymm; ss). subst.
+        assert (v = b) by (apply Time.le_antisymm; ss). subst.
         esplits; eauto. destruct ex1; ss. ii.
         exploit in_mem_of_ex; swap 1 2; eauto.
         { eapply Permutation_NoDup; [by symmetry; eauto|].
@@ -1799,7 +1799,7 @@ Proof.
   { destruct (equiv_dec tid tid); [|congr]. ss. }
   intro FIND.
   cut (exists st2 lc2,
-          <<STEP: rtc (ExecUnit.state_step tid)
+          <<STEP: rtc (ExecUnit.state_step (A:=unit) tid)
                       (ExecUnit.mk
                          (State.init stmts)
                          (Local.init_with_promises (promises_from_mem tid (Machine.mem m)))
