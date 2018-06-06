@@ -29,6 +29,19 @@ Module Lock.
     guarantee: Loc.t -> Prop;
   }.
   Hint Constructors t.
+
+  Inductive prune (locks:Lock.t -> Prop) (lock:Lock.t): Prop :=
+  | prune_base
+      (LOCKS: locks lock)
+      (BASE: lock.(from) = 0)
+  | prune_step
+      l
+      (LOCKS: locks lock)
+      (PREV: prune locks l)
+      (LOC: l.(loc) = lock.(loc))
+      (COUNTER: l.(to) = lock.(from))
+  .
+  Hint Constructors prune.
 End Lock.
 
 Module Taint.
@@ -46,6 +59,7 @@ Module Taint.
       (R: taint (R id lock.(Lock.from)))
       (W: taint (W id lock.(Lock.to) lock.(Lock.loc) lock.(Lock.guarantee)))
   .
+  Hint Constructors is_locked.
 End Taint.
 
 Module AExecUnit.
@@ -195,10 +209,82 @@ Module AExecUnit.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.
 
-Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)): forall (locks:Lock.t -> Prop), Prop :=
+Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (locks:Lock.t -> Prop): Prop :=
 | certify_intro
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
-    (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot):
-    certify tid eu (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
+    (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
+    (LOCKS: locks = Lock.prune (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint)))
 .
+Hint Constructors certify.
+
+Module AMachine.
+  Inductive t := mk {
+    machine: Machine.t;
+    locks: IdMap.t (Lock.t -> Prop);
+  }.
+  Hint Constructors t.
+  Coercion machine: t >-> Machine.t.
+
+  Definition init (p:program): t :=
+    mk
+      (Machine.init p)
+      (IdMap.map (fun _ => bot) p).
+
+  Inductive consistent (m:t): Prop :=
+  | consistent_intro
+      (* TODO *)
+  .
+  Hint Constructors consistent.
+
+  Lemma init_consistent p:
+    consistent (init p).
+  Proof.
+  Admitted.
+
+  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
+  | step_intro
+      tid st1 lc1 st2 lc2 l
+      (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st1, lc1))
+      (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(Machine.mem)) (ExecUnit.mk st2 lc2 m2.(Machine.mem)))
+      (TPOOL: m2.(Machine.tpool) = IdMap.add tid (st2, lc2) m1.(Machine.tpool))
+      (LOCKS: m2.(locks) = IdMap.add tid l m1.(locks))
+      (CONSISTENT: consistent m2)
+  .
+  Hint Constructors step.
+
+  Lemma step_mon
+        (eustep1 eustep2: _ -> _ -> _ -> Prop)
+        (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
+    forall m1 m2, step eustep1 m1 m2 -> step eustep2 m1 m2.
+  Proof.
+    i. inv H. econs; eauto.
+  Qed.
+
+  Lemma rtc_step_mon
+        (eustep1 eustep2: _ -> _ -> _ -> Prop)
+        (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
+    forall m1 m2, rtc (step eustep1) m1 m2 -> rtc (step eustep2) m1 m2.
+  Proof.
+    i. induction H; eauto. econs; eauto. eapply step_mon; eauto.
+  Qed.
+
+  Inductive exec (p:program) (m:Machine.t): Prop :=
+  | exec_intro
+      am
+      (STEP: rtc (step ExecUnit.step) (init p) am)
+      (MACHINE: m = am.(machine))
+      (NOPROMISE: Machine.no_promise m)
+  .
+  Hint Constructors exec.
+
+  Inductive pf_exec (p:program) (m:Machine.t): Prop :=
+  | pf_exec_intro
+      am1
+      (STEP1: rtc (step ExecUnit.promise_step) (init p) am1)
+      (STEP2: rtc (Machine.step ExecUnit.state_step) am1.(machine) m)
+      (NOPROMISE: Machine.no_promise m)
+  .
+  Hint Constructors pf_exec.
+End AMachine.
+Coercion AMachine.machine: AMachine.t >-> Machine.t.

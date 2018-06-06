@@ -797,7 +797,7 @@ Module Machine.
       tid st1 lc1 st2 lc2
       (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
       (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
-      (ADD: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
+      (TPOOL: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
   .
   Hint Constructors step.
 

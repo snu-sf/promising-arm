@@ -159,18 +159,7 @@ Proof.
   - esplits; cycle 1; eauto.
 Qed.
 
-Theorem pf_promising_to_promising
-        p m
-        (EXEC: Machine.pf_exec p m):
-  Machine.exec p m.
-Proof.
-  inv EXEC. econs; eauto.
-  etrans.
-  - eapply Machine.rtc_step_mon; cycle 1; eauto. right. ss.
-  - eapply Machine.rtc_step_mon; cycle 1; eauto. left. ss.
-Qed.
-
-Theorem promising_to_pf_promising
+Theorem promising_to_promising_pf
         p m
         (EXEC: Machine.exec p m):
   Machine.pf_exec p m.

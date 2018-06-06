@@ -1728,7 +1728,7 @@ Proof.
   - ss.
 Qed.
 
-Theorem axiomatic_to_pf_promising
+Theorem axiomatic_to_promising_pf
       p ex
       (EX: Valid.ex p ex):
   exists m,
