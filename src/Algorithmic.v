@@ -46,8 +46,8 @@ End Lock.
 
 Module Taint.
   Inductive elt :=
-  | R (id:nat) (c:nat)
-  | W (id:nat) (c:nat) (loc:Loc.t) (guarantee:Loc.t -> Prop)
+  | R (id:nat) (from:nat)
+  | W (id:nat) (to:nat) (loc:Loc.t) (guarantee:Loc.t -> Prop)
   .
   Hint Constructors elt.
 
@@ -214,6 +214,7 @@ Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (locks:Lock.t -> Prop): P
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
+    (VCAP: aeu.(ExecUnit.local).(Local.vcap) < List.length eu.(ExecUnit.mem))
     (LOCKS: locks = Lock.prune (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint)))
 .
 Hint Constructors certify.
