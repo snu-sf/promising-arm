@@ -112,5 +112,10 @@ Module AExecUnit.
       (COUNTER: aeu2.(counter) = aeu1.(counter))
       (GUARANTEE: aeu2.(guarantee) = join aeu1.(guarantee) (eq vloc.(ValA.val)))
   .
+
+  (* TODO
+   * - initialize: [R 0 tr] in vcap if exbank exists?
+   * - calculate locks in fulfill step.  `res` contains the necessary taint.  Use `Taint.is_lock`.
+   *)
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.

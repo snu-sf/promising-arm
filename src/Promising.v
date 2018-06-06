@@ -792,62 +792,23 @@ Module Machine.
     econs. i. eapply TERMINAL. eauto.
   Qed.
 
-  Inductive step0 (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
-  | step0_intro
+  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
+  | step_intro
       tid st1 lc1 st2 lc2
       (FIND: IdMap.find tid m1.(tpool) = Some (st1, lc1))
       (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
       (ADD: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
   .
-  Hint Constructors step0.
-
-  (* The "global" consistency condition: in certification, machine may take any thread's steps. *)
-  Inductive consistent (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m:t): Prop :=
-  | consistent_intro
-      m'
-      (STEP: rtc (step0 eustep) m m')
-      (NOPROMISE: no_promise m')
-  .
-  Hint Constructors consistent.
-
-  Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
-  | step_intro
-      (STEP: step0 eustep m1 m2)
-      (CONSISTENT: consistent eustep m2)
-  .
   Hint Constructors step.
 
-  Lemma no_promise_consistent
-        eustep m
-        (NOPROMISE: no_promise m):
-    consistent eustep m.
-  Proof. econs; eauto. Qed.
-
-  Lemma step0_consistent
-        eustep m1 m2
-        (STEP: rtc (step0 eustep) m1 m2)
-        (CONSISTENT: consistent eustep m2):
-    consistent eustep m1.
-  Proof. inv CONSISTENT. econs; [|by eauto]. etrans; eauto. Qed.
-
-  Lemma rtc_step0_step eustep m1 m2
-        (STEP: rtc (step0 eustep) m1 m2)
-        (CONSISTENT: consistent eustep m2):
-    rtc (step eustep) m1 m2.
-  Proof.
-    revert CONSISTENT. induction STEP; [refl|]. i. econs.
-    - econs; eauto. eapply step0_consistent; eauto.
-    - eauto.
-  Qed.
-
-  Lemma rtc_eu_step_step0
+  Lemma rtc_eu_step_step
         eustep tid m st1 lc1 mem1 st2 lc2 mem2
         (FIND: IdMap.find tid m.(tpool) = Some (st1, lc1))
         (MEM: m.(mem) = mem1)
         (EX: rtc (eustep tid)
                  (ExecUnit.mk st1 lc1 mem1)
                  (ExecUnit.mk st2 lc2 mem2)):
-    rtc (step0 eustep)
+    rtc (step eustep)
         m
         (mk
            (IdMap.add tid (st2, lc2) m.(tpool))
@@ -883,17 +844,17 @@ Module Machine.
     - apply Local.init_wf.
   Qed.
 
-  Lemma init_consistent eustep p:
-    consistent eustep (init p).
+  Lemma init_no_promise p:
+    no_promise (init p).
   Proof.
-    econs; eauto. econs. s. i.
+    econs. s. i.
     revert FIND. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss. i. inv FIND.
     ss.
   Qed.
 
-  Lemma step0_state_step_wf
+  Lemma step_state_step_wf
         m1 m2
-        (STEP: step0 ExecUnit.state_step m1 m2)
+        (STEP: step ExecUnit.state_step m1 m2)
         (WF: wf m1):
     wf m2.
   Proof.
@@ -906,9 +867,9 @@ Module Machine.
     - i. exploit WF0; eauto.
   Qed.
 
-  Lemma step0_promise_step_wf
+  Lemma step_promise_step_wf
         m1 m2
-        (STEP: step0 ExecUnit.promise_step m1 m2)
+        (STEP: step ExecUnit.promise_step m1 m2)
         (WF: wf m1):
     wf m2.
   Proof.
@@ -930,49 +891,46 @@ Module Machine.
         * i. exploit PROMISES; eauto. lia.
   Qed.
 
-  Lemma step0_step_wf
+  Lemma step_step_wf
         m1 m2
-        (STEP: step0 ExecUnit.step m1 m2)
+        (STEP: step ExecUnit.step m1 m2)
         (WF: wf m1):
     wf m2.
   Proof.
     inv STEP. inv STEP0.
-    - eapply step0_state_step_wf; eauto.
-    - eapply step0_promise_step_wf; eauto.
+    - eapply step_state_step_wf; eauto.
+    - eapply step_promise_step_wf; eauto.
   Qed.
 
-  Lemma step0_mon
+  Lemma step_mon
         (eustep1 eustep2: _ -> _ -> _ -> Prop)
         (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
-    forall m1 m2, step0 eustep1 m1 m2 -> step0 eustep2 m1 m2.
+    forall m1 m2, step eustep1 m1 m2 -> step eustep2 m1 m2.
   Proof.
     i. inv H. econs; eauto.
   Qed.
 
-  Lemma rtc_step0_mon
+  Lemma rtc_step_mon
         (eustep1 eustep2: _ -> _ -> _ -> Prop)
         (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
-    forall m1 m2, rtc (step0 eustep1) m1 m2 -> rtc (step0 eustep2) m1 m2.
+    forall m1 m2, rtc (step eustep1) m1 m2 -> rtc (step eustep2) m1 m2.
   Proof.
-    i. induction H; eauto. econs; eauto. eapply step0_mon; eauto.
+    i. induction H; eauto. econs; eauto. eapply step_mon; eauto.
   Qed.
 
-  Lemma rtc_step_consistent
-        eustep m1 m2
-        (STEP: rtc (Machine.step eustep) m1 m2)
-        (CONSISTENT: Machine.consistent eustep m1):
-    Machine.consistent eustep m2.
-  Proof.
-    revert CONSISTENT. induction STEP; ss.
-    i. apply IHSTEP. apply H.
-  Qed.
+  Inductive exec (p:program) (m:t): Prop :=
+  | exec_intro
+      (STEP: rtc (step ExecUnit.step) (init p) m)
+      (NOPROMISE: no_promise m)
+  .
+  Hint Constructors exec.
 
-  Inductive pf_exec (p:program) (m:t): Prop :=
+  Inductive pf_exec (p:program) (m:Machine.t): Prop :=
   | pf_exec_intro
       m1
-      (STEP1: rtc (step0 ExecUnit.promise_step) (init p) m1)
-      (STEP2: rtc (step0 ExecUnit.state_step) m1 m)
-      (NOPROMISE: no_promise m)
+      (STEP1: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m1)
+      (STEP2: rtc (Machine.step ExecUnit.state_step) m1 m)
+      (NOPROMISE: Machine.no_promise m)
   .
   Hint Constructors pf_exec.
 End Machine.

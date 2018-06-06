@@ -1693,7 +1693,7 @@ Lemma pf_init_with_promises
       p promises
       (MEM: forall msg (MSG: List.In msg promises), IdMap.find msg.(Msg.tid) p <> None):
   exists m,
-    <<STEP: rtc (Machine.step0 ExecUnit.promise_step) (Machine.init p) m>> /\
+    <<STEP: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m>> /\
     <<TPOOL: IdMap.Equal m.(Machine.tpool) (init_with_promises p promises).(Machine.tpool)>> /\
     <<MEM: m.(Machine.mem) = promises>>.
 Proof.
@@ -1758,7 +1758,7 @@ Proof.
 
   (* It's sufficient to construct steps from the promised state. *)
   cut (exists m0,
-          <<STEP: rtc (Machine.step0 ExecUnit.state_step) m m0>> /\
+          <<STEP: rtc (Machine.step ExecUnit.state_step) m m0>> /\
           <<NOPROMISE: Machine.no_promise m0>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m0>> /\
           <<MEM: sim_mem ex (Machine.mem m0)>>).
@@ -1808,7 +1808,7 @@ Proof.
           <<TERMINAL: EX.(Valid.is_terminal) -> State.is_terminal st2>> /\
           <<NOPROMISE: lc2.(Local.promises) = bot>>).
   { i. des. subst.
-    exploit Machine.rtc_eu_step_step0; try exact STEP; eauto. i.
+    exploit Machine.rtc_eu_step_step; try exact STEP; eauto. i.
     assert (NOTIN: SetoidList.findA (fun id' : IdMap.key => if equiv_dec tid id' then true else false) ps = None).
     { inv NODUP. revert H1. clear. induction ps; ss.
       destruct a. i. destruct (equiv_dec tid k); eauto.

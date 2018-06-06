@@ -24,11 +24,11 @@ Set Implicit Arguments.
 Lemma reorder_state_step_promise_step
       m1 m2 m3
       (WF: Machine.wf m1)
-      (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
-      (STEP2: Machine.step0 ExecUnit.promise_step m2 m3):
+      (STEP1: Machine.step ExecUnit.state_step m1 m2)
+      (STEP2: Machine.step ExecUnit.promise_step m2 m3):
   exists m2',
-    <<STEP: Machine.step0 ExecUnit.promise_step m1 m2'>> /\
-    <<STEP: Machine.step0 ExecUnit.state_step m2' m3>>.
+    <<STEP: Machine.step ExecUnit.promise_step m1 m2'>> /\
+    <<STEP: Machine.step ExecUnit.state_step m2' m3>>.
 Proof.
   destruct m1 as [tpool1 mem1].
   destruct m2 as [tpool2 mem2].
@@ -129,29 +129,29 @@ Qed.
 Lemma reorder_state_step_rtc_promise_step
       m1 m2 m3
       (WF: Machine.wf m1)
-      (STEP1: Machine.step0 ExecUnit.state_step m1 m2)
-      (STEP2: rtc (Machine.step0 ExecUnit.promise_step) m2 m3):
+      (STEP1: Machine.step ExecUnit.state_step m1 m2)
+      (STEP2: rtc (Machine.step ExecUnit.promise_step) m2 m3):
   exists m2',
-    <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2'>> /\
-    <<STEP: Machine.step0 ExecUnit.state_step m2' m3>>.
+    <<STEP: rtc (Machine.step ExecUnit.promise_step) m1 m2'>> /\
+    <<STEP: Machine.step ExecUnit.state_step m2' m3>>.
 Proof.
   revert m1 WF STEP1. induction STEP2; eauto.
   i. exploit reorder_state_step_promise_step; eauto. i. des.
-  exploit Machine.step0_promise_step_wf; eauto. i.
+  exploit Machine.step_promise_step_wf; eauto. i.
   exploit IHSTEP2; eauto. i. des.
   esplits; cycle 1; eauto.
 Qed.
 
-Lemma split_rtc_step0
+Lemma split_rtc_step
       m1 m3
       (WF: Machine.wf m1)
-      (STEP: rtc (Machine.step0 ExecUnit.step) m1 m3):
+      (STEP: rtc (Machine.step ExecUnit.step) m1 m3):
   exists m2,
-    <<STEP: rtc (Machine.step0 ExecUnit.promise_step) m1 m2>> /\
-    <<STEP: rtc (Machine.step0 ExecUnit.state_step) m2 m3>>.
+    <<STEP: rtc (Machine.step ExecUnit.promise_step) m1 m2>> /\
+    <<STEP: rtc (Machine.step ExecUnit.state_step) m2 m3>>.
 Proof.
   revert WF. induction STEP; eauto. i.
-  exploit Machine.step0_step_wf; eauto. i.
+  exploit Machine.step_step_wf; eauto. i.
   exploit IHSTEP; eauto. i. des.
   inv H. inv STEP2.
   - exploit reorder_state_step_rtc_promise_step; try exact WF; eauto. i. des.
@@ -159,37 +159,23 @@ Proof.
   - esplits; cycle 1; eauto.
 Qed.
 
-Theorem promising_to_pf_promising
-        p m
-        (STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m)
-        (NOPROMISE: Machine.no_promise m):
-  Machine.pf_exec p m.
-Proof.
-  generalize (Machine.init_wf p). intro WF.
-  generalize (Machine.init_consistent ExecUnit.step p). intro CONSISTENT.
-  exploit Machine.rtc_step_consistent; eauto. i.
-  exploit rtc_mon.
-  { instantiate (1 := Machine.step0 ExecUnit.step).
-    instantiate (1 := Machine.step ExecUnit.step).
-    i. inv H. ss.
-  }
-  { eauto. }
-  i. exploit split_rtc_step0; eauto. i. des.
-  econs; eauto.
-Qed.
-
 Theorem pf_promising_to_promising
         p m
         (EXEC: Machine.pf_exec p m):
-  <<STEP: rtc (Machine.step ExecUnit.step) (Machine.init p) m>> /\
-  <<NOPROMISE: Machine.no_promise m>>.
+  Machine.exec p m.
 Proof.
-  inv EXEC. esplits; ss.
-  apply Machine.rtc_step0_step; cycle 1.
-  { apply Machine.no_promise_consistent. ss. }
+  inv EXEC. econs; eauto.
   etrans.
-  - eapply rtc_mon; cycle 1; eauto.
-    apply Machine.step0_mon. right. ss.
-  - eapply rtc_mon; cycle 1; eauto.
-    apply Machine.step0_mon. left. ss.
+  - eapply Machine.rtc_step_mon; cycle 1; eauto. right. ss.
+  - eapply Machine.rtc_step_mon; cycle 1; eauto. left. ss.
+Qed.
+
+Theorem promising_to_pf_promising
+        p m
+        (EXEC: Machine.exec p m):
+  Machine.pf_exec p m.
+Proof.
+  inv EXEC. generalize (Machine.init_wf p). intro WF.
+  exploit split_rtc_step; eauto. i. des.
+  econs; eauto.
 Qed.
