@@ -214,7 +214,7 @@ Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (locks:Lock.t -> Prop): P
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
-    (VCAP: aeu.(ExecUnit.local).(Local.vcap) < List.length eu.(ExecUnit.mem))
+    (VCAP: aeu.(ExecUnit.local).(Local.vcap).(View.ts) < List.length eu.(ExecUnit.mem))
     (LOCKS: locks = Lock.prune (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint)))
 .
 Hint Constructors certify.

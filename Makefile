@@ -1,5 +1,5 @@
 COQMODULE    := promising
-COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v lib/hahn/*.v $(find src -name '*.v' -print)
+COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v lib/hahn/*.v $(shell find src -name '*.v' -print)
 
 .PHONY: all theories clean
 
