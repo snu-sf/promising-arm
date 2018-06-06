@@ -24,7 +24,8 @@ Set Implicit Arguments.
 Module Lock.
   Inductive t := mk {
     loc: Loc.t;
-    counter: nat;
+    from: nat;
+    to: nat;
     guarantee: Loc.t -> Prop;
   }.
   Hint Constructors t.
@@ -32,8 +33,8 @@ End Lock.
 
 Module Taint.
   Inductive elt :=
-  | R (id:nat) (tr:Time.t)
-  | W (id:nat) (tr:Time.t) (lock:Lock.t)
+  | R (id:nat) (c:nat)
+  | W (id:nat) (c:nat) (loc:Loc.t) (guarantee:Loc.t -> Prop)
   .
   Hint Constructors elt.
 
@@ -41,9 +42,9 @@ Module Taint.
 
   Inductive is_locked (taint:t) (lock:Lock.t): Prop :=
   | is_locked_intro
-      id tr
-      (R: taint (R id tr))
-      (W: taint (W id tr lock))
+      id
+      (R: taint (R id lock.(Lock.from)))
+      (W: taint (W id lock.(Lock.to) lock.(Lock.loc) lock.(Lock.guarantee)))
   .
 End Taint.
 
@@ -52,7 +53,7 @@ Module AExecUnit.
     ex_counter: nat;
     st_counter: Loc.t -> nat;
     guarantee: Loc.t -> Prop;
-    locks: Lock.t -> Prop;
+    taint: Taint.t;
   }.
   Hint Constructors aux_t.
 
@@ -63,12 +64,14 @@ Module AExecUnit.
   Hint Constructors t.
   Coercion eu: t >-> ExecUnit.t.
 
-  Definition taint_read_event (c:nat) (lc:Local.t (A:=Taint.t)) (e:Event.t (A:=View.t (A:=Taint.t))): Event.t (A:=View.t (A:=Taint.t)) :=
-    match e, lc.(Local.exbank) with
-    | Event.read true ord vloc res, Some tsr =>
+  Definition taint_read_event (aux:aux_t) (e:Event.t (A:=View.t (A:=Taint.t))): Event.t (A:=View.t (A:=Taint.t)) :=
+    match e with
+    | Event.read true ord vloc res =>
       Event.read true ord vloc
-                 (ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join (eq (Taint.R c tsr)) res.(ValA.annot).(View.annot))))
-    | _, _ => e
+                 (ValA.mk _ res.(ValA.val)
+                          (View.mk res.(ValA.annot).(View.ts)
+                                   (join (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))) res.(ValA.annot).(View.annot))))
+    | _ => e
     end.
 
   Definition state_step_aux (e:Event.t (A:=View.t (A:=Taint.t))) (aux:aux_t): aux_t :=
@@ -78,13 +81,13 @@ Module AExecUnit.
         (S aux.(ex_counter))
         aux.(st_counter)
         aux.(guarantee)
-        aux.(locks)
+        aux.(taint)
     | Event.write _ _ vloc _ res =>
       mk_aux
         aux.(ex_counter)
-        (fun_add vloc.(ValA.val) (S (aux.(st_counter) vloc.(ValA.val))) aux.(st_counter))
+        aux.(st_counter)
         (join aux.(guarantee) (eq vloc.(ValA.val)))
-        (join aux.(locks) (Taint.is_locked res.(ValA.annot).(View.annot)))
+        (join aux.(taint) res.(ValA.annot).(View.annot))
     | _ =>
       aux
     end.
@@ -92,7 +95,7 @@ Module AExecUnit.
   Inductive state_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | state_step_intro
       e1 e2
-      (EVENT: e2 = taint_read_event aeu2.(aux).(ex_counter) aeu2.(eu).(ExecUnit.local) e1)
+      (EVENT: e2 = taint_read_event aeu2.(aux) e1)
       (STATE: State.step e2 aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
       (LOCAL: Local.step e1 tid aeu1.(ExecUnit.mem) aeu1.(ExecUnit.local) aeu2.(eu).(ExecUnit.local))
       (MEM: aeu2.(ExecUnit.mem) = aeu1.(ExecUnit.mem))
@@ -100,19 +103,18 @@ Module AExecUnit.
   .
   Hint Constructors state_step.
 
-  Definition taint_write (ex:bool) (loc:Loc.t) (tsr:Time.t) (aux:aux_t): Taint.elt :=
-    Taint.W aux.(ex_counter) tsr (Lock.mk loc (aux.(st_counter) loc) (ifc ex aux.(guarantee))).
+  Definition taint_write (ord:OrdW.t) (loc:Loc.t) (aux:aux_t): Taint.elt :=
+    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc (ifc (OrdW.ge ord OrdW.release) aux.(guarantee)).
 
-  Definition taint_write_res (lc: Local.t (A:=Taint.t)) (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
-    match ex, lc.(Local.exbank) with
-    | true, Some tsr =>
-      ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join (eq (taint_write ex loc tsr aux)) res.(ValA.annot).(View.annot)))
-    | _, _ => res
-    end.
+  Definition taint_write_res (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
+    if negb ex
+    then res
+    else ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join (eq (taint_write ord loc aux)) res.(ValA.annot).(View.annot))).
 
-  Definition taint_write_lc (tsr:option Time.t) (lc: Local.t (A:=Taint.t)) (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t): Local.t (A:=Taint.t) :=
-    match ex, tsr, lc.(Local.fwdbank) loc with
-    | true, Some tsr, Some fwd =>
+  Definition taint_write_lc (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (lc: Local.t (A:=Taint.t)): Local.t (A:=Taint.t) :=
+    if negb ex
+    then lc
+    else
       Local.mk
         lc.(Local.coh)
         lc.(Local.vrp)
@@ -123,31 +125,32 @@ Module AExecUnit.
         lc.(Local.vrel)
         (fun_add
            loc
-           (Some (FwdItem.mk fwd.(FwdItem.ts)
-                             (View.mk fwd.(FwdItem.view).(View.ts)
-                                      (join (eq (taint_write ex loc tsr aux)) fwd.(FwdItem.view).(View.annot)))
-                             fwd.(FwdItem.ex)))
+           (option_map
+              (fun fwd => (FwdItem.mk
+                          fwd.(FwdItem.ts)
+                          (View.mk fwd.(FwdItem.view).(View.ts)
+                                   (join (eq (taint_write ord loc aux)) fwd.(FwdItem.view).(View.annot)))
+                          fwd.(FwdItem.ex)))
+              (lc.(Local.fwdbank) loc))
            lc.(Local.fwdbank))
         lc.(Local.exbank)
-        lc.(Local.promises)
-    | _, _, _ => lc
-    end.
+        lc.(Local.promises).
 
   Definition write_step_aux (loc:Loc.t) (aux:aux_t): aux_t :=
     mk_aux
       aux.(ex_counter)
       (fun_add loc (S (aux.(st_counter) loc)) aux.(st_counter))
       (join aux.(guarantee) (eq loc))
-      aux.(locks).
+      aux.(taint).
 
   Inductive write_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | write_step_intro
       ex ord vloc vval res1 res2 lc1 lc2
-      (RES: res2 = taint_write_res lc1 aeu1.(aux) ex ord vloc.(ValA.val) res1)
+      (RES: res2 = taint_write_res aeu1.(aux) ex ord vloc.(ValA.val) res1)
       (STATE: State.step (Event.write ex ord vloc vval res2) aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
       (LOCAL1: Local.promise vloc.(ValA.val) vval.(ValA.val) tid aeu1.(ExecUnit.local) aeu1.(ExecUnit.mem) lc1 aeu2.(ExecUnit.mem))
       (LOCAL2: Local.fulfill ex ord vloc vval res1 tid lc1 aeu2.(ExecUnit.mem) lc2)
-      (LOCAL3: aeu2.(ExecUnit.local) = taint_write_lc lc1.(Local.exbank) lc2 aeu2.(aux) ex ord vloc.(ValA.val))
+      (LOCAL3: aeu2.(ExecUnit.local) = taint_write_lc aeu2.(aux) ex ord vloc.(ValA.val) lc2)
       (AUX: aeu2.(aux) = write_step_aux vloc.(ValA.val) aeu1.(aux))
   .
   Hint Constructors write_step.
@@ -168,7 +171,7 @@ Module AExecUnit.
       (init_view lc.(Local.vwp))
       (init_view lc.(Local.vrm))
       (init_view lc.(Local.vwm))
-      (View.mk lc.(Local.vcap).(View.ts) match lc.(Local.exbank) with Some tsr => eq (Taint.R 0 tsr) | None => bot end)
+      (View.mk lc.(Local.vcap).(View.ts) (eq (Taint.R 0 0)))
       (init_view lc.(Local.vrel))
       (fun loc =>
          option_map
@@ -197,5 +200,5 @@ Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)): forall (locks:Lock.t -> 
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot):
-    certify tid eu aeu.(AExecUnit.aux).(AExecUnit.locks)
+    certify tid eu (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
