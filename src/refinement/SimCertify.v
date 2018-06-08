@@ -231,9 +231,9 @@ Proof.
         unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
         destruct (IdMap.find id (State.rmap st1)); ss. econs. econs; ss.
         splits; ss.
-        admit. (* but cap X = bot *)
+        admit. (* bot cap X = bot *)
       + admit. (* sim_lc *)
-    - admit. (* but cap X = bot *)
+    - admit. (* bot cap X = bot *)
   }
   i. des. esplits.
   - econs; eauto.
