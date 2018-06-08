@@ -43,7 +43,7 @@ Qed.
 
 Theorem algorithmic_deadlock_free
         m
-        (CONSISTENT: AMachine.consistent m):
+        (CONSISTENT: AMachine.wf m):
   exists m',
     <<STEPS: rtc (Machine.step ExecUnit.step) m.(AMachine.machine) m'>> /\
     <<NOPROMISE: Machine.no_promise m'>>.

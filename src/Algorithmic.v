@@ -26,28 +26,20 @@ Module Lock.
     loc: Loc.t;
     from: nat;
     to: nat;
-    guarantee: Loc.t -> Prop;
+    guarantee: Loc.t -> nat;
   }.
   Hint Constructors t.
 
-  Inductive prune (locks:Lock.t -> Prop) (lock:Lock.t): Prop :=
-  | prune_base
-      (LOCKS: locks lock)
-      (BASE: lock.(from) = 0)
-  | prune_step
-      l
-      (LOCKS: locks lock)
-      (PREV: prune locks l)
-      (LOC: l.(loc) = lock.(loc))
-      (COUNTER: l.(to) = lock.(from))
+  Inductive is_final (locks: Lock.t -> Prop) (c: Loc.t -> nat): Prop :=
+  | is_final_intro
+      (LOCK: forall lock (LOCK: locks lock), lock.(to) <= (c lock.(loc)))
   .
-  Hint Constructors prune.
 End Lock.
 
 Module Taint.
   Inductive elt :=
   | R (id:nat) (from:nat)
-  | W (id:nat) (to:nat) (loc:Loc.t) (guarantee:Loc.t -> Prop)
+  | W (id:nat) (to:nat) (loc:Loc.t) (guarantee:Loc.t -> nat)
   .
   Hint Constructors elt.
 
@@ -66,7 +58,6 @@ Module AExecUnit.
   Inductive aux_t := mk_aux {
     ex_counter: nat;
     st_counter: Loc.t -> nat;
-    guarantee: Loc.t -> Prop;
     taint: Taint.t;
   }.
   Hint Constructors aux_t.
@@ -84,7 +75,7 @@ Module AExecUnit.
       Event.read true ord vloc
                  (ValA.mk _ res.(ValA.val)
                           (View.mk res.(ValA.annot).(View.ts)
-                                   (join (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))) res.(ValA.annot).(View.annot))))
+                                   (join res.(ValA.annot).(View.annot) (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))))))
     | _ => e
     end.
 
@@ -94,13 +85,11 @@ Module AExecUnit.
       mk_aux
         (S aux.(ex_counter))
         aux.(st_counter)
-        aux.(guarantee)
         aux.(taint)
     | Event.write _ _ vloc _ res =>
       mk_aux
         aux.(ex_counter)
         aux.(st_counter)
-        (join aux.(guarantee) (eq vloc.(ValA.val)))
         (join aux.(taint) res.(ValA.annot).(View.annot))
     | _ =>
       aux
@@ -118,12 +107,12 @@ Module AExecUnit.
   Hint Constructors state_step.
 
   Definition taint_write (ord:OrdW.t) (loc:Loc.t) (aux:aux_t): Taint.elt :=
-    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc (ifc (OrdW.ge ord OrdW.release) aux.(guarantee)).
+    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc (ifc (OrdW.ge ord OrdW.release) aux.(st_counter)).
 
   Definition taint_write_res (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
     if negb ex
     then res
-    else ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join (eq (taint_write ord loc aux)) res.(ValA.annot).(View.annot))).
+    else ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join res.(ValA.annot).(View.annot) (eq (taint_write ord loc aux)))).
 
   Definition taint_write_lc (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (lc: Local.t (A:=Taint.t)): Local.t (A:=Taint.t) :=
     if negb ex
@@ -143,7 +132,7 @@ Module AExecUnit.
               (fun fwd => (FwdItem.mk
                           fwd.(FwdItem.ts)
                           (View.mk fwd.(FwdItem.view).(View.ts)
-                                   (join (eq (taint_write ord loc aux)) fwd.(FwdItem.view).(View.annot)))
+                                   (join fwd.(FwdItem.view).(View.annot) (eq (taint_write ord loc aux))))
                           fwd.(FwdItem.ex)))
               (lc.(Local.fwdbank) loc))
            lc.(Local.fwdbank))
@@ -154,7 +143,6 @@ Module AExecUnit.
     mk_aux
       aux.(ex_counter)
       (fun_add loc (S (aux.(st_counter) loc)) aux.(st_counter))
-      (join aux.(guarantee) (eq loc))
       aux.(taint).
 
   Inductive write_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
@@ -194,7 +182,7 @@ Module AExecUnit.
       lc.(Local.exbank)
       lc.(Local.promises).
 
-  Definition init_aux: aux_t := mk_aux 0 (fun _ => 0) bot bot.
+  Definition init_aux: aux_t := mk_aux 0 (fun _ => 0) bot.
 
   Definition init_rmap (rmap:RMap.t (A:=View.t (A:=unit))): RMap.t (A:=View.t (A:=Taint.t)) :=
     IdMap.map (fun vala => ValA.mk _ vala.(ValA.val) (init_view vala.(ValA.annot))) rmap.
@@ -214,15 +202,24 @@ Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (locks:Lock.t -> Prop): P
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
-    (VCAP: aeu.(ExecUnit.local).(Local.vcap).(View.ts) < List.length eu.(ExecUnit.mem))
-    (LOCKS: locks = Lock.prune (Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint)))
+    (LOCKS: locks = Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
 Hint Constructors certify.
+
+Lemma wf_certify
+      tid (eu:ExecUnit.t (A:=unit))
+      (PROMISES: eu.(ExecUnit.local).(Local.promises) = bot)
+      (WF: ExecUnit.wf eu):
+  certify tid eu bot.
+Proof.
+  econs; eauto. s. funext. i. propext. econs; ss.
+  intro X. inv X. inv R.
+Qed.
 
 Module AMachine.
   Inductive t := mk {
     machine: Machine.t;
-    locks: IdMap.t (Lock.t -> Prop);
+    tlocks: IdMap.t (Lock.t -> Prop);
   }.
   Hint Constructors t.
   Coercion machine: t >-> Machine.t.
@@ -232,27 +229,87 @@ Module AMachine.
       (Machine.init p)
       (IdMap.map (fun _ => bot) p).
 
-  Inductive consistent (m:t): Prop :=
-  | consistent_intro
-      (* TODO *)
+  Inductive consistent (am: IdMap.t ((Lock.t -> Prop) * (Loc.t -> nat))): Prop :=
+  | consistent_final
+      (FINAL: IdMap.Forall (fun _ th => Lock.is_final th.(fst) th.(snd)) am)
+  | consistent_step
+      (TODO: False)
   .
   Hint Constructors consistent.
 
-  Lemma init_consistent p:
-    consistent (init p).
+  Inductive wf (m:t): Prop :=
+  | wf_intro
+      (MACHINE: Machine.wf m.(machine))
+      (CERTIFY: IdMap.Forall2
+                  (fun tid th tlock => certify tid (ExecUnit.mk th.(fst) th.(snd) m.(Machine.mem)) tlock)
+                  m.(Machine.tpool) m.(tlocks))
+      (CONSISTENT: consistent (IdMap.map (fun tlock => (tlock, bot)) m.(tlocks)))
+  .
+  Hint Constructors wf.
+
+  Lemma init_wf p:
+    wf (init p).
   Proof.
-  Admitted.
+    econs.
+    - apply Machine.init_wf.
+    - s. ii. rewrite ? IdMap.map_spec. destruct (IdMap.find id p); ss.
+      econs. s. apply wf_certify; ss.
+      econs; ss.
+      + econs. i. unfold RMap.find, RMap.init. rewrite IdMap.gempty. ss.
+      + apply Local.init_wf.
+    - econs. s. intros ? ?. rewrite ? IdMap.map_spec.
+      destruct (IdMap.find id p); ss. i. inv FIND. ss.
+  Qed.
 
   Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
   | step_intro
-      tid st1 lc1 st2 lc2 l
+      tid st1 lc1 st2 lc2 tlock
       (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st1, lc1))
       (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(Machine.mem)) (ExecUnit.mk st2 lc2 m2.(Machine.mem)))
       (TPOOL: m2.(Machine.tpool) = IdMap.add tid (st2, lc2) m1.(Machine.tpool))
-      (LOCKS: m2.(locks) = IdMap.add tid l m1.(locks))
-      (CONSISTENT: consistent m2)
+      (TLOCKS: m2.(tlocks) = IdMap.add tid tlock m1.(tlocks))
+      (CERTIFY: certify tid (ExecUnit.mk st2 lc2 m2.(Machine.mem)) tlock)
+      (INTERFERE: True) (* TODO: doesn't bother other's lock *)
+      (CONSISTENT: consistent (IdMap.map (fun tlock => (tlock, bot)) m2.(tlocks)))
   .
   Hint Constructors step.
+
+  Lemma step_state_step_wf
+        m1 m2
+        (STEP: step ExecUnit.state_step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    inv WF. inv STEP. econs; eauto.
+    - eapply Machine.step_state_step_wf; eauto.
+    - rewrite TPOOL, TLOCKS. ii. rewrite ? IdMap.add_spec. condtac.
+      + inversion e. eauto.
+      + inv STEP0. ss. rewrite MEM. eauto.
+  Qed.
+
+  Lemma step_promise_step_wf
+        m1 m2
+        (STEP: step ExecUnit.promise_step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    inv WF. inv STEP. econs; eauto.
+    - eapply Machine.step_promise_step_wf; eauto.
+    - rewrite TPOOL, TLOCKS. ii. rewrite ? IdMap.add_spec. condtac.
+      + inversion e. eauto.
+      + admit. (* certify after changing mem; "INTERFERE" is important here. *)
+  Admitted.
+
+  Lemma step_step_wf
+        m1 m2
+        (STEP: step ExecUnit.step m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    inv STEP. inv STEP0.
+    - eapply step_state_step_wf; eauto.
+    - eapply step_promise_step_wf; eauto.
+  Qed.
 
   Lemma step_mon
         (eustep1 eustep2: _ -> _ -> _ -> Prop)

@@ -32,9 +32,7 @@ Proof.
   revert tid st lc FIND NOPROMISE. induction STEPS.
   { econs; eauto; ss.
     - eapply NOPROMISE. eauto.
-    - funext. unfold bot, fun_bot. i. propext. econs; ss. i. inv H.
-      + inv LOCKS. ss.
-      + inv LOCKS. ss.
+    - funext. unfold bot, fun_bot. i. propext. econs; ss. i. inv H; ss.
   }
   i. inv H. exploit IHSTEPS; ss.
   { rewrite TPOOL, IdMap.add_spec, FIND.
