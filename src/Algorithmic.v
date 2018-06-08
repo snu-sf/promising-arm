@@ -71,11 +71,14 @@ Module AExecUnit.
 
   Definition taint_read_event (aux:aux_t) (e:Event.t (A:=View.t (A:=Taint.t))): Event.t (A:=View.t (A:=Taint.t)) :=
     match e with
-    | Event.read true ord vloc res =>
-      Event.read true ord vloc
-                 (ValA.mk _ res.(ValA.val)
-                          (View.mk res.(ValA.annot).(View.ts)
-                                   (join res.(ValA.annot).(View.annot) (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))))))
+    | Event.read ex ord vloc res =>
+      Event.read
+        ex ord vloc
+        (if ex
+         then (ValA.mk _ res.(ValA.val)
+                       (View.mk res.(ValA.annot).(View.ts)
+                                (join res.(ValA.annot).(View.annot) (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))))))
+         else res)
     | _ => e
     end.
 
@@ -98,9 +101,9 @@ Module AExecUnit.
   Inductive state_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | state_step_intro
       e1 e2
-      (EVENT: e2 = taint_read_event aeu2.(aux) e1)
       (STATE: State.step e2 aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
       (LOCAL: Local.step e1 tid aeu1.(ExecUnit.mem) aeu1.(ExecUnit.local) aeu2.(eu).(ExecUnit.local))
+      (EVENT: e2 = taint_read_event aeu2.(aux) e1)
       (MEM: aeu2.(ExecUnit.mem) = aeu1.(ExecUnit.mem))
       (AUX: aeu2.(aux) = state_step_aux e1 aeu1.(aux))
   .
