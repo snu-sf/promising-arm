@@ -26,7 +26,7 @@ paco-quick: lib/paco/src
 Makefile.coq: Makefile $(COQTHEORIES)
 	(echo "-R lib/sflib sflib"; \
    echo "-R lib/paco/src Paco"; \
-   echo "-R lib/hahn Hahn"; \
+   echo "-R lib/hahn Top"; \
    \
    echo "-R src $(COQMODULE)"; \
    \

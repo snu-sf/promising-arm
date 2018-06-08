@@ -241,4 +241,4 @@ Proof.
     + inv SIM. congr.
   - ii. des. destruct lock as [loc from to guarantee]. ss. subst.
     inv LOCK. ss. inv SIM. eapply AUX_EX. econs; cycle 1; eauto.
-Qed.
+Admitted.
