@@ -33,7 +33,7 @@ Inductive sim_view (ts:Time.t) (ex:Taint.t) (v1 v2:View.t (A:=Taint.t)): Prop :=
 | sim_view_intro
     (TS: v2.(View.ts) <= ts ->
          v1 = v2 /\
-         v2.(View.annot) ∩₁ ex = bot)
+         v2.(View.annot) ∩₁ ex ⊆₁ bot)
 .
 Hint Constructors sim_view.
 
@@ -41,7 +41,7 @@ Inductive sim_val (ts:Time.t) (ex:Taint.t) (v1 v2:ValA.t (A:=View.t (A:=Taint.t)
 | sim_val_intro
     (TS: v2.(ValA.annot).(View.ts) <= ts ->
          v1 = v2 /\
-         v2.(ValA.annot).(View.annot) ∩₁ ex = bot)
+         v2.(ValA.annot).(View.annot) ∩₁ ex ⊆₁ bot)
 .
 Hint Constructors sim_val.
 
@@ -210,9 +210,17 @@ Proof.
   esplits; [|by eauto]. econs; eauto.
 Qed.
 
+Lemma init_sim_view
+      ts ex v:
+  sim_view ts ex (AExecUnit.init_view v) (AExecUnit.init_view v).
+Proof.
+  econs; ss. splits; ss. ii. inv H0. inv H1.
+Qed.
+
 Lemma certify_lift_diff
-      tid eu1 eu2 locks msg
+      tid (eu1 eu2:ExecUnit.t (A:=unit)) locks msg
       (CERTIFY: certify tid eu2 locks)
+      (WF: ExecUnit.wf eu1)
       (ST: eu2.(ExecUnit.state) = eu1.(ExecUnit.state))
       (LC: eu2.(ExecUnit.local) = eu1.(ExecUnit.local))
       (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
@@ -231,9 +239,14 @@ Proof.
         unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
         destruct (IdMap.find id (State.rmap st1)); ss. econs. econs; ss.
         splits; ss.
-        admit. (* bot cap X = bot *)
-      + admit. (* sim_lc *)
-    - admit. (* bot cap X = bot *)
+        ii. inv H0. inv H1.
+      + unfold AExecUnit.init_lc. econs; ss; eauto using init_sim_view.
+        * admit. (* TODO: bug on init vcap *)
+        * i. destruct (Local.fwdbank lc1 loc); ss. econs; ss.
+          splits; ss. apply init_sim_view.
+        * admit. (* TODO: bug on exbank rel *)
+        * inv WF. inv LOCAL. ss.
+    - ii. inv H. inv H0.
   }
   i. des. esplits.
   - econs; eauto.
