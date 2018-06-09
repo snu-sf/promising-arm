@@ -333,78 +333,101 @@ Proof.
   destruct aeu2 as [[[stmts2 rmap2] lc2 mem2] aux2].
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
   inv STEP.
-  - (* state_step *)
+  { (* state_step *)
     inv STEP0. ss. subst.
     inv SIM. ss. subst.
     inv EU. ss.
     inv STATE0. ss. subst.
-    inv STATE; inv LOCAL; inv H0.
-    + (* skip *)
+    inv LOCAL; ss; inv STATE.
+    - (* skip *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      * left. econs; ss.
-        { instantiate (2 := Event.internal bot). s. econs 1. }
-        econs; eauto. econs; eauto.
-      * econs; ss. econs; ss. inv LOCAL0. econs; ss.
+      + left. econs; ss; cycle 1.
+        * econs 1; eauto. econs; eauto.
+        * s. econs 1.
+      + econs; ss. econs; ss. inv LOCAL0. econs; ss.
         apply sim_view_join; ss. apply sim_view_bot.
-    + (* assign *)
+    - (* assign *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      * left. econs; ss.
-        { instantiate (2 := Event.internal bot). s. econs 2. eauto. }
-        econs; eauto. econs; eauto.
-      * econs; ss. econs; ss.
-        { econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr. ss. }
-        { inv LOCAL0. econs; ss. eauto using sim_view_join, sim_view_bot. }
-    + (* read *)
-      admit.
-    + (* fulfill *)
-      admit.
-    + (* write_failure *)
-      inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      * left. econs; ss.
-        { instantiate (2 := Event.write _ _ _ _ _). s. econs 4; eauto. }
-        econs 4; eauto. econs; eauto.
-      * econs; ss; cycle 1.
-        { ii. apply AUX_FORBID. inv H. econs; ss. inv H0; ss. }
-        econs; ss.
-        { econs; ss. apply sim_rmap_add; ss. apply sim_val_const. }
-        { econs; try by apply LOCAL0. ss. }
-    + (* isb *)
-      admit.
-    + (* dmbst *)
-      admit.
-    + (* dmbld *)
-      admit.
-    + (* dmbsy *)
-      admit.
-    + (* if *)
+      + left. econs; ss; cycle 1.
+        * econs 1; eauto. econs; eauto.
+        * s. econs 2. ss.
+      + econs; ss. econs; ss.
+        * econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
+        * inv LOCAL0. econs; ss. eauto using sim_view_join, sim_view_bot.
+    - (* if *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      * left. econs; ss.
-        { instantiate (2 := Event.internal _). s. econs 6; eauto. }
-        econs; eauto. econs; eauto.
-      * econs; ss. econs; ss.
-        { econs; ss.
-          exploit sim_rmap_expr; eauto. instantiate (1 := cond). i.
+      + left. econs; ss; cycle 1.
+        * econs 1; eauto. econs; eauto.
+        * s. econs 6; ss.
+      + econs; ss. econs; ss.
+        * econs; ss.
+          exploit sim_rmap_expr; eauto. i.
           inv x0. exploit TS; cycle 1.
           { i. des. rewrite x. ss. }
           admit. (* not depend on big ts *)
-        }
-        { inv LOCAL0. econs; ss. apply sim_view_join; ss.
+        * inv LOCAL0. econs; ss. apply sim_view_join; ss.
           apply sim_val_view. apply sim_rmap_expr. ss.
-        }
-    + (* dowhile *)
+    - (* dowhile *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      * left. econs; ss.
-        { instantiate (2 := Event.internal bot). s. econs 7. ss. }
-        econs; eauto. econs; eauto.
-      * econs; ss. econs; ss. inv LOCAL0. econs; ss.
+      + left. econs; ss; cycle 1.
+        * econs 1; eauto. econs; eauto.
+        * s. econs 7. ss.
+      + econs; ss. econs; ss. inv LOCAL0. econs; ss.
         eauto using sim_view_join, sim_view_bot.
-  - (* write_step *)
+    - (* read *)
+      admit.
+    - (* fulfill *)
+      admit.
+    - (* write_failure *)
+      inv STEP.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      + left. econs; ss; cycle 1.
+        * econs 4; eauto. econs; eauto.
+        * s. econs 4; ss.
+      + econs; ss; cycle 1.
+        * ii. apply AUX_FORBID. inv H. econs; ss. inv H0; ss.
+        * econs; ss; eauto using sim_rmap_add, sim_val_const.
+          inv LOCAL0. econs; ss.
+    - (* isb *)
+      inv STEP.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      + left. econs; ss; cycle 1.
+        * econs 5; eauto. econs; eauto.
+        * s. econs 5.
+      + econs; ss. econs; ss.
+        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+    - (* dmbst *)
+      inv STEP.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      + left. econs; ss; cycle 1.
+        * econs 6; eauto. econs; eauto.
+        * s. econs 5.
+      + econs; ss. econs; ss.
+        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+    - (* dmbld *)
+      inv STEP.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      + left. econs; ss; cycle 1.
+        * econs 7; eauto. econs; eauto.
+        * s. econs 5.
+      + econs; ss. econs; ss.
+        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+    - (* dmbsy *)
+      inv STEP.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      + left. econs; ss; cycle 1.
+        * econs 8; eauto. econs; eauto.
+        * s. econs 5.
+      + econs; ss. econs; ss.
+        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+  }
+  { (* write_step *)
     admit.
+  }
 Admitted.
 
 Lemma sim_aeu_rtc_step
