@@ -221,106 +221,6 @@ Proof.
   condtac; ss. inversion e. subst. econs. ss.
 Qed.
 
-Lemma sim_lc_step
-      ts forbid tid
-      e2 mem1 mem2
-      (lc1 lc2 lc2':Local.t (A:=Taint.t))
-      (STEP:  Local.step e2 tid mem2 lc2 lc2')
-      (MEM: sim_mem tid ts forbid mem1 mem2)
-      (LC: sim_lc ts forbid lc1 lc2)
-      (EVENT: sim_event ts forbid e2 e2):
-  exists e1 lc1',
-    <<STEP: Local.step e1 tid mem1 lc1 lc1'>> /\
-    <<LC: sim_lc ts forbid lc1' lc2'>> /\
-    <<EVENT: sim_event ts forbid e1 e2>>.
-Proof.
-  inv LC. inv STEP.
-  - (* internal *)
-    inv LC. esplits.
-    + econs 1; ss.
-    + econs; ss. apply sim_view_join; ss.
-      admit. (* sim_view ctrl *)
-    + eauto.
-  - (* read *)
-    inv STEP0. destruct (le_dec ts0 ts).
-    + (* read from old msg. *)
-      esplits.
-      * econs 2; eauto. econs; eauto.
-        { etrans; [|exact COH0].
-          specialize (COH (ValA.val vloc)). inv COH. rewrite TS; ss.
-          etrans; eauto.
-        }
-        { admit. (* memory no_msgs *) }
-        { admit. (* memory read *) }
-      * econs; ss.
-        { i. rewrite ? fun_add_spec. condtac; ss. }
-        { apply sim_view_join; [by ss|].
-          instantiate (1 := ord). destruct (OrdR.ge ord OrdR.acquire_pc); eauto using sim_view_bot.
-          s. repeat apply sim_view_join.
-          - inv EVENT. inv VLOC. econs. i. specialize (TS H). des.
-            splits; ss.
-          - ss.
-          - destruct (OrdR.ge ord OrdR.acquire); ss. apply sim_view_bot.
-          - apply sim_view_bot.
-          - specialize (FWDBANK (ValA.val vloc)). inv FWDBANK.
-            + apply sim_view_const.
-            + admit. (* fwd *)
-        }
-        { admit. (* sim_view *) }
-        { admit. (* sim_view *) }
-        { admit. (* sim_view *) }
-        { admit. (* exbank *) }
-      * admit. (* event *)
-    + (* read from new msg. *)
-      admit.
-  - (* write *)
-    admit.
-  - (* write_failure *)
-    admit.
-  - (* isb *)
-    admit.
-  - (* dmbst *)
-    admit.
-  - (* dmbld *)
-    admit.
-  - (* dmbsy *)
-    admit.
-Admitted.
-
-Lemma sim_state_step
-      ts forbid e1 e2 (st1 st2 st2':State.t (A:=View.t (A:=Taint.t)))
-      (EVENT: sim_event ts forbid e1 e2)
-      (STEP: State.step e2 st2 st2')
-      (SIM: sim_state ts forbid st1 st2):
-  exists st1',
-    <<STEP: State.step e1 st1 st1'>> /\
-    <<SIM: sim_state ts forbid st1' st2'>>.
-Proof.
-  destruct st1 as [stmts1 rmap1].
-  destruct st2 as [stmts2 rmap2].
-  inv SIM. ss. subst. inv STEP; inv EVENT.
-  - inv CTRL. exploit TS; [by apply bot_spec|]. i. des. subst.
-    esplits; ss.
-    + econs 1; ss.
-    + econs; ss.
-  - inv CTRL. exploit TS; [by apply bot_spec|]. i. des. subst.
-    esplits; ss.
-    + econs 2; ss.
-    + econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
-  - esplits; ss.
-    + econs 3; ss.
-      admit. (* sim_event dead end.. *)
-    + econs; ss. apply sim_rmap_add; ss.
-  - (* write *)
-    admit.
-  - (* barrier *)
-    admit.
-  - (* if *)
-    admit.
-  - (* dowhile *)
-    admit.
-Admitted.
-
 Lemma sim_aeu_step
       tid ts forbid aeu1 aeu2 aeu2'
       (SIM: sim_aeu tid ts forbid aeu1 aeu2)
@@ -379,7 +279,28 @@ Proof.
       + econs; ss. econs; ss. inv LOCAL0. econs; ss.
         eauto using sim_view_join, sim_view_bot.
     - (* read *)
-      admit.
+      inv STEP. destruct (le_dec ts0 ts).
+      { (* read from old msg. *)
+        eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+        - left. econs; ss; cycle 1.
+          + econs 2; eauto. econs.
+            4: instantiate (1 := ts0).
+            1: instantiate (1 := (sem_expr rmap1 eloc)).
+            all: ss.
+            * rewrite <- COH.
+              admit. (* should reason about no big ts *)
+            * admit. (* memory no_msgs *)
+            * admit. (* memory read *)
+          + econs 3; ss.
+        - econs; ss; cycle 1.
+          { destruct ex; ss. }
+          econs; ss.
+          + admit. (* sim_state *)
+          + admit. (* sim_lc *)
+      }
+      { (* read from new msg. *)
+        admit.
+      }
     - (* fulfill *)
       admit.
     - (* write_failure *)
