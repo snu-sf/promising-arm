@@ -367,15 +367,15 @@ Proof.
 Qed.
 
 Lemma certify_lift_diff
-      tid (eu1 eu2:ExecUnit.t (A:=unit)) locks msg
-      (CERTIFY: certify tid eu2 locks)
+      tid (eu1 eu2:ExecUnit.t (A:=unit)) lock msg
+      (CERTIFY: certify tid eu2 lock)
       (WF: ExecUnit.wf tid eu1)
       (ST: eu2.(ExecUnit.state) = eu1.(ExecUnit.state))
       (LC: eu2.(ExecUnit.local) = eu1.(ExecUnit.local))
       (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
       (MSG: msg.(Msg.tid) <> tid):
-  <<CERTIFY: certify tid eu1 locks>> /\
-  <<NOLOCK: forall lock (LOCK: locks lock), ~ (lock.(Lock.loc) = msg.(Msg.loc) /\ lock.(Lock.from) = 0)>>.
+  <<CERTIFY: certify tid eu1 lock>> /\
+  <<NOLOCK: ~ Lock.is_locked lock bot msg.(Msg.loc)>>.
 Proof.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
@@ -401,6 +401,9 @@ Proof.
   - econs; eauto.
     + inv SIM. inv EU. inv LOCAL. etrans; eauto.
     + inv SIM. congr.
-  - ii. des. destruct lock as [loc from to guarantee]. ss. subst.
-    inv LOCK. ss. inv SIM. eapply AUX_FORBID. econs; cycle 1; eauto.
+    + inv SIM. congr.
+  - intro X. inv X. destruct exlock as [loc from to]. ss. subst.
+    des. inv RANGE.
+    rewrite EX in LOCK. inv LOCK. ss.
+    inv SIM. eapply AUX_FORBID. econs; cycle 1; eauto.
 Admitted.

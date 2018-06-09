@@ -68,12 +68,12 @@ Proof.
 Admitted.
 
 Lemma rtc_state_step_certify_inv
-      m1 m2 tid st lc l
+      m1 m2 tid st lc lock
       (STEPS: rtc (Machine.step ExecUnit.state_step) m1 m2)
       (NOPROMISE: Machine.no_promise m2)
       (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st, lc))
-      (CERTIFY: certify tid (ExecUnit.mk st lc m1.(Machine.mem)) l):
-  l = bot.
+      (CERTIFY: certify tid (ExecUnit.mk st lc m1.(Machine.mem)) lock):
+  lock = Lock.init.
 Proof.
 Admitted.
 

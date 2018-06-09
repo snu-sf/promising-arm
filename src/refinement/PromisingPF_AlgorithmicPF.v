@@ -73,7 +73,7 @@ Lemma rtc_state_step_certify_bot
       (WF: Machine.wf m1)
       (NOPROMISE: Machine.no_promise m2)
       (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st, lc)):
-  certify tid (ExecUnit.mk st lc m1.(Machine.mem)) bot.
+  certify tid (ExecUnit.mk st lc m1.(Machine.mem)) Lock.init.
 Proof.
   revert tid st lc FIND NOPROMISE. induction STEPS.
   { econs; eauto; ss.

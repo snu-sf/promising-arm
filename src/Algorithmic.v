@@ -22,34 +22,48 @@ Set Implicit Arguments.
 
 
 Module Lock.
-  Inductive t := mk {
+  Inductive ex_t := mk_ex {
     loc: Loc.t;
     from: nat;
     to: nat;
-    guarantee: Loc.t -> nat;
   }.
-  Hint Constructors t.
+  Hint Constructors ex.
 
-  Inductive is_final (locks: Lock.t -> Prop) (c: Loc.t -> nat): Prop :=
+  Inductive t := mk {
+    ex: ex_t -> Prop;
+    release: (Loc.t * nat) -> Loc.t -> nat;
+  }.
+
+  Definition init: t := mk bot bot.
+
+  Inductive is_locked (lock:t) (c:Loc.t -> nat) (l:Loc.t): Prop :=
+  | is_locked_intro
+      exlock
+      (LOCK: lock.(ex) exlock)
+      (LOC: l = exlock.(loc))
+      (RANGE: exlock.(from) <= c l /\ c l < exlock.(to))
+  .
+
+  Inductive is_final (lock:t) (c:Loc.t -> nat): Prop :=
   | is_final_intro
-      (LOCK: forall lock (LOCK: locks lock), lock.(to) <= (c lock.(loc)))
+      (LOCK: forall exlock (LOCK: lock.(ex) exlock), exlock.(to) <= (c exlock.(loc)))
   .
 End Lock.
 
 Module Taint.
   Inductive elt :=
   | R (id:nat) (from:nat)
-  | W (id:nat) (to:nat) (loc:Loc.t) (guarantee:Loc.t -> nat)
+  | W (id:nat) (to:nat) (loc:Loc.t)
   .
   Hint Constructors elt.
 
   Definition t := elt -> Prop.
 
-  Inductive is_locked (taint:t) (lock:Lock.t): Prop :=
+  Inductive is_locked (taint:t) (lock:Lock.ex_t): Prop :=
   | is_locked_intro
       id
       (R: taint (R id lock.(Lock.from)))
-      (W: taint (W id lock.(Lock.to) lock.(Lock.loc) lock.(Lock.guarantee)))
+      (W: taint (W id lock.(Lock.to) lock.(Lock.loc)))
   .
   Hint Constructors is_locked.
 End Taint.
@@ -59,6 +73,7 @@ Module AExecUnit.
     ex_counter: nat;
     st_counter: Loc.t -> nat;
     taint: Taint.t;
+    release: (Loc.t * nat) -> Loc.t -> nat;
   }.
   Hint Constructors aux_t.
 
@@ -89,11 +104,13 @@ Module AExecUnit.
         (S aux.(ex_counter))
         aux.(st_counter)
         aux.(taint)
+        aux.(release)
     | Event.write _ _ vloc _ res =>
       mk_aux
         aux.(ex_counter)
         aux.(st_counter)
         (join aux.(taint) res.(ValA.annot).(View.annot))
+        aux.(release)
     | _ =>
       aux
     end.
@@ -110,7 +127,7 @@ Module AExecUnit.
   Hint Constructors state_step.
 
   Definition taint_write (ord:OrdW.t) (loc:Loc.t) (aux:aux_t): Taint.elt :=
-    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc (ifc (OrdW.ge ord OrdW.release) aux.(st_counter)).
+    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc.
 
   Definition taint_write_res (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
     if negb ex
@@ -142,11 +159,14 @@ Module AExecUnit.
         lc.(Local.exbank)
         lc.(Local.promises).
 
-  Definition write_step_aux (loc:Loc.t) (aux:aux_t): aux_t :=
+  Definition write_step_aux (loc:Loc.t) (ord:OrdW.t) (aux:aux_t): aux_t :=
     mk_aux
       aux.(ex_counter)
       (fun_add loc (S (aux.(st_counter) loc)) aux.(st_counter))
-      aux.(taint).
+      aux.(taint)
+      (if OrdW.ge ord OrdW.release
+       then fun_add (loc, S (aux.(st_counter) loc)) aux.(st_counter) aux.(release)
+       else aux.(release)).
 
   Inductive write_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | write_step_intro
@@ -156,7 +176,7 @@ Module AExecUnit.
       (LOCAL1: Local.promise vloc.(ValA.val) vval.(ValA.val) tid aeu1.(ExecUnit.local) aeu1.(ExecUnit.mem) lc1 aeu2.(ExecUnit.mem))
       (LOCAL2: Local.fulfill ex ord vloc vval res1 tid lc1 aeu2.(ExecUnit.mem) lc2)
       (LOCAL3: aeu2.(ExecUnit.local) = taint_write_lc aeu2.(aux) ex ord vloc.(ValA.val) lc2)
-      (AUX: aeu2.(aux) = write_step_aux vloc.(ValA.val) aeu1.(aux))
+      (AUX: aeu2.(aux) = write_step_aux vloc.(ValA.val) ord aeu1.(aux))
   .
   Hint Constructors write_step.
 
@@ -185,7 +205,7 @@ Module AExecUnit.
       lc.(Local.exbank)
       lc.(Local.promises).
 
-  Definition init_aux: aux_t := mk_aux 0 (fun _ => 0) bot.
+  Definition init_aux: aux_t := mk_aux 0 (fun _ => 0) bot bot.
 
   Definition init_rmap (rmap:RMap.t (A:=View.t (A:=unit))): RMap.t (A:=View.t (A:=Taint.t)) :=
     IdMap.map (fun vala => ValA.mk _ vala.(ValA.val) (init_view vala.(ValA.annot))) rmap.
@@ -200,12 +220,14 @@ Module AExecUnit.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.
 
-Inductive certify (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (locks:Lock.t -> Prop): Prop :=
+Inductive certify
+          (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (lock:Lock.t): Prop :=
 | certify_intro
     aeu
     (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
-    (LOCKS: locks = Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
+    (EX: lock.(Lock.ex) = Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
+    (RELEASE: lock.(Lock.release) = aeu.(AExecUnit.aux).(AExecUnit.release))
 .
 Hint Constructors certify.
 
@@ -213,7 +235,7 @@ Lemma wf_certify
       tid (eu:ExecUnit.t (A:=unit))
       (PROMISES: eu.(ExecUnit.local).(Local.promises) = bot)
       (WF: ExecUnit.wf tid eu):
-  certify tid eu bot.
+  certify tid eu Lock.init.
 Proof.
   econs; eauto. s. funext. i. propext. econs; ss.
   intro X. inv X. inv R.
@@ -222,7 +244,7 @@ Qed.
 Module AMachine.
   Inductive t := mk {
     machine: Machine.t;
-    tlocks: IdMap.t (Lock.t -> Prop);
+    tlocks: IdMap.t Lock.t;
   }.
   Hint Constructors t.
   Coercion machine: t >-> Machine.t.
@@ -230,9 +252,9 @@ Module AMachine.
   Definition init (p:program): t :=
     mk
       (Machine.init p)
-      (IdMap.map (fun _ => bot) p).
+      (IdMap.map (fun _ => Lock.init) p).
 
-  Inductive consistent (am: IdMap.t ((Lock.t -> Prop) * (Loc.t -> nat))): Prop :=
+  Inductive consistent (am: IdMap.t (Lock.t * (Loc.t -> nat))): Prop :=
   | consistent_final
       (FINAL: IdMap.Forall (fun _ th => Lock.is_final th.(fst) th.(snd)) am)
   | consistent_step
