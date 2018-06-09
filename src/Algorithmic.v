@@ -212,7 +212,7 @@ Hint Constructors certify.
 Lemma wf_certify
       tid (eu:ExecUnit.t (A:=unit))
       (PROMISES: eu.(ExecUnit.local).(Local.promises) = bot)
-      (WF: ExecUnit.wf eu):
+      (WF: ExecUnit.wf tid eu):
   certify tid eu bot.
 Proof.
   econs; eauto. s. funext. i. propext. econs; ss.

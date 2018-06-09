@@ -369,7 +369,7 @@ Qed.
 Lemma certify_lift_diff
       tid (eu1 eu2:ExecUnit.t (A:=unit)) locks msg
       (CERTIFY: certify tid eu2 locks)
-      (WF: ExecUnit.wf eu1)
+      (WF: ExecUnit.wf tid eu1)
       (ST: eu2.(ExecUnit.state) = eu1.(ExecUnit.state))
       (LC: eu2.(ExecUnit.local) = eu1.(ExecUnit.local))
       (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
