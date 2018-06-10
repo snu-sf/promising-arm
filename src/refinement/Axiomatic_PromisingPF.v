@@ -732,7 +732,7 @@ Lemma label_write_mem_of_ex
       (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)):
   exists n,
     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
-    <<READ: Memory.read (S n) loc (mem_of_ex ex ob) = Some val>> /\
+    <<READ: Memory.read loc (S n) (mem_of_ex ex ob) = Some val>> /\
     <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val eid.(fst))>>.
 Proof.
   exploit label_write_mem_of_ex_msg; eauto. i. des.

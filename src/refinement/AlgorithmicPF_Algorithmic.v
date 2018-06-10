@@ -40,7 +40,7 @@ Theorem algorithmic_pf_to_algorithmic
   AMachine.exec p m.
 Proof.
   inv EXEC. econs; cycle 1; ss.
-  { instantiate (1 := AMachine.mk m (IdMap.map (fun _ => bot) p)). ss. }
+  { instantiate (1 := AMachine.mk m (IdMap.map (fun _ => Lock.init) m.(Machine.tpool))). ss. }
   etrans.
   { eapply AMachine.rtc_step_mon; cycle 1; eauto. right. ss. }
   admit. (* use rtc_state_step_certify_inv *)

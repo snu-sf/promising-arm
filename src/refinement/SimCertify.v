@@ -60,7 +60,14 @@ Inductive sim_state (ts:Time.t) (forbid:Taint.t) (st1 st2:State.t (A:=View.t (A:
 .
 Hint Constructors sim_state.
 
-Inductive sim_lc (ts:Time.t) (forbid:Taint.t) (lc1 lc2:Local.t (A:=Taint.t)): Prop :=
+Inductive sim_exbank (tid:Id.t) (mem1 mem2:Memory.t) (ts1 ts2:Time.t): Prop :=
+| sim_exbank_intro
+    (EXBANK: forall loc,
+        Memory.exclusive tid loc ts2 (length mem2) mem2 ->
+        Memory.exclusive tid loc ts1 (length mem1) mem1)
+.
+
+Inductive sim_lc (tid:Id.t) (ts:Time.t) (forbid:Taint.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem2:Memory.t): Prop :=
 | sim_lc_intro
     (COH: forall loc, sim_time ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
     (VRP: sim_view ts forbid lc1.(Local.vrp) lc2.(Local.vrp))
@@ -77,9 +84,7 @@ Inductive sim_lc (ts:Time.t) (forbid:Taint.t) (lc1 lc2:Local.t (A:=Taint.t)): Pr
               sim_view ts forbid fwd1.(FwdItem.view) fwd2.(FwdItem.view) /\
               fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex)))
           (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
-    (EXBANK: opt_rel
-               (fun exbank1 exbank2 => True)
-               lc1.(Local.exbank) lc2.(Local.exbank))
+    (EXBANK: opt_rel (sim_exbank tid mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
     (PROMISES: lc1.(Local.promises) = lc2.(Local.promises))
     (PROMISES_TS: forall mid (FIND: Promises.lookup mid lc1.(Local.promises)), mid <= ts)
 .
@@ -101,7 +106,7 @@ Hint Constructors sim_mem.
 Inductive sim_eu (tid:Id.t) (ts:Time.t) (forbid:Taint.t) (eu1 eu2:ExecUnit.t (A:=Taint.t)): Prop :=
 | sim_eu_intro
     (STATE: sim_state ts forbid eu1.(ExecUnit.state) eu2.(ExecUnit.state))
-    (LOCAL: sim_lc ts forbid eu1.(ExecUnit.local) eu2.(ExecUnit.local))
+    (LOCAL: sim_lc tid ts forbid eu1.(ExecUnit.local) eu2.(ExecUnit.local) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
     (MEM: sim_mem tid ts forbid eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
 .
 Hint Constructors sim_eu.
@@ -393,7 +398,13 @@ Proof.
         * admit. (* TODO: bug on init vcap *)
         * i. destruct (Local.fwdbank lc1 loc); ss. econs; ss.
           splits; ss. apply sim_view_const.
-        * admit. (* TODO: bug on exbank rel *)
+        * destruct lc1. s. destruct exbank; ss. econs.
+          econs; eauto. ii. eapply H; eauto.
+          { apply Memory.read_mon. eauto. }
+          { rewrite app_length. lia. }
+          { exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
+            rewrite nth_error_app1; ss.
+          }
         * inv WF. inv LOCAL. ss.
     - ii. inv H. inv H0.
   }

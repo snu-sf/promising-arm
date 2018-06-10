@@ -50,7 +50,7 @@ Module Memory.
 
   Definition empty: t := [].
 
-  Definition read (ts:Time.t) (loc:Loc.t) (mem:t): option Val.t :=
+  Definition read (loc:Loc.t) (ts:Time.t) (mem:t): option Val.t :=
     match Time.pred_opt ts with
     | None => Some Val.default
     | Some ts =>
@@ -79,9 +79,16 @@ Module Memory.
       (MSG: List.nth_error mem ts = Some msg),
       ~ pred msg.
 
+  Definition latest (loc:Loc.t) (from to:Time.t) (mem:t): Prop :=
+    Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc) mem.
+
+  Definition exclusive (tid:Id.t) (loc:Loc.t) (from to:Time.t) (mem:t): Prop :=
+    forall val (READ: Memory.read loc from mem = Some val),
+      Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem.
+
   Lemma read_mon ts loc val mem1 mem2
-        (READ: Memory.read ts loc mem1 = Some val):
-    Memory.read ts loc (mem1 ++ mem2) = Some val.
+        (READ: Memory.read loc ts mem1 = Some val):
+    Memory.read loc ts (mem1 ++ mem2) = Some val.
   Proof.
     revert READ. unfold Memory.read. destruct (Time.pred_opt ts); ss.
     destruct (nth_error mem1 t0) eqn:NTH; ss.
@@ -395,8 +402,8 @@ Section Local.
       (VIEW: view = vloc.(ValA.annot))
       (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
-      (LATEST: Memory.no_msgs ts view_ext1.(View.ts) (fun msg => msg.(Msg.loc) = loc) mem1)
-      (MSG: Memory.read ts loc mem1 = Some val)
+      (LATEST: Memory.latest loc ts view_ext1.(View.ts) mem1)
+      (MSG: Memory.read loc ts mem1 = Some val)
       (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
                                               | None => View.mk ts bot
                                               | Some fwd => fwd.(FwdItem.read_view) ts ord
@@ -434,8 +441,7 @@ Section Local.
       (EXT: lt view_ext.(View.ts) ts)
       (EX: ex -> exists tsx,
            <<TSX: lc1.(exbank) = Some tsx>> /\
-           <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
-               Memory.no_msgs tsx ts (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem1>>)
+           <<EX: Memory.exclusive tid loc tsx ts mem1>>)
   .
   Hint Constructors writable.
 
@@ -705,7 +711,7 @@ Section ExecUnit.
 
   Lemma read_wf
         ts loc val mem
-        (READ: Memory.read ts loc mem = Some val):
+        (READ: Memory.read loc ts mem = Some val):
     ts <= List.length mem.
   Proof.
     revert READ. unfold Memory.read. destruct ts; [lia|]. s.
