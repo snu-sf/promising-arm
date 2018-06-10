@@ -89,11 +89,9 @@ Module AExecUnit.
     | Event.read ex ord vloc res =>
       Event.read
         ex ord vloc
-        (if ex
-         then (ValA.mk _ res.(ValA.val)
-                       (View.mk res.(ValA.annot).(View.ts)
-                                (join res.(ValA.annot).(View.annot) (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val)))))))
-         else res)
+        (ValA.mk _ res.(ValA.val)
+                   (View.mk res.(ValA.annot).(View.ts)
+                            (join res.(ValA.annot).(View.annot) (ifc ex (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val))))))))
     | _ => e
     end.
 
@@ -117,12 +115,9 @@ Module AExecUnit.
 
   Inductive state_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | state_step_intro
-      e1 e2
-      (STATE: State.step e2 aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
-      (LOCAL: Local.step e1 tid aeu1.(ExecUnit.mem) aeu1.(ExecUnit.local) aeu2.(eu).(ExecUnit.local))
-      (EVENT: e2 = taint_read_event aeu2.(aux) e1)
-      (MEM: aeu2.(ExecUnit.mem) = aeu1.(ExecUnit.mem))
-      (AUX: aeu2.(aux) = state_step_aux e1 aeu1.(aux))
+      e
+      (STEP: ExecUnit.state_step0 tid (taint_read_event aeu2.(aux) e) e aeu1 aeu2)
+      (AUX: aeu2.(aux) = state_step_aux e aeu1.(aux))
   .
   Hint Constructors state_step.
 
@@ -130,34 +125,29 @@ Module AExecUnit.
     Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc.
 
   Definition taint_write_res (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
-    if negb ex
-    then res
-    else ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join res.(ValA.annot).(View.annot) (eq (taint_write ord loc aux)))).
+    ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join res.(ValA.annot).(View.annot) (ifc ex (eq (taint_write ord loc aux))))).
 
   Definition taint_write_lc (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (lc: Local.t (A:=Taint.t)): Local.t (A:=Taint.t) :=
-    if negb ex
-    then lc
-    else
-      Local.mk
-        lc.(Local.coh)
-        lc.(Local.vrp)
-        lc.(Local.vwp)
-        lc.(Local.vrm)
-        lc.(Local.vwm)
-        lc.(Local.vcap)
-        lc.(Local.vrel)
-        (fun_add
-           loc
-           (option_map
-              (fun fwd => (FwdItem.mk
-                          fwd.(FwdItem.ts)
-                          (View.mk fwd.(FwdItem.view).(View.ts)
-                                   (join fwd.(FwdItem.view).(View.annot) (eq (taint_write ord loc aux))))
-                          fwd.(FwdItem.ex)))
-              (lc.(Local.fwdbank) loc))
-           lc.(Local.fwdbank))
-        lc.(Local.exbank)
-        lc.(Local.promises).
+    Local.mk
+      lc.(Local.coh)
+      lc.(Local.vrp)
+      lc.(Local.vwp)
+      lc.(Local.vrm)
+      lc.(Local.vwm)
+      lc.(Local.vcap)
+      lc.(Local.vrel)
+      (fun_add
+         loc
+         (option_map
+            (fun fwd => FwdItem.mk
+                       fwd.(FwdItem.ts)
+                       (View.mk fwd.(FwdItem.view).(View.ts)
+                                (join fwd.(FwdItem.view).(View.annot) (ifc ex (eq (taint_write ord loc aux)))))
+                       fwd.(FwdItem.ex))
+            (lc.(Local.fwdbank) loc))
+         lc.(Local.fwdbank))
+      lc.(Local.exbank)
+      lc.(Local.promises).
 
   Definition write_step_aux (loc:Loc.t) (ord:OrdW.t) (aux:aux_t): aux_t :=
     mk_aux
@@ -168,14 +158,38 @@ Module AExecUnit.
        then fun_add (loc, S (aux.(st_counter) loc)) aux.(st_counter) aux.(release)
        else aux.(release)).
 
+  Inductive local_write (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=Taint.t))) (tid:Id.t) (lc1:Local.t) (mem1:Memory.t) (aux:aux_t) (lc2:Local.t): Prop :=
+  | fulfill_intro
+      ts loc val
+      view_loc view_val view_ext
+      (LOC: loc = vloc.(ValA.val))
+      (VIEW_LOC: view_loc = vloc.(ValA.annot))
+      (VAL: val = vval.(ValA.val))
+      (VIEW_VAL: view_val = vval.(ValA.annot))
+      (TS: ts = S (length mem1))
+      (WRITABLE: Local.writable ex ord vloc vval tid lc1 mem1 ts view_ext)
+      (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) (ifc ex (eq (taint_write ord loc aux))))))
+      (LC2: lc2 =
+            Local.mk
+              (fun_add loc ts lc1.(Local.coh))
+              lc1.(Local.vrp)
+              lc1.(Local.vwp)
+              lc1.(Local.vrm)
+              (join lc1.(Local.vwm) (View.mk ts bot))
+              (join lc1.(Local.vcap) view_loc)
+              (join lc1.(Local.vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
+              (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(Local.fwdbank))
+              (if ex then None else lc1.(Local.exbank))
+              lc1.(Local.promises))
+  .
+  Hint Constructors local_write.
+
   Inductive write_step (tid:Id.t) (aeu1 aeu2:t): Prop :=
   | write_step_intro
-      ex ord vloc vval res1 res2 lc1 lc2
-      (RES: res2 = taint_write_res aeu1.(aux) ex ord vloc.(ValA.val) res1)
-      (STATE: State.step (Event.write ex ord vloc vval res2) aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
-      (LOCAL1: Local.promise vloc.(ValA.val) vval.(ValA.val) tid aeu1.(ExecUnit.local) aeu1.(ExecUnit.mem) lc1 aeu2.(ExecUnit.mem))
-      (LOCAL2: Local.fulfill ex ord vloc vval res1 tid lc1 aeu2.(ExecUnit.mem) lc2)
-      (LOCAL3: aeu2.(ExecUnit.local) = taint_write_lc aeu2.(aux) ex ord vloc.(ValA.val) lc2)
+      ex ord vloc vval res
+      (STATE: State.step (Event.write ex ord vloc vval res) aeu1.(ExecUnit.state) aeu2.(ExecUnit.state))
+      (LOCAL: local_write ex ord vloc vval res tid aeu1.(ExecUnit.local) aeu1.(ExecUnit.mem) aeu1.(aux) aeu2.(ExecUnit.local))
+      (MEM: aeu2.(ExecUnit.mem) = aeu1.(ExecUnit.mem) ++ [Msg.mk vloc.(ValA.val) vval.(ValA.val) tid])
       (AUX: aeu2.(aux) = write_step_aux vloc.(ValA.val) ord aeu1.(aux))
   .
   Hint Constructors write_step.
@@ -217,6 +231,68 @@ Module AExecUnit.
     mk
       (ExecUnit.mk (init_st eu.(ExecUnit.state)) (init_lc eu.(ExecUnit.local)) eu.(ExecUnit.mem))
       init_aux.
+
+  Lemma taint_read_event_eqts aux e:
+    ExecUnit.eqts_event (taint_read_event aux e) e.
+  Proof.
+    destruct e; try refl.
+    econs; ss.
+  Qed.
+
+  Lemma state_step_wf
+        tid aeu1 aeu2
+        (STEP: state_step tid aeu1 aeu2)
+        (WF: ExecUnit.wf tid aeu1):
+    ExecUnit.wf tid aeu2.
+  Proof.
+    inv STEP.
+    eapply ExecUnit.state_step0_wf in STEP0; ss.
+    apply taint_read_event_eqts.
+  Qed.
+
+  Lemma write_step_wf
+        tid aeu1 aeu2
+        (STEP: write_step tid aeu1 aeu2)
+        (WF: ExecUnit.wf tid aeu1):
+    ExecUnit.wf tid aeu2.
+  Proof.
+    destruct aeu1 as [[st1 lc1 mem1] aux1].
+    destruct aeu2 as [[st2 lc2 mem2] aux2].
+    inv STEP. ss. subst.
+    inv STATE. inv LOCAL. inv WRITABLE. inv WF. econs; ss.
+    - apply ExecUnit.rmap_add_wf; viewtac.
+      inv STATE. econs. i. rewrite app_length. s.
+      rewrite RMAP. intuition.
+    - inv LOCAL. econs; ss.
+      all: try rewrite app_length; s.
+      all: viewtac; intuition.
+      + rewrite fun_add_spec. condtac; intuition.
+      + rewrite ExecUnit.expr_wf; eauto. intuition.
+      + revert H. rewrite fun_add_spec. condtac.
+        * inversion e. i. inv H0. s. intuition.
+        * i. exploit FWDBANK; eauto. i. des. intuition.
+      + revert H. rewrite fun_add_spec. condtac.
+        * inversion e. i. inv H0. s. apply join_spec.
+          { rewrite ExecUnit.expr_wf; eauto. intuition. }
+          { rewrite ExecUnit.expr_wf; eauto. intuition. }
+        * i. exploit FWDBANK; eauto. i. des. intuition.
+      + destruct ex; ss. rewrite EXBANK; ss. intuition.
+      + apply Memory.get_msg_snoc_inv in MSG.
+        revert TS. rewrite fun_add_spec. condtac.
+        { i. des; intuition. }
+        des.
+        * eapply PROMISES0; eauto.
+        * subst. ss. congr.
+  Qed.      
+
+  Lemma step_wf
+        tid aeu1 aeu2
+        (STEP: step tid aeu1 aeu2)
+        (WF: ExecUnit.wf tid aeu1):
+    ExecUnit.wf tid aeu2.
+  Proof.
+    inv STEP; eauto using state_step_wf, write_step_wf.
+  Qed.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.
 
@@ -309,7 +385,7 @@ Module AMachine.
     - eapply Machine.step_state_step_wf; eauto.
     - rewrite TPOOL, TLOCKS. ii. rewrite ? IdMap.add_spec. condtac.
       + inversion e. eauto.
-      + inv STEP0. ss. rewrite MEM. eauto.
+      + inv STEP0. inv STEP. ss. rewrite MEM. eauto.
   Qed.
 
   Lemma step_promise_step_wf

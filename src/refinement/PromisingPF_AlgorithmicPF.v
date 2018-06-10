@@ -34,10 +34,10 @@ Proof.
   destruct aeu2 as [[st2 lc2 mem2] aux2].
   ss. inv STEP.
   - (* state_step *)
-    inv STEP0. ss. subst. inv LOCAL.
+    inv STEP0. inv STEP. ss. subst. inv LOCAL.
     + inv LC. eauto.
     + inv STEP. ss. destruct ex; ss.
-    + inv WF. ss. inv LOCAL. inv STEP. ss.
+    + inv WF. ss. inv LOCAL. inv STEP. inv WRITABLE. ss.
       exploit PROMISES0; eauto. rewrite NOPROMISE, Promises.lookup_bot. ss.
     + inv STEP. ss. esplits; ss.
       funext. i. propext. econs; i.
@@ -48,8 +48,9 @@ Proof.
     + inv STEP. ss.
     + inv STEP. ss.
   - (* write step *)
-    admit.
-Admitted.
+    inv STEP0. ss. subst.
+    inv LOCAL. ss.
+Qed.
 
 Lemma no_promise_steps
       tid aeu1 aeu2
@@ -62,10 +63,10 @@ Proof.
   revert NOPROMISE. induction STEPS; ss. i.
   exploit no_promise_step; eauto. i. des.
   exploit IHSTEPS; eauto.
-  { admit. (* ExecUnit.wf after aeu step *) }
+  { eapply AExecUnit.step_wf; eauto. }
   i. des.
   esplits; ss. etrans; eauto.
-Admitted.
+Qed.
 
 Lemma rtc_state_step_certify_bot
       m1 m2 tid st lc

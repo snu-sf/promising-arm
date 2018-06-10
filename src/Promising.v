@@ -187,6 +187,16 @@ Section View.
   Lemma ts_bot:
     bot.(View.ts) = bot.
   Proof. ss. Qed.
+
+  Inductive eqts (v1 v2:t): Prop :=
+  | eqts_intro
+      (TS: v1.(ts) = v2.(ts))
+  .
+  Hint Constructors eqts.
+
+  Global Program Instance eqts_equiv: Equivalence eqts.
+  Next Obligation. econs. inv H1. ss. Qed.
+  Next Obligation. econs. inv H1. inv H2. etrans; eauto. Qed.
 End View.
 End View.
 
@@ -205,6 +215,19 @@ Section FwdItem.
     if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (negb (OrdR.ge ord OrdR.acquire_pc)))
     then fwd.(view)
     else View.mk tsx bot.
+
+  Inductive eqts (fwd1 fwd2:t): Prop :=
+  | eqts_intro
+      (TS: fwd1.(ts) = fwd2.(ts))
+      (VIEW: View.eqts fwd1.(view) fwd2.(view))
+      (EX: fwd1.(ex) = fwd2.(ex))
+  .
+  Hint Constructors eqts.
+
+  Global Program Instance eqts_equiv: Equivalence eqts.
+  Next Obligation. econs; ss. Qed.
+  Next Obligation. ii. destruct x, y. inv H1. ss. subst. econs; ss. symmetry. ss. Qed.
+  Next Obligation. ii. destruct x, y, z. inv H1. inv H2. ss. subst. econs; ss. etrans; eauto. Qed.
 End FwdItem.
 End FwdItem.
 
@@ -364,7 +387,7 @@ Section Local.
   .
   Hint Constructors internal.
 
-  Inductive read (ex:bool) (ord:OrdR.t) (vloc:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       ts loc val view
       view_ext1 view_ext2
@@ -394,10 +417,10 @@ Section Local.
   .
   Hint Constructors read.
 
-  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=View.t)) (vval:ValA.t (A:=View.t)) (res: ValA.t (A:=View.t)) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
-  | fulfill_intro
-      ts loc val
-      view_loc view_val view_ext
+  Inductive writable (ex:bool) (ord:OrdW.t) (vloc vval:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (ts:Time.t) (view_ext:View.t (A:=A)): Prop :=
+  | writable_intro
+      loc val
+      view_loc view_val
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
       (VAL: val = vval.(ValA.val))
@@ -413,6 +436,18 @@ Section Local.
            <<TSX: lc1.(exbank) = Some tsx>> /\
            <<LATEST: forall valx (READ: Memory.read tsx loc mem1 = Some valx),
                Memory.no_msgs tsx ts (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem1>>)
+  .
+  Hint Constructors writable.
+
+  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  | fulfill_intro
+      ts loc val
+      view_loc view_val view_ext
+      (LOC: loc = vloc.(ValA.val))
+      (VIEW_LOC: view_loc = vloc.(ValA.annot))
+      (VAL: val = vval.(ValA.val))
+      (VIEW_VAL: view_val = vval.(ValA.annot))
+      (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_ext)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
       (RES: res = ValA.mk _ 0 (View.mk bot view_ext.(View.annot)))
       (LC2: lc2 =
@@ -430,7 +465,7 @@ Section Local.
   .
   Hint Constructors fulfill.
 
-  Inductive write_failure (ex:bool) (res: ValA.t (A:=View.t)) (lc1:t) (lc2:t): Prop :=
+  Inductive write_failure (ex:bool) (res: ValA.t (A:=View.t (A:=A))) (lc1:t) (lc2:t): Prop :=
   | write_failure_intro
       (EX: ex)
       (RES: res = ValA.mk _ 1 bot)
@@ -517,7 +552,7 @@ Section Local.
   .
   Hint Constructors dmbsy.
 
-  Inductive step (event:Event.t (A:=View.t)) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
+  Inductive step (event:Event.t (A:=View.t (A:=A))) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
   | step_internal
       ctrl
       (EVENT: event = (Event.internal ctrl))
@@ -608,12 +643,18 @@ Section ExecUnit.
   }.
   Hint Constructors t.
 
+  Inductive state_step0 (tid:Id.t) (e1 e2:Event.t (A:=View.t (A:=A))) (eu1 eu2:t): Prop :=
+  | state_step0_intro
+      (STATE: State.step e1 eu1.(state) eu2.(state))
+      (LOCAL: Local.step e2 tid eu1.(mem) eu1.(local) eu2.(local))
+      (MEM: eu2.(mem) = eu1.(mem))
+  .
+  Hint Constructors state_step0.
+
   Inductive state_step (tid:Id.t) (eu1 eu2:t): Prop :=
   | state_step_intro
       e
-      (STATE: State.step e eu1.(state) eu2.(state))
-      (LOCAL: Local.step e tid eu1.(mem) eu1.(local) eu2.(local))
-      (MEM: eu2.(mem) = eu1.(mem))
+      (STEP: state_step0 tid e e eu1 eu2)
   .
   Hint Constructors state_step.
 
@@ -631,7 +672,7 @@ Section ExecUnit.
   .
   Hint Constructors step.
 
-  Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t)): Prop :=
+  Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t (A:=A))): Prop :=
   | rmap_wf_intro
       (RMAP: forall r, (RMap.find r rmap).(ValA.annot).(View.ts) <= List.length mem)
   .
@@ -645,7 +686,7 @@ Section ExecUnit.
   Hint Constructors wf.
 
   Lemma rmap_add_wf
-        mem rmap loc val
+        mem rmap loc (val:ValA.t (A:=View.t (A:=A)))
         (WF: rmap_wf mem rmap)
         (VAL: val.(ValA.annot).(View.ts) <= List.length mem):
     rmap_wf mem (RMap.add loc val rmap).
@@ -682,8 +723,53 @@ Section ExecUnit.
     eapply List.nth_error_Some. congr.
   Qed.
 
-  Lemma state_step_wf tid eu1 eu2
-        (STEP: state_step tid eu1 eu2)
+  Inductive eqts_val (v1 v2:ValA.t (A:=View.t (A:=A))): Prop :=
+  | eqts_val_intro
+      (VAL: v1.(ValA.val) = v2.(ValA.val))
+      (VIEW: View.eqts v1.(ValA.annot) v2.(ValA.annot))
+  .
+  Hint Constructors eqts_val.
+
+  Global Program Instance eqts_val_equiv: Equivalence eqts_val.
+  Next Obligation. econs; ss. Qed.
+  Next Obligation. ii. destruct x, y. inv H1. ss. subst. econs; ss. symmetry. ss. Qed.
+  Next Obligation. ii. destruct x, y, z. inv H1. inv H2. ss. subst. econs; ss. etrans; eauto. Qed.
+
+  Inductive eqts_event: forall (e1 e2:Event.t (A:=View.t (A:=A))), Prop :=
+  | eqts_event_internal
+      ctrl:
+      eqts_event (Event.internal ctrl) (Event.internal ctrl)
+  | eqts_event_read
+      ex ord vloc1 vloc2 res1 res2
+      (VLOC: eqts_val vloc1 vloc2)
+      (RES: eqts_val res1 res2):
+      eqts_event (Event.read ex ord vloc1 res1) (Event.read ex ord vloc2 res2)
+  | eqts_event_write
+      ex ord vloc1 vloc2 vval1 vval2 res1 res2
+      (VLOC: eqts_val vloc1 vloc2)
+      (VVAL: eqts_val vval1 vval2)
+      (RES: eqts_val res1 res2):
+      eqts_event (Event.write ex ord vloc1 vval1 res1) (Event.write ex ord vloc2 vval2 res2)
+  | eqts_event_barrier
+      b:
+      eqts_event (Event.barrier b) (Event.barrier b)
+  .
+  Hint Constructors eqts_event.
+
+  Global Program Instance eqts_event_equiv: Equivalence eqts_event.
+  Next Obligation. ii. destruct x; econs; ss. Qed.
+  Next Obligation.
+    ii. inv H1; econs; ss.
+    all: symmetry; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H1; inv H2; econs; ss.
+    all: etrans; eauto.
+  Qed.
+
+  Lemma state_step0_wf tid e1 e2 eu1 eu2
+        (STEP: state_step0 tid e1 e2 eu1 eu2)
+        (EVENT: eqts_event e1 e2)
         (WF: wf tid eu1):
     wf tid eu2.
   Proof.
@@ -708,41 +794,54 @@ Section ExecUnit.
     - inv LC. econs; ss.
       + eauto using rmap_add_wf, expr_wf.
       + econs; viewtac.
-    - inv STEP. econs; ss.
+    - inv RES. inv VIEW. inv VLOC. inv VIEW.
+      inv STEP. ss. subst.
+      econs; ss.
       + apply rmap_add_wf; viewtac.
+        rewrite TS, <- TS0. viewtac.
         * eauto using expr_wf.
         * apply FWD. eauto using read_wf.
       + econs; viewtac; eauto using expr_wf.
+        all: try by rewrite <- TS0; eauto using expr_wf.
+        all: try by apply FWD; eauto using read_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
-        * apply FWD. eauto using read_wf.
-        * apply FWD. eauto using read_wf.
-        * apply FWD. eauto using read_wf.
         * destruct ex0; ss. i. inv H1. eapply read_wf. eauto.
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
           rewrite fun_add_spec. condtac; ss. inversion e. ss.
-    - inv STEP. econs; ss.
+    - inv RES. inv VIEW. inv VVAL. inv VIEW. inv VLOC. inv VIEW.
+      inv STEP. inv WRITABLE. econs; ss.
       + apply rmap_add_wf; viewtac.
-      + econs; viewtac; eauto using get_msg_wf, expr_wf.
+        rewrite TS. apply bot_spec.
+      + econs; viewtac; rewrite <- ? TS0, <- ? TS1; eauto using get_msg_wf, expr_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
         * i. revert H1. rewrite fun_add_spec. condtac; viewtac.
-          i. inv H1. s. splits; viewtac; eauto using get_msg_wf, expr_wf.
+          i. inv H1. s. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
         * destruct ex0; ss.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
-        * i. rewrite Promises.unset_o. rewrite fun_add_spec in TS. condtac.
+        * i. rewrite Promises.unset_o. rewrite fun_add_spec in TS2. condtac.
           { inversion e. subst. rewrite MSG in MSG0. destruct msg. inv MSG0. ss.
-            revert TS. condtac; intuition.
+            revert TS2. condtac; intuition.
           }
-          { eapply PROMISES0; eauto. revert TS. condtac; ss. i.
+          { eapply PROMISES0; eauto. revert TS2. condtac; ss. i.
             inversion e. rewrite COH0. ss.
           }
     - inv STEP. econs; ss. apply rmap_add_wf; viewtac.
+      inv RES. inv VIEW. rewrite TS. s. apply bot_spec.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv LC. econs; ss. econs; viewtac. eauto using expr_wf.
     - inv LC. econs; ss. econs; viewtac.
+  Qed.
+
+  Lemma state_step_wf tid eu1 eu2
+        (STEP: state_step tid eu1 eu2)
+        (WF: wf tid eu1):
+    wf tid eu2.
+  Proof.
+    inv STEP. eapply state_step0_wf; eauto. refl.
   Qed.
 
   Lemma rmap_append_wf
@@ -782,7 +881,9 @@ Section ExecUnit.
         (WF: wf tid eu1):
     wf tid eu2.
   Proof.
-    inv STEP; eauto using state_step_wf, promise_step_wf.
+    inv STEP.
+    - eapply state_step_wf; eauto.
+    - eapply promise_step_wf; eauto.
   Qed.
 End ExecUnit.
 End ExecUnit.
@@ -897,7 +998,7 @@ Module Machine.
     i. revert FIND0. rewrite IdMap.add_spec. condtac.
     - inversion e0. i. inv FIND0.
       eapply ExecUnit.state_step_wf; eauto. econs; eauto.
-    - i. exploit WF0; eauto.
+    - inv STEP. ss. i. subst. exploit WF0; eauto.
   Qed.
 
   Lemma step_promise_step_wf

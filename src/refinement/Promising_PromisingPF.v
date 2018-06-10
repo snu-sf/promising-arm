@@ -37,12 +37,12 @@ Proof.
   revert FIND0. rewrite IdMap.add_spec. condtac.
   - (* same thread *)
     inversion e. i. inv FIND0.
-    inv STEP. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
+    inv STEP. inv STEP0. inv STEP1. inv LOCAL. inv MEM2. ss. subst.
     eexists (Machine.mk _ _). esplits.
     + econs; eauto; ss. econs; ss. econs; ss.
     + econs; ss.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|congr]. eauto.
-      * econs; eauto; ss.
+      * econs. econs; eauto; ss.
         instantiate (1 :=
                        Local.mk
                          lc0.(Local.coh)
@@ -55,7 +55,7 @@ Proof.
                          lc0.(Local.fwdbank)
                          lc0.(Local.exbank)
                          (Promises.set (S (length mem1)) lc0.(Local.promises))).
-        inv LOCAL.
+        inv LOCAL0.
         { econs 1; eauto. inv LC. econs; ss. }
         { econs 2; eauto. inv STEP. ss.
           exploit ExecUnit.read_wf; try exact MSG. i.
@@ -65,13 +65,14 @@ Proof.
             eapply lt_le_trans; eauto.
             inv WF. exploit WF0; eauto. i. inv x. ss. inv LOCAL.
             repeat apply join_spec; viewtac.
-            inv STATE. apply ExecUnit.expr_wf. ss.
+            inv STATE0. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }
-        { econs 3; eauto. inv STEP. ss.
+        { econs 3; eauto. inv STEP. inv WRITABLE. ss.
           exploit ExecUnit.get_msg_wf; try exact MSG. i.
           econs; eauto; ss.
-          - i. exploit EX; eauto. i. des.
+          - econs; eauto.
+            i. exploit EX; eauto. i. des.
             esplits; eauto. ii.
             rewrite nth_error_app1 in MSG0; [|lia].
             eapply LATEST; eauto.
@@ -79,6 +80,7 @@ Proof.
             rewrite nth_error_app1; [|lia]. ss.
           - rewrite <- MSG. unfold Memory.get_msg. destruct ts; ss.
             rewrite nth_error_app1; [|lia]. ss.
+          - ss.
           - f_equal. apply Promises.set_unset.
             ii. subst. lia.
         }
@@ -89,13 +91,13 @@ Proof.
         { econs 8; eauto. inv STEP. econs; eauto. }
       * rewrite ? IdMap.add_add. eauto.
   - (* diff thread *)
-    inv STEP. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
+    inv STEP. inv STEP1. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
     eexists (Machine.mk _ _). esplits.
     + econs; eauto; ss. econs; ss. econs; ss.
     + econs; ss.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|by eauto].
         inversion e0. subst. congr.
-      * econs; eauto; ss.
+      * econs. econs; eauto; ss.
         inv LOCAL.
         { econs 1; eauto. }
         { econs 2; eauto. inv STEP. econs; eauto.
@@ -109,8 +111,9 @@ Proof.
             inv STATE. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }
-        { econs 3; eauto. inv STEP. econs; eauto.
-          - i. exploit EX; eauto. i. des. esplits; eauto.
+        { econs 3; eauto. inv STEP. inv WRITABLE. econs; eauto.
+          - econs; ss.
+            i. exploit EX; eauto. i. des. esplits; eauto.
             exploit ExecUnit.get_msg_wf; eauto. i.
             ii. des. rewrite nth_error_app1 in MSG0; [|lia].
             eapply LATEST; eauto.

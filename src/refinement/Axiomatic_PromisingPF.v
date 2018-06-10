@@ -924,7 +924,7 @@ Proof.
     { apply sim_view_join; ss. }
 
     eexists (ExecUnit.mk _ _ _). esplits.
-    + econs; ss.
+    + econs. econs; ss.
       { econs; ss. }
       econs 2; ss. econs; eauto.
       * (* internal *)
@@ -1074,12 +1074,13 @@ Proof.
     exploit sim_rmap_expr; eauto. instantiate (1 := eloc). intro X. inv X.
     exploit sim_rmap_expr; eauto. instantiate (1 := eval). intro X. inv X.
     eexists (ExecUnit.mk _ _ _). esplits.
-    + econs; ss.
+    + econs. econs; ss.
       { econs; ss. }
       econs 3; ss.
       econs; try refl.
-      all: cycle 3.
-      * rewrite <- VAL, <- VAL0. eauto.
+      all: cycle 1.
+      { rewrite <- VAL, <- VAL0. eauto. }
+      econs; try refl.
       * (* internal *)
         rewrite <- VAL.
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))).
@@ -1300,7 +1301,7 @@ Proof.
         rewrite List.app_length, Nat.add_1_r. inv N; [|lia]. congr.
   - (* write_failure *)
     eexists (ExecUnit.mk _ _ _). esplits.
-    + econs; ss.
+    + econs. econs; ss.
       { econs; ss. }
       econs 4; ss.
     + econs; ss.
@@ -1312,7 +1313,7 @@ Proof.
     intro LABEL_LEN. destruct b0; eexists (ExecUnit.mk _ _ _).
     + (* isb *)
       esplits.
-      { econs; ss.
+      { econs. econs; ss.
         - econs; ss.
         - econs 5; ss.
       }
@@ -1365,7 +1366,7 @@ Proof.
         inv WRITE. destruct l; ss. congr.
     + (* dmbst *)
       esplits.
-      { econs; ss.
+      { econs. econs; ss.
         - econs; ss.
         - econs 6; ss.
       }
@@ -1418,7 +1419,7 @@ Proof.
         inv WRITE. destruct l; ss. congr.
     + (* dmbld *)
       esplits.
-      { econs; ss.
+      { econs. econs; ss.
         - econs; ss.
         - econs 7; ss.
       }
@@ -1477,7 +1478,7 @@ Proof.
         inv WRITE. destruct l; ss. congr.
     + (* dmbsy *)
       esplits.
-      { econs; ss.
+      { econs. econs; ss.
         - econs; ss.
         - econs 8; ss.
       }
@@ -1548,7 +1549,7 @@ Proof.
         i. inv WRITE. destruct l; ss. congr.
   - (* if *)
     eexists (ExecUnit.mk _ _ _). esplits.
-    + econs; ss.
+    + econs. econs; ss.
       { econs; ss. }
       econs; ss.
     + econs; ss.
@@ -1562,7 +1563,7 @@ Proof.
         econs; eauto. left. apply CTRL. econs; eauto. s. right. econs; ss.
   - (* dowhile *)
     eexists (ExecUnit.mk _ _ _). esplits.
-    + econs; ss.
+    + econs. econs; ss.
       { econs; ss. }
       * econs; ss.
     + econs; ss.

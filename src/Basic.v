@@ -2,7 +2,7 @@ Require Import PArith.
 Require Import ZArith.
 Require Import Lia.
 Require Import FunctionalExtensionality.
-Require Import Classical.
+Require Export Classical.
 Require Import ClassicalFacts.
 Require Import Relations.
 Require Import RelationClasses.

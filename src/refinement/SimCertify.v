@@ -234,7 +234,7 @@ Proof.
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
   inv STEP.
   { (* state_step *)
-    inv STEP0. ss. subst.
+    inv STEP0. inv STEP. ss. subst.
     inv SIM. ss. subst.
     inv EU. ss.
     inv STATE0. ss. subst.
@@ -242,7 +242,7 @@ Proof.
     - (* skip *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 1.
       + econs; ss. econs; ss. inv LOCAL0. econs; ss.
@@ -250,7 +250,7 @@ Proof.
     - (* assign *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 2. ss.
       + econs; ss. econs; ss.
@@ -259,7 +259,7 @@ Proof.
     - (* if *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 6; ss.
       + econs; ss. econs; ss.
@@ -273,7 +273,7 @@ Proof.
     - (* dowhile *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 7. ss.
       + econs; ss. econs; ss. inv LOCAL0. econs; ss.
@@ -282,7 +282,7 @@ Proof.
       inv STEP. destruct (le_dec ts0 ts).
       { (* read from old msg. *)
         eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-        - left. econs; ss; cycle 1.
+        - left. econs; ss. econs; ss; cycle 1.
           + econs 2; eauto. econs.
             4: instantiate (1 := ts0).
             1: instantiate (1 := (sem_expr rmap1 eloc)).
@@ -306,7 +306,7 @@ Proof.
     - (* write_failure *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 4; eauto. econs; eauto.
         * s. econs 4; ss.
       + econs; ss; cycle 1.
@@ -316,7 +316,7 @@ Proof.
     - (* isb *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 5; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
@@ -324,7 +324,7 @@ Proof.
     - (* dmbst *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 6; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
@@ -332,7 +332,7 @@ Proof.
     - (* dmbld *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 7; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
@@ -340,7 +340,7 @@ Proof.
     - (* dmbsy *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
-      + left. econs; ss; cycle 1.
+      + left. econs; ss. econs; ss; cycle 1.
         * econs 8; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
