@@ -17,6 +17,7 @@ Require Import Order.
 Require Import Time.
 Require Import Lang.
 Require Import Promising.
+Require Import StateExecFacts.
 
 Set Implicit Arguments.
 
@@ -160,25 +161,6 @@ Proof.
   - exploit reorder_state_step_rtc_promise_step; try exact WF; eauto. i. des.
     esplits; eauto.
   - esplits; cycle 1; eauto.
-Qed.
-
-Lemma rtc_state_step_state_exec
-      m1 m2
-      (WF: Machine.wf m1)
-      (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2):
-  Machine.state_exec m1 m2.
-Proof.
-  revert WF. induction STEP.
-  { econs; ss. ii. destruct (IdMap.find id (Machine.tpool x)); ss. econs. refl. }
-  i. exploit Machine.step_state_step_wf; eauto. i.
-  exploit IHSTEP; eauto. i. inv x0.
-  destruct x as [tpool1 mem1].
-  destruct y as [tpool2 mem2].
-  inv H. inversion STEP0. inv STEP1. ss. subst. econs; ss.
-  ii. specialize (TPOOL id). revert TPOOL.
-  rewrite IdMap.add_spec. condtac; ss. i.
-  inversion e0. inv TPOOL. rewrite FIND, <- H2. econs.
-  econs; eauto.
 Qed.
 
 Theorem promising_to_promising_pf

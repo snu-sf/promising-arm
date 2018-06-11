@@ -18,6 +18,7 @@ Require Import Time.
 Require Import Lang.
 Require Import Promising.
 Require Import Algorithmic.
+Require Import StateExecFacts.
 
 Set Implicit Arguments.
 
@@ -37,11 +38,15 @@ Admitted.
 Theorem algorithmic_pf_to_algorithmic
         p m
         (EXEC: AMachine.pf_exec p m):
-  AMachine.exec p m.
+  exists m',
+    <<EXEC: AMachine.exec p m'>> /\
+    <<EQUIV: Machine.equiv m m'>>.
 Proof.
-  inv EXEC. econs; cycle 1; ss.
-  { instantiate (1 := AMachine.mk m (IdMap.map (fun _ => Lock.init) m.(Machine.tpool))). ss. }
-  etrans.
-  { eapply AMachine.rtc_step_mon; cycle 1; eauto. right. ss. }
-  admit. (* use rtc_state_step_certify_inv *)
+  inv EXEC. exploit state_exec_rtc_state_step; eauto. i. des.
+  eexists (AMachine.mk m2' _). splits; eauto. econs.
+  - etrans.
+    + eapply rtc_mon; [|by eauto]. apply AMachine.step_mon. right. ss.
+    + admit. (* machine step -> amachine step *)
+  - eauto.
+  - eapply Machine.equiv_no_promise; eauto.
 Admitted.

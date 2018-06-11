@@ -21,7 +21,24 @@ Require Import Promising.
 Set Implicit Arguments.
 
 
-(* TODO: move to AlgorithmicPF_Algorithmic. *)
+Lemma rtc_state_step_state_exec
+      m1 m2
+      (WF: Machine.wf m1)
+      (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2):
+  Machine.state_exec m1 m2.
+Proof.
+  revert WF. induction STEP.
+  { econs; ss. ii. destruct (IdMap.find id (Machine.tpool x)); ss. econs. refl. }
+  i. exploit Machine.step_state_step_wf; eauto. i.
+  exploit IHSTEP; eauto. i. inv x0.
+  destruct x as [tpool1 mem1].
+  destruct y as [tpool2 mem2].
+  inv H. inversion STEP0. inv STEP1. ss. subst. econs; ss.
+  ii. specialize (TPOOL id). revert TPOOL.
+  rewrite IdMap.add_spec. condtac; ss. i.
+  inversion e0. inv TPOOL. rewrite FIND, <- H2. econs.
+  econs; eauto.
+Qed.
 
 Lemma state_exec_rtc_state_step
       m1 m2
@@ -85,19 +102,4 @@ Proof.
   - i. rewrite IdMap.add_spec. condtac.
     + inversion e. subst. exfalso. eapply TID; eauto.
     + eapply P. destruct (equiv_dec tid k); ss.
-Qed.
-
-Theorem promising_pf_to_promising
-        p m
-        (EXEC: Machine.pf_exec p m):
-  exists m',
-    <<EQUIV: Machine.equiv m m'>> /\
-    <<EXEC: Machine.exec p m'>>.
-Proof.
-  inv EXEC. exploit state_exec_rtc_state_step; eauto. i. des.
-  esplits; eauto. econs.
-  - etrans.
-    + eapply rtc_mon; [|by eauto]. apply Machine.step_mon. right. ss.
-    + eapply rtc_mon; [|by eauto]. apply Machine.step_mon. left. ss.
-  - eapply Machine.equiv_no_promise; eauto.
 Qed.
