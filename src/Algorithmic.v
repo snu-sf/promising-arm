@@ -11,6 +11,7 @@ Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import EquivDec.
 Require Import sflib.
+Require Import HahnSets.
 
 Require Import Basic.
 Require Import Order.
@@ -124,31 +125,6 @@ Module AExecUnit.
   Definition taint_write (ord:OrdW.t) (loc:Loc.t) (aux:aux_t): Taint.elt :=
     Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc.
 
-  Definition taint_write_res (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (res:ValA.t (A:=View.t (A:=Taint.t))): ValA.t (A:=View.t (A:=Taint.t)) :=
-    ValA.mk _ res.(ValA.val) (View.mk res.(ValA.annot).(View.ts) (join res.(ValA.annot).(View.annot) (ifc ex (eq (taint_write ord loc aux))))).
-
-  Definition taint_write_lc (aux:aux_t) (ex:bool) (ord:OrdW.t) (loc:Loc.t) (lc: Local.t (A:=Taint.t)): Local.t (A:=Taint.t) :=
-    Local.mk
-      lc.(Local.coh)
-      lc.(Local.vrp)
-      lc.(Local.vwp)
-      lc.(Local.vrm)
-      lc.(Local.vwm)
-      lc.(Local.vcap)
-      lc.(Local.vrel)
-      (fun_add
-         loc
-         (option_map
-            (fun fwd => FwdItem.mk
-                       fwd.(FwdItem.ts)
-                       (View.mk fwd.(FwdItem.view).(View.ts)
-                                (join fwd.(FwdItem.view).(View.annot) (ifc ex (eq (taint_write ord loc aux)))))
-                       fwd.(FwdItem.ex))
-            (lc.(Local.fwdbank) loc))
-         lc.(Local.fwdbank))
-      lc.(Local.exbank)
-      lc.(Local.promises).
-
   Definition write_step_aux (loc:Loc.t) (ord:OrdW.t) (aux:aux_t): aux_t :=
     mk_aux
       aux.(ex_counter)
@@ -160,7 +136,7 @@ Module AExecUnit.
 
   Inductive local_write (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=Taint.t))) (tid:Id.t) (lc1:Local.t) (mem1:Memory.t) (aux:aux_t) (lc2:Local.t): Prop :=
   | fulfill_intro
-      ts loc val
+      ts loc val dep
       view_loc view_val view_ext
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
@@ -168,7 +144,8 @@ Module AExecUnit.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (TS: ts = S (length mem1))
       (WRITABLE: Local.writable ex ord vloc vval tid lc1 mem1 ts view_ext)
-      (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) (ifc ex (eq (taint_write ord loc aux))))))
+      (DEPENDENT: dep = (ex /\ exists tsx msg, lc1.(Local.exbank) = Some tsx /\ Memory.get_msg tsx mem1 = Some msg /\ msg.(Msg.loc) = loc))
+      (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) ((fun _ => dep) ∩₁ (eq (taint_write ord loc aux))))))
       (LC2: lc2 =
             Local.mk
               (fun_add loc ts lc1.(Local.coh))
@@ -178,7 +155,9 @@ Module AExecUnit.
               (join lc1.(Local.vwm) (View.mk ts bot))
               (join lc1.(Local.vcap) view_loc)
               (join lc1.(Local.vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
-              (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(Local.fwdbank))
+              (fun_add loc (Some (FwdItem.mk ts
+                                             (joins [view_loc; view_val; View.mk bot ((fun _ => dep) ∩₁ (eq (taint_write ord loc aux)))])
+                                             ex)) lc1.(Local.fwdbank))
               (if ex then None else lc1.(Local.exbank))
               lc1.(Local.promises))
   .
@@ -203,7 +182,7 @@ Module AExecUnit.
   Definition init_view (v:View.t (A:=unit)): View.t (A:=Taint.t) :=
     View.mk v.(View.ts) bot.
 
-  Definition init_lc (lc:Local.t (A:=unit)): Local.t (A:=Taint.t) :=
+  Definition init_lc (tid:Id.t) (lc:Local.t (A:=unit)) (mem:Memory.t): Local.t (A:=Taint.t) :=
     Local.mk
       lc.(Local.coh)
       (init_view lc.(Local.vrp))
@@ -227,9 +206,9 @@ Module AExecUnit.
   Definition init_st (st:State.t (A:=View.t (A:=unit))): State.t (A:=View.t (A:=Taint.t)) :=
     State.mk st.(State.stmts) (init_rmap st.(State.rmap)).
 
-  Definition init (eu:ExecUnit.t (A:=unit)): t :=
+  Definition init (tid:Id.t) (eu:ExecUnit.t (A:=unit)): t :=
     mk
-      (ExecUnit.mk (init_st eu.(ExecUnit.state)) (init_lc eu.(ExecUnit.local)) eu.(ExecUnit.mem))
+      (ExecUnit.mk (init_st eu.(ExecUnit.state)) (init_lc tid eu.(ExecUnit.local) eu.(ExecUnit.mem)) eu.(ExecUnit.mem))
       init_aux.
 
   Lemma taint_read_event_eqts aux e:
@@ -268,13 +247,13 @@ Module AExecUnit.
       all: viewtac; intuition.
       + rewrite fun_add_spec. condtac; intuition.
       + rewrite ExecUnit.expr_wf; eauto. intuition.
-      + revert H. rewrite fun_add_spec. condtac.
+      + subst. revert H. rewrite fun_add_spec. condtac.
         * inversion e. i. inv H0. s. intuition.
         * i. exploit FWDBANK; eauto. i. des. intuition.
       + revert H. rewrite fun_add_spec. condtac.
-        * inversion e. i. inv H0. s. apply join_spec.
-          { rewrite ExecUnit.expr_wf; eauto. intuition. }
-          { rewrite ExecUnit.expr_wf; eauto. intuition. }
+        * inversion e. i. inv H0. s. repeat apply join_spec.
+          all: try rewrite ExecUnit.expr_wf; eauto.
+          all: intuition.
         * i. exploit FWDBANK; eauto. i. des. intuition.
       + destruct ex; ss. rewrite EXBANK; ss. intuition.
       + apply Memory.get_msg_snoc_inv in MSG.
@@ -300,7 +279,7 @@ Inductive certify
           (tid:Id.t) (eu:ExecUnit.t (A:=unit)) (lock:Lock.t): Prop :=
 | certify_intro
     aeu
-    (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init eu) aeu)
+    (STEPS: rtc (AExecUnit.step tid) (AExecUnit.init tid eu) aeu)
     (NOPROMISE: aeu.(ExecUnit.local).(Local.promises) = bot)
     (EX: lock.(Lock.ex) = Taint.is_locked aeu.(AExecUnit.aux).(AExecUnit.taint))
     (RELEASE: lock.(Lock.release) = aeu.(AExecUnit.aux).(AExecUnit.release))
