@@ -1034,6 +1034,16 @@ Module Machine.
           { subst. ss. congr. }
   Qed.
 
+  Lemma rtc_step_promise_step_wf
+        m1 m2
+        (STEP: rtc (step ExecUnit.promise_step) m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    revert WF. induction STEP; ss. i. apply IHSTEP.
+    eapply step_promise_step_wf; eauto.
+  Qed.
+
   Lemma step_step_wf
         m1 m2
         (STEP: step ExecUnit.step m1 m2)
@@ -1068,12 +1078,40 @@ Module Machine.
   .
   Hint Constructors exec.
 
+  Inductive state_exec (m1 m2:Machine.t): Prop :=
+  | state_exec_intro
+      (TPOOL: IdMap.Forall2
+                (fun tid sl1 sl2 =>
+                   rtc (ExecUnit.state_step tid)
+                       (ExecUnit.mk sl1.(fst) sl1.(snd) m1.(mem))
+                       (ExecUnit.mk sl2.(fst) sl2.(snd) m1.(mem)))
+                m1.(tpool) m2.(tpool))
+      (MEM: m1.(mem) = m2.(mem))
+  .      
+
   Inductive pf_exec (p:program) (m:Machine.t): Prop :=
   | pf_exec_intro
       m1
       (STEP1: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m1)
-      (STEP2: rtc (Machine.step ExecUnit.state_step) m1 m)
-      (NOPROMISE: Machine.no_promise m)
+      (STEP2: state_exec m1 m)
+      (NOPROMISE: no_promise m)
   .
   Hint Constructors pf_exec.
+
+  Inductive equiv (m1 m2:Machine.t): Prop :=
+  | equiv_intro
+      (TPOOL: IdMap.Equal m1.(tpool) m2.(tpool))
+      (MEM: m1.(mem) = m2.(mem))
+  .
+
+  Lemma equiv_no_promise
+        m1 m2
+        (EQUIV: equiv m1 m2)
+        (NOPROMISE: no_promise m1):
+    no_promise m2.
+  Proof.
+    inv EQUIV. inv NOPROMISE. econs. i.
+    specialize (TPOOL tid). rewrite FIND in TPOOL.
+    eapply PROMISES. eauto.
+  Qed.
 End Machine.

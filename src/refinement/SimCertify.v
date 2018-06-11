@@ -120,6 +120,7 @@ Inductive sim_aeu (tid:Id.t) (ts:Time.t) (aeu1 aeu2:AExecUnit.t): Prop :=
     (PROMISES1: aeu1.(ExecUnit.local).(Local.promises) = bot)
     (PROMISES2: aeu2.(ExecUnit.local).(Local.promises) = bot)
     (TAINT: aeu1.(AExecUnit.aux).(AExecUnit.taint) = aeu2.(AExecUnit.aux).(AExecUnit.taint))
+    (RELEASE: aeu1.(AExecUnit.aux).(AExecUnit.release) = aeu2.(AExecUnit.aux).(AExecUnit.release))
 .
 Hint Constructors sim_aeu.
 
@@ -276,7 +277,9 @@ Proof.
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
   ss. inv SIM; ss; cycle 1.
   { exploit no_promise_step; eauto. s. i. des.
-    esplits; eauto. econs 2; ss. etrans; eauto.
+    esplits; eauto. econs 2; ss.
+    - etrans; eauto.
+    - etrans; eauto. admit.
   }
 
   inv STEP.

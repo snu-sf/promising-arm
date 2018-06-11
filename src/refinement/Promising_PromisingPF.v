@@ -162,6 +162,25 @@ Proof.
   - esplits; cycle 1; eauto.
 Qed.
 
+Lemma rtc_state_step_state_exec
+      m1 m2
+      (WF: Machine.wf m1)
+      (STEP: rtc (Machine.step ExecUnit.state_step) m1 m2):
+  Machine.state_exec m1 m2.
+Proof.
+  revert WF. induction STEP.
+  { econs; ss. ii. destruct (IdMap.find id (Machine.tpool x)); ss. econs. refl. }
+  i. exploit Machine.step_state_step_wf; eauto. i.
+  exploit IHSTEP; eauto. i. inv x0.
+  destruct x as [tpool1 mem1].
+  destruct y as [tpool2 mem2].
+  inv H. inversion STEP0. inv STEP1. ss. subst. econs; ss.
+  ii. specialize (TPOOL id). revert TPOOL.
+  rewrite IdMap.add_spec. condtac; ss. i.
+  inversion e0. inv TPOOL. rewrite FIND, <- H2. econs.
+  econs; eauto.
+Qed.
+
 Theorem promising_to_promising_pf
         p m
         (EXEC: Machine.exec p m):
@@ -169,5 +188,6 @@ Theorem promising_to_promising_pf
 Proof.
   inv EXEC. generalize (Machine.init_wf p). intro WF.
   exploit split_rtc_step; eauto. i. des.
-  econs; eauto.
+  exploit Machine.rtc_step_promise_step_wf; eauto. i.
+  exploit rtc_state_step_state_exec; eauto.
 Qed.

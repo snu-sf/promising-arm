@@ -1733,7 +1733,7 @@ Theorem axiomatic_to_promising_pf
       p ex
       (EX: Valid.ex p ex):
   exists m,
-    <<STEP: Machine.pf_exec p m>> /\
+    <<STEP: Machine.exec p m>> /\
     <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m>> /\
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
@@ -1763,7 +1763,11 @@ Proof.
           <<NOPROMISE: Machine.no_promise m0>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m0>> /\
           <<MEM: sim_mem ex (Machine.mem m0)>>).
-  { i. des. esplits; eauto. }
+  { i. des. esplits; eauto. econs; eauto.
+    etrans.
+    - eapply rtc_mon; [|by eauto]. apply Machine.step_mon. right. ss.
+    - eapply rtc_mon; [|by eauto]. apply Machine.step_mon. left. ss.
+  }
   clear STEP.
 
   (* Execute threads one-by-one (induction). *)

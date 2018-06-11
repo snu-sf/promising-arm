@@ -430,7 +430,7 @@ Module AMachine.
   | pf_exec_intro
       am1
       (STEP1: rtc (step ExecUnit.promise_step) (init p) am1)
-      (STEP2: rtc (Machine.step ExecUnit.state_step) am1.(machine) m)
+      (STEP2: Machine.state_exec am1 m)
       (NOPROMISE: Machine.no_promise m)
   .
   Hint Constructors pf_exec.
