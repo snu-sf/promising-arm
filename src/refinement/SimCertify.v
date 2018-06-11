@@ -408,26 +408,6 @@ Proof.
   esplits; [|by eauto]. econs; eauto.
 Qed.
 
-Lemma lift_wf
-      tid (eu1 eu2:ExecUnit.t (A:=unit)) msg
-      (WF: ExecUnit.wf tid eu1)
-      (ST: eu2.(ExecUnit.state) = eu1.(ExecUnit.state))
-      (LC: eu2.(ExecUnit.local) = eu1.(ExecUnit.local))
-      (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
-      (MSG: msg.(Msg.tid) <> tid):
-  ExecUnit.wf tid eu2.
-Proof.
-  destruct eu1 as [st1 lc1 mem1].
-  destruct eu2 as [st2 lc2 mem2].
-  ss. subst. inv WF. ss. econs; ss.
-  - apply ExecUnit.rmap_append_wf. ss.
-  - inv LOCAL. econs; try rewrite app_length; intuition.
-    + exploit FWDBANK; eauto. i. des. intuition.
-    + exploit FWDBANK; eauto. i. des. intuition.
-    + apply Memory.get_msg_snoc_inv in MSG0. des; eauto.
-      subst. ss.
-Qed.
-
 Inductive sound_taint (loc:Loc.t) (v:Taint.t): Prop :=
 | sound_taint_intro
     (TAINT: forall from to, ~ v (Taint.W from to loc))
@@ -448,7 +428,7 @@ Inductive sound_st (loc:Loc.t) (st:State.t (A:=View.t (A:=Taint.t))): Prop :=
     (RMAP: IdMap.Forall (fun _ => sound_val loc) st.(State.rmap))
 .
 
-Inductive sound_lc (is_first_ex:bool) (ts:Time.t) (loc:Loc.t) (lc:Local.t (A:=Taint.t)): Prop :=
+Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
 | sound_lc_intro
     (VRP: sound_view loc lc.(Local.vrp))
     (VWP: sound_view loc lc.(Local.vwp))
@@ -457,28 +437,32 @@ Inductive sound_lc (is_first_ex:bool) (ts:Time.t) (loc:Loc.t) (lc:Local.t (A:=Ta
     (VCAP: sound_view loc lc.(Local.vcap))
     (VREL: sound_view loc lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), sound_view loc fwd.(FwdItem.view))
-    (EXBANK: is_first_ex -> forall exbank (EXBANK: lc.(Local.exbank) = Some exbank), exbank <= ts)
+    (EXBANK: forall exbank val
+               (FIRST: is_first_ex)
+               (EXBANK: lc.(Local.exbank) = Some exbank)
+               (READ: Memory.read loc exbank mem = Some val),
+        ~ Memory.exclusive tid loc exbank (length mem) mem)
 .
 
-Inductive sound_aeu (loc:Loc.t) (ts:Time.t) (aeu:AExecUnit.t): Prop :=
+Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (aeu:AExecUnit.t): Prop :=
 | sound_aeu_intro
     (ST: sound_st loc aeu.(ExecUnit.state))
-    (LC: sound_lc (aeu.(AExecUnit.aux).(AExecUnit.ex_counter) == 0) ts loc aeu.(ExecUnit.local))
+    (LC: sound_lc tid (aeu.(AExecUnit.aux).(AExecUnit.ex_counter) == 0) loc aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
     (AUX: sound_taint loc aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
 
 Lemma sound_aeu_step
-      loc ts tid aeu1 aeu2
+      loc tid aeu1 aeu2
       (STEP: AExecUnit.step tid aeu1 aeu2)
-      (SOUND: sound_aeu loc ts aeu1):
-  sound_aeu loc ts aeu2.
+      (SOUND: sound_aeu tid loc aeu1):
+  sound_aeu tid loc aeu2.
 Proof.
   destruct aeu1 as [[st1 lc1 mem1] aux1].
   destruct aeu2 as [[st2 lc2 mem2] aux2].
   inv SOUND. ss. inv STEP.
   { inv STEP0. inv STEP. ss. subst.
     inv ST. inv LC.
-    inv LOCAL; inv STATE; ss. 
+    inv LOCAL; inv STATE; ss.
     - inv LC. econs; ss. econs; ss.
       admit. (* soudn view bot join *)
     - inv LC. econs; ss.
@@ -522,40 +506,33 @@ Proof.
 Admitted.
 
 Lemma sound_rtc_aeu_step
-      loc ts tid aeu1 aeu2
+      tid loc aeu1 aeu2
       (STEP: rtc (AExecUnit.step tid) aeu1 aeu2)
-      (SOUND: sound_aeu loc ts aeu1):
-  sound_aeu loc ts aeu2.
+      (SOUND: sound_aeu tid loc aeu1):
+  sound_aeu tid loc aeu2.
 Proof.
   revert SOUND. induction STEP; ss. i. exploit sound_aeu_step; eauto.
 Qed.
 
-Lemma certify_diff_not_locked
-      tid (eu:ExecUnit.t (A:=unit)) lock mem msg
-      (CERTIFY: certify tid eu lock)
-      (WF: ExecUnit.wf tid eu)
-      (MEM: eu.(ExecUnit.mem) = mem ++ [msg])
+Lemma lift_wf
+      tid (eu1 eu2:ExecUnit.t (A:=unit)) msg
+      (WF: ExecUnit.wf tid eu1)
+      (ST: eu2.(ExecUnit.state) = eu1.(ExecUnit.state))
+      (LC: eu2.(ExecUnit.local) = eu1.(ExecUnit.local))
+      (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
       (MSG: msg.(Msg.tid) <> tid):
-  ~ Lock.is_locked lock bot msg.(Msg.loc).
+  ExecUnit.wf tid eu2.
 Proof.
-  inv CERTIFY.
-  exploit sound_rtc_aeu_step; eauto.
-  { instantiate (1 := (length mem)).
-    instantiate (1 := msg.(Msg.loc)).
-    destruct eu as [st1 lc1 mem1]. ss. subst.
-    econs.
-    - econs. s. ii. revert FIND.
-      unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
-      destruct (IdMap.find id (State.rmap st1)); ss. i. inv FIND.
-      econs. econs. econs. ss.
-    - s. admit.
-    - econs. ss.
-  }
-  ii. destruct lock as [ex release]. ss. subst.
-  inv H. destruct exlock as [from to loc]. ss. subst.
-  inv RANGE. inv H. inv LOCK. ss.
-  eapply x0. eauto.
-Admitted.
+  destruct eu1 as [st1 lc1 mem1].
+  destruct eu2 as [st2 lc2 mem2].
+  ss. subst. inv WF. ss. econs; ss.
+  - apply ExecUnit.rmap_append_wf. ss.
+  - inv LOCAL. econs; try rewrite app_length; intuition.
+    + exploit FWDBANK; eauto. i. des. intuition.
+    + exploit FWDBANK; eauto. i. des. intuition.
+    + apply Memory.get_msg_snoc_inv in MSG0. des; eauto.
+      subst. ss.
+Qed.
 
 Lemma lift_certify_diff
       tid (eu1 eu2:ExecUnit.t (A:=unit)) lock msg
@@ -569,33 +546,56 @@ Lemma lift_certify_diff
   <<NOLOCK: ~ Lock.is_locked lock bot msg.(Msg.loc)>>.
 Proof.
   exploit lift_wf; eauto. i.
-  splits; cycle 1.
-  { eapply certify_diff_not_locked; eauto. }
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
-  ss. subst. inv CERTIFY.
-  exploit sim_aeu_rtc_step; eauto.
-  { instantiate (1 := AExecUnit.init tid (ExecUnit.mk st1 lc1 mem1)). econs; ss.
-    econs; ss; cycle 2.
-    - econs; ss. rewrite List.app_nil_r. ss.
-    - econs; ss. econs. ii.
-      unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
-      destruct (IdMap.find id (State.rmap st1)); ss. econs. econs; ss.
-    - unfold AExecUnit.init_lc, AExecUnit.init_view.
-      inv WF. ss. inv LOCAL.
-      econs; ss; eauto using sim_view_const, sim_low_view_const.
-      + i. destruct (Local.fwdbank lc1 loc) eqn:FWD; ss. econs; ss.
-        splits; ss. apply sim_low_view_const. eapply FWDBANK. eauto.
-      + destruct lc1. s. destruct exbank; ss. econs.
-        econs; eauto. ii. eapply H; eauto.
-        * apply Memory.read_mon. eauto.
-        * rewrite app_length. lia.
-        * exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
-          rewrite nth_error_app1; ss.
-  }
-  i. des.
-  econs; eauto.
-  - inv SIM. inv EU. inv LOCAL. etrans; eauto.
-  - inv SIM. congr.
-  - inv SIM. congr.
+  ss. subst. inv CERTIFY. splits; cycle 1.
+  - (* not is_locked *)
+    exploit sound_rtc_aeu_step; eauto.
+    { instantiate (1 := msg.(Msg.loc)).
+      ss. subst. econs.
+      - econs. s. ii. revert FIND.
+        unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
+        destruct (IdMap.find id (State.rmap st1)); ss. i. inv FIND.
+        econs. econs. econs. ss.
+      - s. unfold AExecUnit.init_lc, AExecUnit.init_view. econs; ss.
+        all: try by econs; econs; ss.
+        + i. destruct (Local.fwdbank lc1 l) eqn:FWDL; ss. inv FWD. ss.
+          econs. econs. ss.
+        + ii. inv WF. inv LOCAL. ss. exploit EXBANK0; eauto. i.
+          eapply H; cycle 3.
+          { rewrite nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
+          all: eauto.
+          * intuition.
+          * rewrite app_length. s. intuition.
+      - econs. ss.
+    }
+    ii. destruct lock as [ex release]. ss. subst.
+    inv H. destruct exlock as [from to loc]. ss. subst.
+    inv RANGE. inv H. inv LOCK. ss.
+    eapply x1. eauto.
+  - (* certify *)
+    exploit sim_aeu_rtc_step; eauto.
+    { instantiate (1 := AExecUnit.init tid (ExecUnit.mk st1 lc1 mem1)). econs; ss.
+      econs; ss; cycle 2.
+      - econs; ss. rewrite List.app_nil_r. ss.
+      - econs; ss. econs. ii.
+        unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
+        destruct (IdMap.find id (State.rmap st1)); ss. econs. econs; ss.
+      - unfold AExecUnit.init_lc, AExecUnit.init_view.
+        inv WF. ss. inv LOCAL.
+        econs; ss; eauto using sim_view_const, sim_low_view_const.
+        + i. destruct (Local.fwdbank lc1 loc) eqn:FWD; ss. econs; ss.
+          splits; ss. apply sim_low_view_const. eapply FWDBANK. eauto.
+        + destruct lc1. s. destruct exbank; ss. econs.
+          econs; eauto. ii. eapply H; eauto.
+          * apply Memory.read_mon. eauto.
+          * rewrite app_length. lia.
+          * exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
+            rewrite nth_error_app1; ss.
+    }
+    i. des.
+    econs; eauto.
+    + inv SIM. inv EU. inv LOCAL. etrans; eauto.
+    + inv SIM. congr.
+    + inv SIM. congr.
 Qed.
