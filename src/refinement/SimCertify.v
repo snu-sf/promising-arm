@@ -37,6 +37,14 @@ Inductive sim_view (ts:Time.t) (forbid:Taint.t) (v1 v2:View.t (A:=Taint.t)): Pro
 .
 Hint Constructors sim_view.
 
+Inductive sim_low_view (ts:Time.t) (forbid:Taint.t) (v1 v2:View.t (A:=Taint.t)): Prop :=
+| sim_low_view_intro
+    (TS: v2.(View.ts) <= ts)
+    (VAL: v1 = v2)
+    (FORBID: v2.(View.annot) ∩₁ forbid ⊆₁ bot)
+.
+Hint Constructors sim_low_view.
+
 Inductive sim_val (ts:Time.t) (forbid:Taint.t) (v1 v2:ValA.t (A:=View.t (A:=Taint.t))): Prop :=
 | sim_val_intro
     (TS: v2.(ValA.annot).(View.ts) <= ts ->
@@ -70,18 +78,18 @@ Inductive sim_exbank (tid:Id.t) (mem1 mem2:Memory.t) (ts1 ts2:Time.t): Prop :=
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (forbid:Taint.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem2:Memory.t): Prop :=
 | sim_lc_intro
     (COH: forall loc, sim_time ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
-    (VRP: sim_view ts forbid lc1.(Local.vrp) lc2.(Local.vrp))
-    (VWP: sim_view ts forbid lc1.(Local.vwp) lc2.(Local.vwp))
+    (VRP: sim_low_view ts forbid lc1.(Local.vrp) lc2.(Local.vrp))
+    (VWP: sim_low_view ts forbid lc1.(Local.vwp) lc2.(Local.vwp))
     (VRM: sim_view ts forbid lc1.(Local.vrm) lc2.(Local.vrm))
     (VWM: sim_view ts forbid lc1.(Local.vwm) lc2.(Local.vwm))
-    (VCAP: sim_view ts forbid lc1.(Local.vcap) lc2.(Local.vcap))
-    (VREL: sim_view ts forbid lc1.(Local.vrel) lc2.(Local.vrel))
+    (VCAP: sim_low_view ts forbid lc1.(Local.vcap) lc2.(Local.vcap))
+    (VREL: sim_low_view ts forbid lc1.(Local.vrel) lc2.(Local.vrel))
     (FWDBANK: forall loc,
         opt_rel
           (fun fwd1 fwd2 =>
              fwd2.(FwdItem.ts) <= ts ->
              (fwd1.(FwdItem.ts) = fwd2.(FwdItem.ts) /\
-              sim_view ts forbid fwd1.(FwdItem.view) fwd2.(FwdItem.view) /\
+              sim_low_view ts forbid fwd1.(FwdItem.view) fwd2.(FwdItem.view) /\
               fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex)))
           (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
     (EXBANK: opt_rel (sim_exbank tid mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
@@ -190,6 +198,50 @@ Proof.
   - apply TS1. ss.
 Qed.
 
+Lemma sim_view_low_view
+      ts forbid l r
+      (VIEW: sim_view ts forbid l r)
+      (TS: r.(View.ts) <= ts):
+  sim_low_view ts forbid l r.
+Proof.
+  inv VIEW. specialize (TS0 TS). des. econs; ss.
+Qed.
+
+Lemma sim_low_view_bot
+      ts forbid:
+  sim_low_view ts forbid bot bot.
+Proof.
+  econs; ss.
+  - apply bot_spec.
+  - ii. inv H. ss.
+Qed.
+
+Lemma sim_low_view_const
+      ts forbid c
+      (TS: c <= ts):
+  sim_low_view ts forbid (View.mk c bot) (View.mk c bot).
+Proof.
+  econs; ss. ii. inv H. ss.
+Qed.
+
+Lemma sim_low_view_join
+      ts forbid l1 l2 r1 r2
+      (VIEW1: sim_low_view ts forbid l1 r1)
+      (VIEW2: sim_low_view ts forbid l2 r2):
+  sim_low_view ts forbid (join l1 l2) (join r1 r2).
+Proof.
+  destruct l1 as [lt1 lv1].
+  destruct l2 as [lt2 lv2].
+  destruct r1 as [rt1 rv1].
+  destruct r2 as [rt2 rv2].
+  inv VIEW1. inv VIEW2. ss. inv VAL. inv VAL0.
+  econs; ss.
+  - apply join_spec; ss.
+  - ii. inv H. inv H0.
+    + apply FORBID. ss.
+    + apply FORBID0. ss.
+Qed.
+
 Lemma sim_val_view ts forbid v1 v2
       (VAL: sim_val ts forbid v1 v2):
   sim_view ts forbid v1.(ValA.annot) v2.(ValA.annot).
@@ -251,7 +303,7 @@ Proof.
         * econs 1; eauto. econs; eauto.
         * s. econs 1.
       + econs; ss. econs; ss. inv LOCAL0. econs; ss.
-        apply sim_view_join; ss. apply sim_view_bot.
+        apply sim_low_view_join; ss. apply sim_low_view_bot.
     - (* assign *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
@@ -260,21 +312,22 @@ Proof.
         * s. econs 2. ss.
       + econs; ss. econs; ss.
         * econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
-        * inv LOCAL0. econs; ss. eauto using sim_view_join, sim_view_bot.
+        * inv LOCAL0. econs; ss. eauto using sim_low_view_join, sim_low_view_bot.
     - (* if *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
       + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 6; ss.
-      + econs; ss. econs; ss.
+      + econs; ss.
+        assert (LOC_VIEW: View.ts (ValA.annot (sem_expr rmap2' cond)) <= ts).
+        { admit. (* MOVE: not depend on big ts of cond *) }
+        econs; ss.
         * econs; ss.
           exploit sim_rmap_expr; eauto. i.
-          inv x0. exploit TS; cycle 1.
-          { i. des. rewrite x. ss. }
-          admit. (* not depend on big ts *)
-        * inv LOCAL0. econs; ss. apply sim_view_join; ss.
-          apply sim_val_view. apply sim_rmap_expr. ss.
+          inv x0. exploit TS; eauto. i. des. rewrite x. ss.
+        * inv LOCAL0. econs; ss. apply sim_low_view_join; ss.
+          apply sim_view_low_view; ss. apply sim_val_view. apply sim_rmap_expr. ss.
     - (* dowhile *)
       inv LC.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
@@ -282,7 +335,7 @@ Proof.
         * econs 1; eauto. econs; eauto.
         * s. econs 7. ss.
       + econs; ss. econs; ss. inv LOCAL0. econs; ss.
-        eauto using sim_view_join, sim_view_bot.
+        eauto using sim_low_view_join, sim_low_view_bot.
     - (* read *)
       inv STEP. destruct (le_dec ts0 ts).
       { (* read from old msg. *)
@@ -293,8 +346,12 @@ Proof.
             1: instantiate (1 := (sem_expr rmap1 eloc)).
             all: ss.
             * rewrite <- COH.
-              admit. (* should reason about no big ts *)
-            * admit. (* memory no_msgs *)
+              admit. (* not depend on big ts of loc *)
+            * hexploit sim_rmap_expr; eauto. intro X. inv X.
+              exploit TS.
+              { admit. (* not depend on big ts of loc *) }
+              i. des. rewrite x.
+              admit. (* memory no_msgs *)
             * admit. (* memory read *)
           + econs 3; ss.
         - econs; ss; cycle 1.
@@ -325,7 +382,7 @@ Proof.
         * econs 5; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+        inv LOCAL0. econs; ss; eauto using sim_low_view_join, sim_low_view_bot.
     - (* dmbst *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
@@ -333,7 +390,9 @@ Proof.
         * econs 6; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+        inv LOCAL0. econs; ss.
+        admit. (* big vwp *)
+        (* eauto using sim_low_view_join, sim_low_view_bot. *)
     - (* dmbld *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
@@ -341,7 +400,9 @@ Proof.
         * econs 7; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+        inv LOCAL0. econs; ss.
+        all: admit. (* big vwp *)
+        (* eauto using sim_low_view_join, sim_low_view_bot. *)
     - (* dmbsy *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
@@ -349,7 +410,9 @@ Proof.
         * econs 8; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss; eauto using sim_view_join, sim_view_bot.
+        inv LOCAL0. econs; ss.
+        all: admit. (* big vwp *)
+        (* eauto using sim_low_view_join, sim_low_view_bot. *)
   }
   { (* write_step *)
     admit.
@@ -396,8 +459,12 @@ Proof.
       + unfold AExecUnit.init_lc, AExecUnit.init_view.
         econs; ss; eauto using sim_view_const.
         * admit. (* TODO: bug on init vcap *)
+        * admit. (* big vwp *)
+        * admit. (* big vcap *)
+        * admit. (* big vrel *)
         * i. destruct (Local.fwdbank lc1 loc); ss. econs; ss.
-          splits; ss. apply sim_view_const.
+          splits; ss. apply sim_low_view_const.
+          admit. (* big fwd view *)
         * destruct lc1. s. destruct exbank; ss. econs.
           econs; eauto. ii. eapply H; eauto.
           { apply Memory.read_mon. eauto. }
