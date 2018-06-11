@@ -423,9 +423,9 @@ Inductive sound_val (loc:Loc.t) (v:ValA.t (A:=View.t (A:=Taint.t))): Prop :=
     (VAL: sound_view loc v.(ValA.annot))
 .
 
-Inductive sound_st (loc:Loc.t) (st:State.t (A:=View.t (A:=Taint.t))): Prop :=
-| sound_st_intro
-    (RMAP: IdMap.Forall (fun _ => sound_val loc) st.(State.rmap))
+Inductive sound_rmap (loc:Loc.t) (rmap:RMap.t (A:=View.t (A:=Taint.t))): Prop :=
+| sound_rmap_intro
+    (RMAP: IdMap.Forall (fun _ => sound_val loc) rmap)
 .
 
 Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
@@ -446,10 +446,69 @@ Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Tai
 
 Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (aeu:AExecUnit.t): Prop :=
 | sound_aeu_intro
-    (ST: sound_st loc aeu.(ExecUnit.state))
+    (ST: sound_rmap loc aeu.(ExecUnit.state).(State.rmap))
     (LC: sound_lc tid (aeu.(AExecUnit.aux).(AExecUnit.ex_counter) == 0) loc aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
     (AUX: sound_taint loc aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
+
+Lemma sound_taint_join
+      loc l r
+      (L: sound_taint loc l)
+      (R: sound_taint loc r):
+  sound_taint loc (join l r).
+Proof.
+  inv L. inv R. econs. ii. inv H.
+  - eapply TAINT. eauto.
+  - eapply TAINT0. eauto.
+Qed.
+
+Lemma sound_taint_bot
+      loc:
+  sound_taint loc bot.
+Proof.
+  econs. ss.
+Qed.
+
+Lemma sound_view_join
+      loc v1 v2
+      (V1: sound_view loc v1)
+      (V2: sound_view loc v2):
+  sound_view loc (join v1 v2).
+Proof.
+  inv V1. inv V2. econs. eapply sound_taint_join; eauto.
+Qed.
+
+Lemma sound_view_bot
+      loc:
+  sound_view loc bot.
+Proof.
+  econs. apply sound_taint_bot.
+Qed.
+
+Lemma sound_rmap_expr
+      loc rmap e
+      (RMAP: sound_rmap loc rmap):
+  sound_view loc (sem_expr rmap e).(ValA.annot).
+Proof.
+  induction e; ss.
+  - apply sound_view_bot.
+  - unfold RMap.find. destruct (IdMap.find reg rmap) eqn:V.
+    + eapply RMAP. eauto.
+    + apply sound_view_bot.
+  - apply sound_view_join; ss.
+Qed.
+
+Lemma sound_rmap_add
+      loc l v rmap
+      (RMAP: sound_rmap loc rmap)
+      (V: sound_val loc v):
+  sound_rmap loc (RMap.add l v rmap).
+Proof.
+  inv RMAP. econs. ii. revert FIND.
+  unfold RMap.add. rewrite IdMap.add_spec. condtac.
+  - inversion e. i. inv FIND. ss.
+  - apply RMAP0.
+Qed.
 
 Lemma sound_aeu_step
       loc tid aeu1 aeu2
@@ -461,47 +520,52 @@ Proof.
   destruct aeu2 as [[st2 lc2 mem2] aux2].
   inv SOUND. ss. inv STEP.
   { inv STEP0. inv STEP. ss. subst.
-    inv ST. inv LC.
-    inv LOCAL; inv STATE; ss.
+    inv LC. inv LOCAL; inv STATE; ss.
     - inv LC. econs; ss. econs; ss.
-      admit. (* soudn view bot join *)
+      eauto using sound_view_join, sound_view_bot.
     - inv LC. econs; ss.
       + admit. (* sound rmap addd expr *)
-      + econs; ss. admit. (* soudn view bot join *)
+      + econs; ss.
+        eauto using sound_view_join, sound_view_bot.
     - inv LC. econs; ss.
-      econs; ss. admit. (* sound join expr *)
+      econs; ss.
+      apply sound_view_join. ss.
+      apply sound_rmap_expr. ss.
     - inv LC. econs; ss.
-      econs; ss. admit. (* sound join bot *)
+      econs; ss.
+      eauto using sound_view_join, sound_view_bot.
     - inv STEP. econs; ss.
-      + econs; ss. admit.
-      + admit.
+      + apply sound_rmap_add; ss. econs. econs. s.
+        admit. (* sound_view *)
+      + econs; ss.
+        all: admit. (* sound_view *)
       + destruct ex; ss.
     - inv STEP. econs; ss.
-      + econs; ss. admit.
-      + admit.
-      + admit.
+      + apply sound_rmap_add; ss.
+        admit. (* sound view_ext *)
+      + econs; ss.
+        all: admit. (* sound_view *)
+      + apply sound_taint_join; ss.
+        admit. (* sound view_ext *)
     - inv STEP. econs; ss.
-      + econs; ss. admit.
-      + admit.
+      + apply sound_rmap_add; ss. econs. apply sound_view_bot.
+      + eauto using sound_taint_join, sound_taint_bot.
     - inv STEP. econs; ss.
-      econs; ss. admit.
+      econs; ss. eauto using sound_view_join.
     - inv STEP. econs; ss.
-      econs; ss. admit.
+      econs; ss. eauto using sound_view_join.
     - inv STEP. econs; ss.
-      econs; ss.
-      admit.
-      admit.
+      econs; ss; eauto using sound_view_join.
     - inv STEP. econs; ss.
-      econs; ss.
-      admit.
-      admit.
+      econs; ss; eauto using sound_view_join, sound_view_bot.
   }
   { inv STEP0. ss. subst.
     inv ST. inv LC.
     inv LOCAL. inv STATE. econs; ss.
-    - econs; ss. admit.
+    - apply sound_rmap_add; ss. econs. econs. ss.
+      admit. (* sound_taint *)
     - econs; ss.
-      all: admit.
+      all: admit. (* sound_view *)
   }
 Admitted.
 
