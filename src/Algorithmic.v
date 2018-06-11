@@ -272,6 +272,16 @@ Module AExecUnit.
   Proof.
     inv STEP; eauto using state_step_wf, write_step_wf.
   Qed.
+
+  Lemma rtc_step_wf
+        tid aeu1 aeu2
+        (STEP: rtc (step tid) aeu1 aeu2)
+        (WF: ExecUnit.wf tid aeu1):
+    ExecUnit.wf tid aeu2.
+  Proof.
+    revert WF. induction STEP; ss.
+    i. apply IHSTEP. eapply step_wf; eauto.
+  Qed.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.
 

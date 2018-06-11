@@ -19,6 +19,7 @@ Require Import Time.
 Require Import Lang.
 Require Import Promising.
 Require Import Algorithmic.
+Require Import CertifyFacts.
 
 Set Implicit Arguments.
 
@@ -115,6 +116,10 @@ Inductive sim_aeu (tid:Id.t) (ts:Time.t) (aeu1 aeu2:AExecUnit.t): Prop :=
 | sim_aeu_intro
     (EU: sim_eu tid ts aeu1.(AExecUnit.eu) aeu2.(AExecUnit.eu))
     (AUX: aeu1.(AExecUnit.aux) = aeu2.(AExecUnit.aux))
+| sim_aeu_exit
+    (PROMISES1: aeu1.(ExecUnit.local).(Local.promises) = bot)
+    (PROMISES2: aeu2.(ExecUnit.local).(Local.promises) = bot)
+    (TAINT: aeu1.(AExecUnit.aux).(AExecUnit.taint) = aeu2.(AExecUnit.aux).(AExecUnit.taint))
 .
 Hint Constructors sim_aeu.
 
@@ -258,24 +263,31 @@ Qed.
 Lemma sim_aeu_step
       tid ts aeu1 aeu2 aeu2'
       (SIM: sim_aeu tid ts aeu1 aeu2)
-      (STEP: AExecUnit.step tid aeu2 aeu2'):
+      (STEP: AExecUnit.step tid aeu2 aeu2')
+      (WF1: ExecUnit.wf tid aeu1)
+      (WF2: ExecUnit.wf tid aeu2):
   exists aeu1',
-    <<STEP: AExecUnit.step tid aeu1 aeu1'>> /\
+    <<STEP: rtc (AExecUnit.step tid) aeu1 aeu1'>> /\
     <<SIM: sim_aeu tid ts aeu1' aeu2'>>.
 Proof.
+  exploit AExecUnit.step_wf; eauto. intro WF2'.
   destruct aeu1 as [[[stmts1 rmap1] lc1 mem1] aux1].
   destruct aeu2 as [[[stmts2 rmap2] lc2 mem2] aux2].
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
+  ss. inv SIM; ss; cycle 1.
+  { exploit no_promise_step; eauto. s. i. des.
+    esplits; eauto. econs 2; ss. etrans; eauto.
+  }
+
   inv STEP.
   { (* state_step *)
     inv STEP0. inv STEP. ss. subst.
-    inv SIM. ss. subst.
     inv EU. ss.
     inv STATE0. ss. subst.
     inv LOCAL; ss; inv STATE.
     - (* skip *)
       inv LC.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 1.
@@ -284,7 +296,7 @@ Proof.
         apply sim_low_view_join; ss. apply sim_low_view_bot.
     - (* assign *)
       inv LC.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 2. ss.
@@ -293,7 +305,7 @@ Proof.
         * inv LOCAL0. econs; ss. eauto using sim_low_view_join, sim_low_view_bot.
     - (* if *)
       inv LC.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 6; ss.
@@ -308,7 +320,7 @@ Proof.
           apply sim_view_low_view; ss. apply sim_val_view. apply sim_rmap_expr. ss.
     - (* dowhile *)
       inv LC.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 1; eauto. econs; eauto.
         * s. econs 7. ss.
@@ -317,7 +329,7 @@ Proof.
     - (* read *)
       inv STEP. destruct (le_dec ts0 ts).
       { (* read from old msg. *)
-        eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+        eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
         - left. econs; ss. econs; ss; cycle 1.
           + econs 2; eauto. econs.
             4: instantiate (1 := ts0).
@@ -343,7 +355,7 @@ Proof.
       admit.
     - (* write_failure *)
       inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 4; eauto. econs; eauto.
         * s. econs 4; ss.
@@ -351,7 +363,7 @@ Proof.
         inv LOCAL0. econs; ss.
     - (* isb *)
       inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 5; eauto. econs; eauto.
         * s. econs 5.
@@ -359,7 +371,7 @@ Proof.
         inv LOCAL0. econs; ss; eauto using sim_low_view_join, sim_low_view_bot.
     - (* dmbst *)
       inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 6; eauto. econs; eauto.
         * s. econs 5.
@@ -369,7 +381,7 @@ Proof.
         (* eauto using sim_low_view_join, sim_low_view_bot. *)
     - (* dmbld *)
       inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 7; eauto. econs; eauto.
         * s. econs 5.
@@ -379,7 +391,7 @@ Proof.
         (* eauto using sim_low_view_join, sim_low_view_bot. *)
     - (* dmbsy *)
       inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits.
+      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 8; eauto. econs; eauto.
         * s. econs 5.
@@ -396,16 +408,20 @@ Admitted.
 Lemma sim_aeu_rtc_step
       tid ts aeu1 aeu2 aeu2'
       (SIM: sim_aeu tid ts aeu1 aeu2)
-      (STEP: rtc (AExecUnit.step tid) aeu2 aeu2'):
+      (STEP: rtc (AExecUnit.step tid) aeu2 aeu2')
+      (WF1: ExecUnit.wf tid aeu1)
+      (WF2: ExecUnit.wf tid aeu2):
   exists aeu1',
     <<STEP: rtc (AExecUnit.step tid) aeu1 aeu1'>> /\
     <<SIM: sim_aeu tid ts aeu1' aeu2'>>.
 Proof.
-  revert aeu1 SIM. induction STEP.
+  revert aeu1 SIM WF1 WF2. induction STEP.
   { i. esplits; eauto. }
   i. exploit sim_aeu_step; eauto. i. des.
+  exploit AExecUnit.step_wf; eauto. i.
+  exploit AExecUnit.rtc_step_wf; eauto. i.
   exploit IHSTEP; eauto. i. des.
-  esplits; [|by eauto]. econs; eauto.
+  esplits; [|by eauto]. etrans; eauto.
 Qed.
 
 Inductive sound_taint (loc:Loc.t) (v:Taint.t): Prop :=
@@ -638,7 +654,7 @@ Proof.
     inv RANGE. inv H. inv LOCK. ss.
     eapply x1. eauto.
   - (* certify *)
-    exploit sim_aeu_rtc_step; eauto.
+    exploit sim_aeu_rtc_step; try exact STEPS; eauto.
     { instantiate (1 := AExecUnit.init tid (ExecUnit.mk st1 lc1 mem1)). econs; ss.
       econs; ss; cycle 2.
       - econs; ss. rewrite List.app_nil_r. ss.
@@ -657,9 +673,11 @@ Proof.
           * exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
             rewrite nth_error_app1; ss.
     }
+    { admit. }
+    { admit. }
     i. des.
     econs; eauto.
-    + inv SIM. inv EU. inv LOCAL. etrans; eauto.
-    + inv SIM. congr.
-    + inv SIM. congr.
-Qed.
+    + inv SIM; ss. inv EU. inv LOCAL. etrans; eauto.
+    + inv SIM; congr.
+    + admit. (* TODO: BUG: release should be the same.. inv SIM; congr. *)
+Admitted.
