@@ -17,55 +17,30 @@ Require Import Order.
 Require Import Time.
 Require Import Lang.
 Require Import Promising.
-Require Import Algorithmic.
+Require Import Certify.
 
 Set Implicit Arguments.
 
 
-Lemma no_promise_step
-      tid aeu1 aeu2
-      (STEP: AExecUnit.step tid aeu1 aeu2)
-      (WF: ExecUnit.wf tid aeu1)
-      (NOPROMISE: aeu1.(ExecUnit.local).(Local.promises) = bot):
-  <<NOPROMISE: aeu2.(ExecUnit.local).(Local.promises) = bot>> /\
-  <<TAINT: aeu2.(AExecUnit.aux).(AExecUnit.taint) = aeu1.(AExecUnit.aux).(AExecUnit.taint)>>.
+Lemma no_promise_certify_init
+      tid (eu:ExecUnit.t (A:=unit))
+      (PROMISES: eu.(ExecUnit.local).(Local.promises) = bot):
+  certify tid eu Lock.init.
 Proof.
-  destruct aeu1 as [[st1 lc1 mem1] aux1].
-  destruct aeu2 as [[st2 lc2 mem2] aux2].
-  ss. inv STEP.
-  - (* state_step *)
-    inv STEP0. inv STEP. ss. subst. inv LOCAL.
-    + inv LC. eauto.
-    + inv STEP. ss. destruct ex; ss.
-    + inv WF. ss. inv LOCAL. inv STEP. inv WRITABLE. ss.
-      exploit PROMISES0; eauto. rewrite NOPROMISE, Promises.lookup_bot. ss.
-    + inv STEP. ss. esplits; ss.
-      funext. i. propext. econs; i.
-      * inv H; ss.
-      * left. ss.
-    + inv STEP. ss.
-    + inv STEP. ss.
-    + inv STEP. ss.
-    + inv STEP. ss.
-  - (* write step *)
-    inv STEP0. ss. subst.
-    inv LOCAL. ss.
+  econs; eauto. s. funext. i. propext. econs; ss.
+  intro X. inv X. inv R.
 Qed.
 
-Lemma no_promise_steps
-      tid aeu1 aeu2
-      (STEPS: rtc (AExecUnit.step tid) aeu1 aeu2)
-      (WF: ExecUnit.wf tid aeu1)
-      (NOPROMISE: aeu1.(ExecUnit.local).(Local.promises) = bot):
-  <<NOPROMISE: aeu2.(ExecUnit.local).(Local.promises) = bot>> /\
-  <<TAINT: aeu2.(AExecUnit.aux).(AExecUnit.taint) = aeu1.(AExecUnit.aux).(AExecUnit.taint)>>.
+Lemma no_promise_certify_inv
+      tid (eu:ExecUnit.t (A:=unit)) l
+      (PROMISES: eu.(ExecUnit.local).(Local.promises) = bot)
+      (CERTIFY: certify tid eu l):
+  l = Lock.init.
 Proof.
-  revert NOPROMISE. induction STEPS; ss. i.
-  exploit no_promise_step; eauto. i. des.
-  exploit IHSTEPS; eauto.
-  { eapply AExecUnit.step_wf; eauto. }
-  i. des.
-  esplits; ss. etrans; eauto.
+  destruct l. inv CERTIFY. ss. subst. inv STEPS.
+  - ss. unfold Lock.init. f_equal. funext. i. propext. econs; i; ss.
+    inv H. inv R.
+  - inv H; inv STEP; ss.
 Qed.
 
 Lemma rtc_state_step_certify_bot

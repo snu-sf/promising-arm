@@ -18,7 +18,7 @@ Require Import Order.
 Require Import Time.
 Require Import Lang.
 Require Import Promising.
-Require Import Algorithmic.
+Require Import Certify.
 Require Import CertifyFacts.
 
 Set Implicit Arguments.
@@ -266,7 +266,9 @@ Lemma sim_aeu_step
       (SIM: sim_aeu tid ts aeu1 aeu2)
       (STEP: AExecUnit.step tid aeu2 aeu2')
       (WF1: ExecUnit.wf tid aeu1)
-      (WF2: ExecUnit.wf tid aeu2):
+      (WF2: ExecUnit.wf tid aeu2)
+      (VWP: aeu2'.(ExecUnit.local).(Local.vwp).(View.ts) <= ts)
+      (VCAP: aeu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts):
   exists aeu1',
     <<STEP: rtc (AExecUnit.step tid) aeu1 aeu1'>> /\
     <<SIM: sim_aeu tid ts aeu1' aeu2'>>.
@@ -275,17 +277,16 @@ Proof.
   destruct aeu1 as [[[stmts1 rmap1] lc1 mem1] aux1].
   destruct aeu2 as [[[stmts2 rmap2] lc2 mem2] aux2].
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
-  ss. inv SIM; ss; cycle 1.
-  { exploit no_promise_step; eauto. s. i. des.
-    esplits; eauto. econs 2; ss.
-    - etrans; eauto.
-    - etrans; eauto. admit.
-  }
+  ss. 
 
+  inv SIM; ss; cycle 1.
+  { inv STEP; inv STEP0; ss. }
   inv STEP.
   { (* state_step *)
     inv STEP0. inv STEP. ss. subst.
     inv EU. ss.
+    assert (PROMISES1: lc1.(Local.promises) <> bot).
+    { inv LOCAL0. ss. congr. }
     inv STATE0. ss. subst.
     inv LOCAL; ss; inv STATE.
     - (* skip *)
@@ -314,7 +315,7 @@ Proof.
         * s. econs 6; ss.
       + econs; ss.
         assert (LOC_VIEW: View.ts (ValA.annot (sem_expr rmap2' cond)) <= ts).
-        { admit. (* MOVE: not depend on big ts of cond *) }
+        { rewrite <- VCAP, <- join_r. refl. }
         econs; ss.
         * econs; ss.
           exploit sim_rmap_expr; eauto. i.
@@ -333,19 +334,19 @@ Proof.
       inv STEP. destruct (le_dec ts0 ts).
       { (* read from old msg. *)
         eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
-        - left. econs; ss. econs; ss; cycle 1.
+        - left. econs; ss.
+          assert (ELOC: sem_expr rmap1 eloc = sem_expr rmap2 eloc).
+          { eapply sim_rmap_expr; eauto. rewrite <- VCAP, <- join_r. refl. }
+          econs; ss; cycle 1.
           + econs 2; eauto. econs.
             4: instantiate (1 := ts0).
             1: instantiate (1 := (sem_expr rmap1 eloc)).
             all: ss.
-            * rewrite <- COH.
-              admit. (* not depend on big ts of loc *)
-            * hexploit sim_rmap_expr; eauto. intro X. inv X.
-              exploit TS.
-              { admit. (* not depend on big ts of loc *) }
-              i. des. rewrite x.
-              admit. (* memory no_msgs *)
-            * admit. (* memory read *)
+            all: rewrite ELOC.
+            * inv LOCAL0. specialize (COH0 (ValA.val (sem_expr rmap2 eloc))). inv COH0.
+              rewrite TS; ss. etrans; eauto.
+            * admit. (* hard: coh <= ts0, so no additional messages *)
+            * admit. (* easy: memory read *)
           + econs 3; ss.
         - econs; ss. econs; ss.
           + admit. (* sim_state *)
@@ -379,9 +380,8 @@ Proof.
         * econs 6; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss.
-        admit. (* big vwp *)
-        (* eauto using sim_low_view_join, sim_low_view_bot. *)
+        inv LOCAL0. econs; ss. apply sim_low_view_join; ss. apply sim_view_low_view; ss.
+        rewrite <- VWP, <- join_r. refl.
     - (* dmbld *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
@@ -390,8 +390,10 @@ Proof.
         * s. econs 5.
       + econs; ss. econs; ss.
         inv LOCAL0. econs; ss.
-        all: admit. (* big vwp *)
-        (* eauto using sim_low_view_join, sim_low_view_bot. *)
+        * apply sim_low_view_join; ss. apply sim_view_low_view; ss.
+          rewrite <- VWP, <- join_r. refl.
+        * apply sim_low_view_join; ss. apply sim_view_low_view; ss.
+          rewrite <- VWP, <- join_r. refl.
     - (* dmbsy *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
@@ -400,8 +402,12 @@ Proof.
         * s. econs 5.
       + econs; ss. econs; ss.
         inv LOCAL0. econs; ss.
-        all: admit. (* big vwp *)
-        (* eauto using sim_low_view_join, sim_low_view_bot. *)
+        * repeat apply sim_low_view_join; eauto using sim_low_view_bot.
+          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_l. refl. }
+          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_r, <- join_l. refl. }
+        * repeat apply sim_low_view_join; eauto using sim_low_view_bot.
+          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_l. refl. }
+          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_r, <- join_l. refl. }
   }
   { (* write_step *)
     admit.
@@ -420,12 +426,15 @@ Lemma sim_aeu_rtc_step
 Proof.
   revert aeu1 SIM WF1 WF2. induction STEP.
   { i. esplits; eauto. }
-  i. exploit sim_aeu_step; eauto. i. des.
+  i. exploit sim_aeu_step; eauto.
+  { admit. (* vwp *) }
+  { admit. (* vcap *) }
+  i. des.
   exploit AExecUnit.step_wf; eauto. i.
   exploit AExecUnit.rtc_step_wf; eauto. i.
   exploit IHSTEP; eauto. i. des.
   esplits; [|by eauto]. etrans; eauto.
-Qed.
+Admitted.
 
 Inductive sound_taint (loc:Loc.t) (v:Taint.t): Prop :=
 | sound_taint_intro
@@ -543,7 +552,8 @@ Proof.
     - inv LC. econs; ss. econs; ss.
       eauto using sound_view_join, sound_view_bot.
     - inv LC. econs; ss.
-      + admit. (* sound rmap addd expr *)
+      + apply sound_rmap_add; ss.
+        econs. apply sound_rmap_expr. ss.
       + econs; ss.
         eauto using sound_view_join, sound_view_bot.
     - inv LC. econs; ss.
@@ -676,11 +686,12 @@ Proof.
           * exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
             rewrite nth_error_app1; ss.
     }
-    { admit. }
-    { admit. }
+    { apply AExecUnit.init_wf. ss. }
+    { apply AExecUnit.init_wf. ss. }
     i. des.
     econs; eauto.
     + inv SIM; ss. inv EU. inv LOCAL. etrans; eauto.
     + inv SIM; congr.
-    + admit. (* TODO: BUG: release should be the same.. inv SIM; congr. *)
+    + rewrite RELEASE. inv SIM; ss.
+      inv EU. congr.
 Admitted.
