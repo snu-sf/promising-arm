@@ -17,8 +17,9 @@ Require Import Order.
 Require Import Time.
 Require Import Lang.
 Require Import Promising.
-Require Import Certify.
 Require Import Algorithmic.
+Require Import Certify.
+Require Import CertifyFacts.
 Require Import StateExecFacts.
 
 Set Implicit Arguments.
@@ -56,9 +57,10 @@ Theorem algorithmic_pf_to_algorithmic
     <<EXEC: AMachine.exec p m'>> /\
     <<EQUIV: Machine.equiv m m'>>.
 Proof.
+  (* TODO: do it first.  change the lock type to function. *)
   inv EXEC. exploit state_exec_rtc_state_step; eauto. i. des.
   exploit Machine.equiv_no_promise; eauto. i.
-  destruct am1.
+  destruct am1. ss.
   assert (tlocks = IdMap.map (fun _ => Lock.init) machine.(Machine.tpool)) by admit. subst. ss.
   exploit lift_rtc_machine_state_step; try exact x0; eauto. i.
   eexists (AMachine.mk m2' _). splits; eauto. econs.

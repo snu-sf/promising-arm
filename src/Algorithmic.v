@@ -146,6 +146,7 @@ Module AMachine.
       am1
       (STEP1: rtc (step ExecUnit.promise_step) (init p) am1)
       (STEP2: Machine.state_exec am1 m)
+      (LOCK: IdMap.Forall (fun _ lock => lock = Lock.init) am1.(tlocks))
       (NOPROMISE: Machine.no_promise m)
   .
   Hint Constructors pf_exec.
