@@ -23,17 +23,30 @@ Require Import StateExecFacts.
 Set Implicit Arguments.
 
 
-Lemma rtc_state_step_certify_inv
-      m1 m2 tid st lc lock
-      (STEPS: rtc (Machine.step ExecUnit.state_step) m1 m2)
-      (NOPROMISE: Machine.no_promise m2)
-      (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st, lc))
-      (CERTIFY: certify tid (ExecUnit.mk st lc m1.(Machine.mem)) lock):
-  lock = Lock.init.
+Lemma lift_machine_state_step
+      m1 m2 m3
+      (STEP1: Machine.step ExecUnit.state_step m1 m2)
+      (STEP2: rtc (Machine.step ExecUnit.state_step) m2 m3)
+      (NOPROMISE: Machine.no_promise m3):
+  AMachine.step ExecUnit.state_step
+                (AMachine.mk m1 (IdMap.map (fun _ => Lock.init) m1.(Machine.tpool)))
+                (AMachine.mk m2 (IdMap.map (fun _ => Lock.init) m2.(Machine.tpool))).
 Proof.
-  destruct lock as [ex release].
-  inv CERTIFY. ss. subst.
+  inv STEP1. econs; eauto; ss.
 Admitted.
+
+Lemma lift_rtc_machine_state_step
+      m1 m2 m3
+      (STEP1: rtc (Machine.step ExecUnit.state_step) m1 m2)
+      (STEP2: rtc (Machine.step ExecUnit.state_step) m2 m3)
+      (NOPROMISE: Machine.no_promise m3):
+  rtc (AMachine.step ExecUnit.state_step)
+      (AMachine.mk m1 (IdMap.map (fun _ => Lock.init) m1.(Machine.tpool)))
+      (AMachine.mk m2 (IdMap.map (fun _ => Lock.init) m2.(Machine.tpool))).
+Proof.
+  revert STEP2 NOPROMISE. induction STEP1; eauto. i.
+  exploit lift_machine_state_step; try exact NOPROMISE; eauto. etrans; eauto.
+Qed.
 
 Theorem algorithmic_pf_to_algorithmic
         p m
@@ -43,10 +56,14 @@ Theorem algorithmic_pf_to_algorithmic
     <<EQUIV: Machine.equiv m m'>>.
 Proof.
   inv EXEC. exploit state_exec_rtc_state_step; eauto. i. des.
+  exploit Machine.equiv_no_promise; eauto. i.
+  destruct am1.
+  assert (tlocks = IdMap.map (fun _ => Lock.init) machine.(Machine.tpool)) by admit. subst. ss.
+  exploit lift_rtc_machine_state_step; try exact x0; eauto. i.
   eexists (AMachine.mk m2' _). splits; eauto. econs.
   - etrans.
     + eapply rtc_mon; [|by eauto]. apply AMachine.step_mon. right. ss.
-    + admit. (* machine step -> amachine step *)
-  - eauto.
-  - eapply Machine.equiv_no_promise; eauto.
+    + eapply rtc_mon; [|by eauto]. apply AMachine.step_mon. left. ss.
+  - ss.
+  - ss.
 Admitted.

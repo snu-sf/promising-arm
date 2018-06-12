@@ -23,32 +23,6 @@ Require Import CertifyFacts.
 Set Implicit Arguments.
 
 
-Lemma rtc_state_step_certify_bot
-      m1 m2 tid st lc
-      (STEPS: rtc (Machine.step ExecUnit.state_step) m1 m2)
-      (WF: Machine.wf m1)
-      (NOPROMISE: Machine.no_promise m2)
-      (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st, lc)):
-  certify tid (ExecUnit.mk st lc m1.(Machine.mem)) Lock.init.
-Proof.
-  revert tid st lc FIND NOPROMISE. induction STEPS.
-  { econs; eauto; ss.
-    - eapply NOPROMISE. eauto.
-    - funext. unfold bot, fun_bot. i. propext. econs; ss. i. inv H; ss.
-  }
-  i. inv H. exploit IHSTEPS; ss.
-  { eapply Machine.step_state_step_wf; eauto. }
-  { rewrite TPOOL, IdMap.add_spec, FIND.
-    instantiate (1 := if equiv_dec tid tid0 then lc2 else lc).
-    instantiate (1 := if equiv_dec tid tid0 then st2 else st).
-    condtac; ss.
-  }
-  condtac.
-  - inversion e. subst. rewrite FIND in FIND0. inv FIND0.
-    admit. (* certify is preserved if I executed a state_step. *)
-  - admit. (* certify is preserved if another thread is executed. *)
-Admitted.
-
 Theorem promising_pf_to_algorithmic_pf
         p m
         (EXEC: Machine.pf_exec p m):
