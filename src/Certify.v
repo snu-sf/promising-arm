@@ -44,6 +44,11 @@ Module Lock.
       (LOC: exlock.(loc) = l)
       (RANGE: exlock.(from) = 0)
   .
+
+  Inductive proceed (l:Loc.t) (lock1 lock2:t): Prop :=
+  | proceed_intro
+      (* TODO *)
+  .
 End Lock.
 
 Module Taint.

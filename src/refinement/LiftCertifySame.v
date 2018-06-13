@@ -32,6 +32,6 @@ Lemma lift_certify_same
       (LOCAL: Local.promise loc val tid eu1.(ExecUnit.local) eu1.(ExecUnit.mem) eu2.(ExecUnit.local) eu2.(ExecUnit.mem)):
   exists lock1,
     <<CERTIFY: certify tid eu1 lock1>> /\
-    <<LOCK: lock2 = lock1>>.
+    <<LOCK: Lock.proceed loc lock1 lock2>>.
 Proof.
 Admitted.

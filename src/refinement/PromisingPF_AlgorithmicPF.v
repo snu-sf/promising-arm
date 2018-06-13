@@ -20,6 +20,8 @@ Require Import Promising.
 Require Import Algorithmic.
 Require Import Certify.
 Require Import CertifyFacts.
+Require Import LiftCertifySame.
+Require Import LiftCertifyDiff.
 
 Set Implicit Arguments.
 
@@ -33,8 +35,43 @@ Lemma amachine_step_backward
     <<STEP: AMachine.step ExecUnit.promise_step (AMachine.mk m1 tlocks1) (AMachine.mk m2 tlocks2)>> /\
     <<WF: AMachine.wf (AMachine.mk m1 tlocks1)>>.
 Proof.
-  inv STEP. eexists (fun_add tid (Some _) tlocks2).
-Admitted.
+  inv WF2. inv STEP. inv STEP0. ss. subst.
+  generalize (CERTIFY tid). rewrite TPOOL, IdMap.add_spec. condtac; [|congr].
+  intro Y. inv Y. rename b into lock2. ss.
+  exploit lift_certify_same.
+  { eauto. }
+  { instantiate (1 := ExecUnit.mk st2 lc1 m1.(Machine.mem)). ss. }
+  { eauto. }
+  i. des.
+  exists (fun_add tid (Some lock1) tlocks2). splits; ss.
+  - econs; eauto.
+    + econs; eauto.
+    + ss. funext. i. rewrite ? fun_add_spec. condtac; ss. inversion e0. subst. ss.
+  - econs; ss. (* TODO: interfere *)
+    + i. generalize (CERTIFY tid0). rewrite TPOOL, IdMap.add_spec, fun_add_spec. condtac; ss.
+      * inversion e0. subst. rewrite FIND. econs. ss.
+      * intro Y. inv Y; ss. econs. 
+        eapply lift_certify_diff; eauto.
+        { apply WF1. destruct a. ss. }
+        { inv LOCAL. inv MEM2. ss. }
+        { s. ii. subst. congr. }
+    + econs 2; eauto.
+      * rewrite fun_add_spec. instantiate (1 := tid). condtac; ss.
+      * i. revert FIND0. rewrite fun_add_spec. condtac; ss. i.
+        generalize (CERTIFY tid'). rewrite FIND0. intro Y. inv Y.
+        revert H1. rewrite TPOOL, IdMap.add_spec. condtac; ss. i. destruct a.
+        exploit lift_certify_diff.
+        { eauto. }
+        { apply WF1. eauto. }
+        { ss. }
+        { ss. }
+        { inv LOCAL. inv MEM2. ss. }
+        { intuition. }
+        i. des. ss.
+      * assert (fun_add tid (Some lock2) (fun_add tid (Some lock1) tlocks2) = tlocks2).
+        { funext. i. rewrite ? fun_add_spec. condtac; ss. inversion e0. subst. ss. }
+        rewrite <- H0 in CONSISTENT. ss.
+Qed.
 
 Lemma amachine_rtc_step_backward
       m1 m2 tlocks2

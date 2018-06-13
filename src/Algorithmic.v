@@ -44,7 +44,11 @@ Module AMachine.
   | consistent_final
       (FINAL: forall tid lock (FIND: am tid = Some lock), lock = Lock.init)
   | consistent_step
-      (TODO: False)
+      tid loc lock1 lock2
+      (FIND: am tid = Some lock1)
+      (PROCEED: Lock.proceed loc lock1 lock2)
+      (INTERFERE: forall tid' lock' (TID: tid' <> tid) (FIND: am tid' = Some lock'), ~ Lock.is_locked lock' loc)
+      (STEP: consistent (fun_add tid (Some lock2) am))
   .
   Hint Constructors consistent.
 
