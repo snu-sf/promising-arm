@@ -41,10 +41,7 @@ Proof.
     { rewrite TPOOL, IdMap.add_spec. condtac; eauto. instantiate (1 := tid). congr. }
     i. des. eapply rtc_state_step_certify_bot; eauto. ss.
     eapply NOPROMISE. eauto.
-  - econs 1. unfold compose. i. revert FIND0. rewrite TPOOL, IdMap.add_spec.
-    condtac; ss.
-    + i. inv FIND0. ss.
-    + destruct (IdMap.find tid0 (Machine.tpool m1)); ss. i. inv FIND0. ss.
+  - apply AMachine.init_tlocks_consistent.
 Qed.
 
 Lemma lift_rtc_machine_state_step

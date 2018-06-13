@@ -33,10 +33,13 @@ Module AMachine.
   Hint Constructors t.
   Coercion machine: t >-> Machine.t.
 
+  Definition init_tlocks A (m:IdMap.t A): Id.t -> (option Lock.t) :=
+    fun tid => option_map (fun _ => Lock.init) (IdMap.find tid m).
+
   Definition init (p:program): t :=
     mk
       (Machine.init p)
-      (fun tid => option_map (fun _ => Lock.init) (IdMap.find tid p)).
+      (init_tlocks p).
 
   Inductive consistent (am: Id.t -> (option (Lock.t * (Loc.t -> nat)))): Prop :=
   | consistent_final
@@ -58,15 +61,21 @@ Module AMachine.
   .
   Hint Constructors wf.
 
+  Lemma init_tlocks_consistent A (m:IdMap.t A):
+    consistent ((option_map (fun lock => (lock, bot))) ∘ (init_tlocks m)).
+  Proof.
+    econs 1. unfold compose, init_tlocks. i. revert FIND.
+    destruct (IdMap.find tid m); ss. i. inv FIND. ss.
+  Qed.
+
   Lemma init_wf p:
     wf (init p).
   Proof.
     econs.
     - apply Machine.init_wf.
-    - s. i. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss.
+    - s. unfold init_tlocks. i. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss.
       econs. s. apply no_promise_certify_init. ss.
-    - econs. unfold compose. s. i. revert FIND. destruct (IdMap.find tid p); ss.
-      i. inv FIND. ss.
+    - apply init_tlocks_consistent.
   Qed.
 
   Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
