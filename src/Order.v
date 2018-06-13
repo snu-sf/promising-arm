@@ -86,11 +86,11 @@ Definition bot (A:Type) `{_: orderC A} := bot.
 
 
 Definition fun_add A B `{_: EqDec A} (a:A) (b:B) (f:A -> B): A -> B :=
-  fun x => if a == x then b else f x.
+  fun x => if x == a then b else f x.
 Hint Unfold fun_add.
 
 Lemma fun_add_spec A B `{_: EqDec A} a (b:B) f x:
-  (fun_add a b f) x = if a == x then b else f x.
+  (fun_add a b f) x = if x == a then b else f x.
 Proof. refl. Qed.
 
 Definition fun_eq A B `{_: Equivalence B} (f g: A -> B): Prop :=
@@ -202,7 +202,6 @@ Next Obligation.
   unfold fun_le, fun_join, fun_bot.
   eauto using bot_spec.
 Qed.
-
 
 Inductive opt_eq X `{_: Equivalence X}: forall (a b: option X), Prop :=
 | opt_eq_None: opt_eq None None

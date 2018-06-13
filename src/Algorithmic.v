@@ -12,6 +12,7 @@ Require Import FSetPositive.
 Require Import EquivDec.
 Require Import sflib.
 Require Import HahnSets.
+Require Import Program.
 
 Require Import Basic.
 Require Import Order.
@@ -27,7 +28,7 @@ Set Implicit Arguments.
 Module AMachine.
   Inductive t := mk {
     machine: Machine.t;
-    tlocks: IdMap.t Lock.t;
+    tlocks: Id.t -> (option Lock.t);
   }.
   Hint Constructors t.
   Coercion machine: t >-> Machine.t.
@@ -35,11 +36,11 @@ Module AMachine.
   Definition init (p:program): t :=
     mk
       (Machine.init p)
-      (IdMap.map (fun _ => Lock.init) p).
+      (fun tid => option_map (fun _ => Lock.init) (IdMap.find tid p)).
 
-  Inductive consistent (am: IdMap.t (Lock.t * (Loc.t -> nat))): Prop :=
+  Inductive consistent (am: Id.t -> (option (Lock.t * (Loc.t -> nat)))): Prop :=
   | consistent_final
-      (FINAL: IdMap.Forall (fun _ th => Lock.is_final th.(fst) th.(snd)) am)
+      (FINAL: forall tid lock cntr (FIND: am tid = Some (lock, cntr)), Lock.is_final lock cntr)
   | consistent_step
       (TODO: False)
   .
@@ -48,10 +49,12 @@ Module AMachine.
   Inductive wf (m:t): Prop :=
   | wf_intro
       (MACHINE: Machine.wf m.(machine))
-      (CERTIFY: IdMap.Forall2
-                  (fun tid th tlock => certify tid (ExecUnit.mk th.(fst) th.(snd) m.(Machine.mem)) tlock)
-                  m.(Machine.tpool) m.(tlocks))
-      (CONSISTENT: consistent (IdMap.map (fun tlock => (tlock, bot)) m.(tlocks)))
+      (CERTIFY:
+         forall tid,
+           opt_rel
+             (fun th tlock => certify tid (ExecUnit.mk th.(fst) th.(snd) m.(Machine.mem)) tlock)
+             (IdMap.find tid m.(Machine.tpool)) (m.(tlocks) tid))
+      (CONSISTENT: consistent ((option_map (fun lock => (lock, bot))) ∘ m.(tlocks)))
   .
   Hint Constructors wf.
 
@@ -60,10 +63,10 @@ Module AMachine.
   Proof.
     econs.
     - apply Machine.init_wf.
-    - s. ii. rewrite ? IdMap.map_spec. destruct (IdMap.find id p); ss.
+    - s. i. rewrite IdMap.map_spec. destruct (IdMap.find tid p); ss.
       econs. s. apply no_promise_certify_init. ss.
-    - econs. s. intros ? ?. rewrite ? IdMap.map_spec.
-      destruct (IdMap.find id p); ss. i. inv FIND. ss.
+    - econs. unfold compose. s. i. revert FIND. destruct (IdMap.find tid p); ss.
+      i. inv FIND. ss.
   Qed.
 
   Inductive step (eustep: forall (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)), Prop) (m1 m2:t): Prop :=
@@ -72,10 +75,10 @@ Module AMachine.
       (FIND: IdMap.find tid m1.(Machine.tpool) = Some (st1, lc1))
       (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(Machine.mem)) (ExecUnit.mk st2 lc2 m2.(Machine.mem)))
       (TPOOL: m2.(Machine.tpool) = IdMap.add tid (st2, lc2) m1.(Machine.tpool))
-      (TLOCKS: m2.(tlocks) = IdMap.add tid tlock m1.(tlocks))
+      (TLOCKS: m2.(tlocks) = fun_add tid (Some tlock) m1.(tlocks))
       (CERTIFY: certify tid (ExecUnit.mk st2 lc2 m2.(Machine.mem)) tlock)
       (INTERFERE: True) (* TODO: doesn't bother other's lock *)
-      (CONSISTENT: consistent (IdMap.map (fun tlock => (tlock, bot)) m2.(tlocks)))
+      (CONSISTENT: consistent ((option_map (fun lock => (lock, bot))) ∘ m2.(tlocks)))
   .
   Hint Constructors step.
 
@@ -87,7 +90,7 @@ Module AMachine.
   Proof.
     inv WF. inv STEP. econs; eauto.
     - eapply Machine.step_state_step_wf; eauto.
-    - rewrite TPOOL, TLOCKS. ii. rewrite ? IdMap.add_spec. condtac.
+    - rewrite TPOOL, TLOCKS. ii. rewrite IdMap.add_spec, fun_add_spec. condtac.
       + inversion e. eauto.
       + inv STEP0. inv STEP. ss. rewrite MEM. eauto.
   Qed.
@@ -100,7 +103,7 @@ Module AMachine.
   Proof.
     inv WF. inv STEP. econs; eauto.
     - eapply Machine.step_promise_step_wf; eauto.
-    - rewrite TPOOL, TLOCKS. ii. rewrite ? IdMap.add_spec. condtac.
+    - rewrite TPOOL, TLOCKS. ii. rewrite IdMap.add_spec, fun_add_spec. condtac.
       + inversion e. eauto.
       + admit. (* certify after changing mem; "INTERFERE" is important here. *)
   Admitted.
@@ -146,7 +149,7 @@ Module AMachine.
       am1
       (STEP1: rtc (step ExecUnit.promise_step) (init p) am1)
       (STEP2: Machine.state_exec am1 m)
-      (LOCK: IdMap.Forall (fun _ lock => lock = Lock.init) am1.(tlocks))
+      (FINAL: forall tid lock (FIND: am1.(tlocks) tid = Some lock), lock = Lock.init)
       (NOPROMISE: Machine.no_promise m)
   .
   Hint Constructors pf_exec.

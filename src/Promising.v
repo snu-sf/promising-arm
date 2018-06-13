@@ -814,7 +814,7 @@ Section ExecUnit.
           eapply read_wf. eauto.
         * destruct ex0; ss. i. inv H1. eapply read_wf. eauto.
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
-          rewrite fun_add_spec. condtac; ss. inversion e. ss.
+          rewrite fun_add_spec. condtac; ss. inversion e. rewrite H2. ss.
     - inv RES. inv VIEW. inv VVAL. inv VIEW. inv VLOC. inv VIEW.
       inv STEP. inv WRITABLE. econs; ss.
       + apply rmap_add_wf; viewtac.
@@ -830,7 +830,7 @@ Section ExecUnit.
             revert TS2. condtac; intuition.
           }
           { eapply PROMISES0; eauto. revert TS2. condtac; ss. i.
-            inversion e. rewrite COH0. ss.
+            inversion e. rewrite H2. rewrite COH0. ss.
           }
     - inv STEP. econs; ss. apply rmap_add_wf; viewtac.
       inv RES. inv VIEW. rewrite TS. s. apply bot_spec.

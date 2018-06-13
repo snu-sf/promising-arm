@@ -30,7 +30,7 @@ Theorem promising_pf_to_algorithmic_pf
   AMachine.pf_exec p m.
 Proof.
   inv EXEC. econs; ss.
-  - instantiate (1 := AMachine.mk m1 (IdMap.map (fun _ => Lock.init) m1.(Machine.tpool))).
+  - instantiate (1 := AMachine.mk m1 (fun tid => option_map (fun _ => Lock.init) (IdMap.find tid m1.(Machine.tpool)))).
     (* TODO
      - rtc_state_step_certify_bot : lock.init at last
      - one step from the end..
