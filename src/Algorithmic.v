@@ -12,7 +12,6 @@ Require Import FSetPositive.
 Require Import EquivDec.
 Require Import sflib.
 Require Import HahnSets.
-Require Import Program.
 
 Require Import Basic.
 Require Import Order.
@@ -41,9 +40,9 @@ Module AMachine.
       (Machine.init p)
       (init_tlocks p).
 
-  Inductive consistent (am: Id.t -> (option (Lock.t * (Loc.t -> nat)))): Prop :=
+  Inductive consistent (am: Id.t -> option Lock.t): Prop :=
   | consistent_final
-      (FINAL: forall tid lock cntr (FIND: am tid = Some (lock, cntr)), Lock.is_final lock cntr)
+      (FINAL: forall tid lock (FIND: am tid = Some lock), lock = Lock.init)
   | consistent_step
       (TODO: False)
   .
@@ -57,14 +56,14 @@ Module AMachine.
            opt_rel
              (fun th tlock => certify tid (ExecUnit.mk th.(fst) th.(snd) m.(Machine.mem)) tlock)
              (IdMap.find tid m.(Machine.tpool)) (m.(tlocks) tid))
-      (CONSISTENT: consistent ((option_map (fun lock => (lock, bot))) ∘ m.(tlocks)))
+      (CONSISTENT: consistent m.(tlocks))
   .
   Hint Constructors wf.
 
   Lemma init_tlocks_consistent A (m:IdMap.t A):
-    consistent ((option_map (fun lock => (lock, bot))) ∘ (init_tlocks m)).
+    consistent (init_tlocks m).
   Proof.
-    econs 1. unfold compose, init_tlocks. i. revert FIND.
+    econs 1. unfold init_tlocks. i. revert FIND.
     destruct (IdMap.find tid m); ss. i. inv FIND. ss.
   Qed.
 
@@ -87,7 +86,7 @@ Module AMachine.
       (TLOCKS: m2.(tlocks) = fun_add tid (Some tlock) m1.(tlocks))
       (CERTIFY: certify tid (ExecUnit.mk st2 lc2 m2.(Machine.mem)) tlock)
       (INTERFERE: True) (* TODO: doesn't bother other's lock *)
-      (CONSISTENT: consistent ((option_map (fun lock => (lock, bot))) ∘ m2.(tlocks)))
+      (CONSISTENT: consistent m2.(tlocks))
   .
   Hint Constructors step.
 

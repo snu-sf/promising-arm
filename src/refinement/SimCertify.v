@@ -636,7 +636,7 @@ Lemma lift_certify_diff
       (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ [msg])
       (MSG: msg.(Msg.tid) <> tid):
   <<CERTIFY: certify tid eu1 lock>> /\
-  <<NOLOCK: ~ Lock.is_locked lock bot msg.(Msg.loc)>>.
+  <<NOLOCK: ~ Lock.is_locked lock msg.(Msg.loc)>>.
 Proof.
   exploit lift_wf; eauto. i.
   destruct eu1 as [st1 lc1 mem1].
@@ -664,8 +664,7 @@ Proof.
     }
     ii. destruct lock as [ex release]. ss. subst.
     inv H. destruct exlock as [from to loc]. ss. subst.
-    inv RANGE. inv H. inv LOCK. ss.
-    eapply x1. eauto.
+    inv LOCK. ss. eapply x1. eauto.
   - (* certify *)
     exploit sim_aeu_rtc_step; try exact STEPS; eauto.
     { instantiate (1 := AExecUnit.init tid (ExecUnit.mk st1 lc1 mem1)). econs; ss.

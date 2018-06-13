@@ -23,6 +23,7 @@ Require Import CertifyFacts.
 
 Set Implicit Arguments.
 
+
 Lemma amachine_step_backward
       m1 m2 tlocks2
       (STEP: Machine.step ExecUnit.promise_step m1 m2)
@@ -32,6 +33,7 @@ Lemma amachine_step_backward
     <<STEP: AMachine.step ExecUnit.promise_step (AMachine.mk m1 tlocks1) (AMachine.mk m2 tlocks2)>> /\
     <<WF: AMachine.wf (AMachine.mk m1 tlocks1)>>.
 Proof.
+  inv STEP. eexists (fun_add tid (Some _) tlocks2).
 Admitted.
 
 Lemma amachine_rtc_step_backward

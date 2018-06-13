@@ -37,17 +37,12 @@ Module Lock.
 
   Definition init: t := mk bot bot.
 
-  Inductive is_locked (lock:t) (c:Loc.t -> nat) (l:Loc.t): Prop :=
+  Inductive is_locked (lock:t) (l:Loc.t): Prop :=
   | is_locked_intro
       exlock
       (LOCK: lock.(ex) exlock)
-      (LOC: l = exlock.(loc))
-      (RANGE: exlock.(from) <= c l /\ c l < exlock.(to))
-  .
-
-  Inductive is_final (lock:t) (c:Loc.t -> nat): Prop :=
-  | is_final_intro
-      (LOCK: forall exlock (LOCK: lock.(ex) exlock), exlock.(to) <= (c exlock.(loc)))
+      (LOC: exlock.(loc) = l)
+      (RANGE: exlock.(from) = 0)
   .
 End Lock.
 
