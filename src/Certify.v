@@ -47,7 +47,16 @@ Module Lock.
 
   Inductive proceed (l:Loc.t) (lock1 lock2:t): Prop :=
   | proceed_intro
-      (* TODO *)
+      (LOCK:
+         forall elt,
+           lock2.(ex) elt =
+           lock1.(ex) (mk_ex elt.(loc) (S elt.(from)) (S elt.(to))) \/
+           (elt.(from) = 0 /\ 0 < elt.(to) /\ lock1.(ex) (mk_ex elt.(loc) 0 (S elt.(to)))))
+      (RELEASE:
+         forall l' n' l'',
+           lock2.(release) (l', n') l'' =
+           let l1 := lock1.(release) (l', if l' == l then S n' else n') l'' in
+           if l'' == l then Nat.pred l1 else l1)
   .
 End Lock.
 

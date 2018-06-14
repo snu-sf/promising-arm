@@ -58,7 +58,7 @@ Proof.
       { ss. }
       { inv MSG; ss. }
       { inv MSG; ss. ii. subst. congr. }
-  - econs; ss. (* TODO: interfere *)
+  - econs; ss.
     + i. generalize (CERTIFY tid0). rewrite TPOOL, IdMap.add_spec, fun_add_spec. condtac; ss.
       * inversion e0. subst. rewrite FIND. econs. ss.
       * intro Y. inv Y; ss. econs. 
