@@ -99,6 +99,14 @@ Proof.
   econs. ss.
 Qed.
 
+Lemma void_taint_ifc
+      c v
+      (V: void_taint v):
+  void_taint (ifc c v).
+Proof.
+  unfold ifc. condtac; ss. apply void_taint_bot.
+Qed.
+
 Lemma void_view_join
       v1 v2
       (V1: void_view v1)
@@ -110,6 +118,20 @@ Qed.
 
 Lemma void_view_bot:
   void_view bot.
+Proof.
+  econs. apply void_taint_bot.
+Qed.
+
+Lemma void_view_ifc
+      c v
+      (V: void_view v):
+  void_view (ifc c v).
+Proof.
+  unfold ifc. condtac; ss. apply void_view_bot.
+Qed.
+
+Lemma void_view_const ts:
+  void_view (View.mk ts bot).
 Proof.
   econs. apply void_taint_bot.
 Qed.
@@ -158,18 +180,47 @@ Proof.
     inv LC0. inv LC. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
   - econs; ss.
     inv LC0. inv LC. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
-  - inv STEP. ss. econs; ss.
+  - inv STEP. ss.
+    assert (FWD:
+              void_view
+                (match Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc)) with
+                 | Some fwd => FwdItem.read_view fwd ts ord
+                 | None => {| View.ts := ts; View.annot := bot |}
+                 end)).
+    { destruct (Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc))) eqn:FWD;
+        eauto using void_view_const.
+      unfold FwdItem.read_view. condtac; eauto using void_view_const.
+      eapply LC. eauto.
+    }
+    econs; ss.
     + apply void_rmap_add; ss. econs. econs. s.
-      admit.
-    + inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
-      all: admit.
+      repeat apply void_taint_join.
+      * apply void_rmap_expr. ss.
+      * apply LC.
+      * unfold ifc. condtac; eauto using void_taint_bot. apply LC.
+      * eauto using void_taint_bot.
+      * apply FWD.
+      * destruct ex; ss. apply void_taint_bot.
+    + inv LC. econs; s; repeat apply void_view_join;
+        eauto 10 using void_view_join, void_view_ifc, void_view_bot, void_rmap_expr.
     + destruct ex; ss.
     + destruct ex; ss.
-  - inv STEP. ss. econs; ss.
-    + apply void_rmap_add; ss. econs. admit. (* view_ext *)
-    + inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
-      all: admit.
-    + admit.
+  - inv STEP. ss.
+    assert (VIEW_EXT: void_taint (View.annot view_ext)).
+    { inv WRITABLE. s.
+      repeat apply void_taint_join.
+      all: try by apply void_rmap_expr.
+      all: try (unfold ifc; condtac).
+      all: try by apply void_taint_bot.
+      all: try by apply LC.
+    }
+    econs; ss.
+    + apply void_rmap_add; ss.
+    + inv LC. econs; s; eauto using void_view_join, void_view_bot, void_view_const, void_rmap_expr.
+      i. revert FWD. rewrite fun_add_spec. condtac; eauto. i.
+      inversion e. inv FWD. s.
+      eauto using void_view_join, void_view_bot, void_view_const, void_rmap_expr.
+    + apply void_taint_join; ss.
   - inv STEP. econs; ss.
     + apply void_rmap_add; ss. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
     + inv LC. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
@@ -182,7 +233,7 @@ Proof.
     inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
   - inv STEP. econs; ss.
     inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
-Admitted.
+Qed.
 
 Lemma void_rtc_aeu_step
       tid aeu1 aeu2
