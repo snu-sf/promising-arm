@@ -47,6 +47,17 @@ Proof.
   - econs; eauto.
     + econs; eauto.
     + ss. funext. i. rewrite ? fun_add_spec. condtac; ss. inversion e0. subst. ss.
+    + s. i. inv LOCAL. inv MEM2. rewrite MEM in H2. apply app_inv_head in H2. subst.
+      revert LOCK0. rewrite fun_add_spec. condtac; ss. i.
+      generalize (CERTIFY tid'). rewrite LOCK0. i. inv H0.
+      revert H2. rewrite TPOOL, IdMap.add_spec. condtac; ss. i. destruct a.
+      eapply certify_diff_not_locked.
+      { eauto. }
+      { apply WF1. eauto. }
+      { ss. }
+      { ss. }
+      { inv MSG; ss. }
+      { inv MSG; ss. ii. subst. congr. }
   - econs; ss. (* TODO: interfere *)
     + i. generalize (CERTIFY tid0). rewrite TPOOL, IdMap.add_spec, fun_add_spec. condtac; ss.
       * inversion e0. subst. rewrite FIND. econs. ss.
@@ -60,14 +71,14 @@ Proof.
       * i. revert FIND0. rewrite fun_add_spec. condtac; ss. i.
         generalize (CERTIFY tid'). rewrite FIND0. intro Y. inv Y.
         revert H1. rewrite TPOOL, IdMap.add_spec. condtac; ss. i. destruct a.
-        exploit lift_certify_diff.
+        replace loc with (Msg.mk loc val tid).(Msg.loc); [|done].
+        eapply certify_diff_not_locked.
         { eauto. }
         { apply WF1. eauto. }
         { ss. }
         { ss. }
         { inv LOCAL. inv MEM2. ss. }
         { intuition. }
-        i. des. ss.
       * assert (fun_add tid (Some lock2) (fun_add tid (Some lock1) tlocks2) = tlocks2).
         { funext. i. rewrite ? fun_add_spec. condtac; ss. inversion e0. subst. ss. }
         rewrite <- H0 in CONSISTENT. ss.

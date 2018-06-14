@@ -89,7 +89,12 @@ Module AMachine.
       (TPOOL: m2.(Machine.tpool) = IdMap.add tid (st2, lc2) m1.(Machine.tpool))
       (TLOCKS: m2.(tlocks) = fun_add tid (Some tlock) m1.(tlocks))
       (CERTIFY: certify tid (ExecUnit.mk st2 lc2 m2.(Machine.mem)) tlock)
-      (INTERFERE: True) (* TODO: doesn't bother other's lock *)
+      (INTERFERE: forall mem msg tid' lock'
+                    (TID: tid' <> tid)
+                    (MEM: m2.(Machine.mem) = m1.(Machine.mem) ++ mem)
+                    (MSG: List.In msg mem)
+                    (LOCK: m1.(tlocks) tid' = Some lock'),
+          ~ Lock.is_locked lock' msg.(Msg.loc))
       (CONSISTENT: consistent m2.(tlocks))
   .
   Hint Constructors step.
@@ -117,7 +122,8 @@ Module AMachine.
     - eapply Machine.step_promise_step_wf; eauto.
     - rewrite TPOOL, TLOCKS. ii. rewrite IdMap.add_spec, fun_add_spec. condtac.
       + inversion e. eauto.
-      + admit. (* certify after changing mem; "INTERFERE" is important here. *)
+      + inv STEP0. inv LOCAL. inv MEM2. ss. subst.
+        admit. (* certify after changing mem *)
   Admitted.
 
   Lemma rtc_step_promise_step_wf

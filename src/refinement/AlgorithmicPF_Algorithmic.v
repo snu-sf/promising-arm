@@ -41,6 +41,8 @@ Proof.
     { rewrite TPOOL, IdMap.add_spec. condtac; eauto. instantiate (1 := tid). congr. }
     i. des. eapply rtc_state_step_certify_bot; eauto. ss.
     eapply NOPROMISE. eauto.
+  - ii. destruct (IdMap.find tid' (Machine.tpool m1)); ss. inv LOCK.
+    inv H. inv LOCK.
   - apply AMachine.init_tlocks_consistent.
 Qed.
 
