@@ -1136,9 +1136,9 @@ Module Machine.
         (TPOOL: IdMap.find tid m1.(tpool) = Some (st1, lc1)):
     exists st2 lc2,
       <<TPOOL: IdMap.find tid m2.(tpool) = Some (st2, lc2)>> /\
-               <<STEPS: rtc (ExecUnit.state_step tid)
-                            (ExecUnit.mk st1 lc1 m1.(mem))
-                            (ExecUnit.mk st2 lc2 m2.(mem))>>.
+      <<STEPS: rtc (ExecUnit.state_step tid)
+                   (ExecUnit.mk st1 lc1 m1.(mem))
+                   (ExecUnit.mk st2 lc2 m2.(mem))>>.
   Proof.
     revert st1 lc1 TPOOL. induction STEPS; eauto. i.
     destruct x as [tpool1 mem1].

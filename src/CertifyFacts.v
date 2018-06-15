@@ -43,6 +43,107 @@ Proof.
   - inv H; inv STEP; ss.
 Qed.
 
+Section Eqts.
+  Context `{A: Type, B: Type, _: orderC A eq, _: orderC B eq}.
+
+  Inductive eqts_rmap (rmap1: RMap.t (A:=View.t (A:=A))) (rmap2: RMap.t (A:=View.t (A:=B))): Prop :=
+  | eqts_rmap_intro
+      (RMAP: IdMap.Forall2 (fun _ => eqts_val) rmap1 rmap2)
+  .
+  Hint Constructors eqts_rmap.
+
+  Inductive eqts_st (st1: State.t (A:=View.t (A:=A))) (st2: State.t (A:=View.t (A:=B))): Prop :=
+  | eqts_st_intro
+      (STMTS: st1.(State.stmts) = st2.(State.stmts))
+      (RMAP: eqts_rmap st1.(State.rmap) st2.(State.rmap))
+  .
+  Hint Constructors eqts_st.
+
+  Inductive eqts_lc (lc1: Local.t (A:=A)) (lc2: Local.t (A:=B)): Prop :=
+  | eqts_lc_intro
+      (COH: forall loc, lc1.(Local.coh) loc = lc2.(Local.coh) loc)
+      (VRP: eqts_view lc1.(Local.vrp) lc2.(Local.vrp))
+      (VWP: eqts_view lc1.(Local.vwp) lc2.(Local.vwp))
+      (VRM: eqts_view lc1.(Local.vrm) lc2.(Local.vrm))
+      (VWM: eqts_view lc1.(Local.vwm) lc2.(Local.vwm))
+      (VCAP: eqts_view lc1.(Local.vcap) lc2.(Local.vcap))
+      (VREL: eqts_view lc1.(Local.vrel) lc2.(Local.vrel))
+      (FWDBANK: forall loc, opt_rel eqts_fwd (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
+      (EXBANK: lc1.(Local.exbank) = lc2.(Local.exbank))
+      (PROMISES: lc1.(Local.promises) = lc2.(Local.promises))
+  .
+  Hint Constructors eqts_lc.
+
+  Inductive eqts_eu (eu1: ExecUnit.t (A:=A)) (eu2: ExecUnit.t (A:=B)): Prop :=
+  | eqts_eu_intro
+      (ST: eqts_st eu1.(ExecUnit.state) eu2.(ExecUnit.state))
+      (LC: eqts_lc eu1.(ExecUnit.local) eu2.(ExecUnit.local))
+      (MEM: eu1.(ExecUnit.mem) = eu2.(ExecUnit.mem))
+  .
+  Hint Constructors eqts_eu.
+
+  Lemma eqts_eu_state_step
+        tid (eu1:ExecUnit.t (A:=A)) (eu2 eu2':ExecUnit.t (A:=B))
+        (STEP: ExecUnit.state_step tid eu2 eu2')
+        (EQTS: eqts_eu eu1 eu2):
+    exists eu1',
+      <<STEP: ExecUnit.state_step tid eu1 eu1'>> /\
+      <<EQTS: eqts_eu eu1' eu2'>>.
+  Proof.
+    destruct eu1 as [st1 lc1 mem1].
+    destruct eu2 as [st2 lc2 mem2].
+    destruct eu2' as [st2' lc2' mem2'].
+  Admitted.
+End Eqts.
+
+Lemma eqts_eu_init tid eu:
+  eqts_eu (AExecUnit.init tid eu) eu.
+Proof.
+  econs; ss.
+  - econs; ss. unfold AExecUnit.init_rmap. econs. ii.
+    rewrite IdMap.map_spec. destruct (IdMap.find id (State.rmap (ExecUnit.state eu))); ss.
+    econs. econs; ss.
+  - unfold AExecUnit.init_lc, AExecUnit.init_view. econs; ss.
+    i. destruct (Local.fwdbank (ExecUnit.local eu) loc); ss. econs. econs; ss.
+Qed.
+
+Lemma lift_eu_state_step
+      tid (eu1 eu2:ExecUnit.t (A:=unit))
+      (STEP: ExecUnit.state_step tid eu1 eu2)
+      (eu1': AExecUnit.t)
+      (EQTS: eqts_eu eu1' eu1):
+  exists eu2',
+    <<STEP: AExecUnit.state_step tid eu1' eu2'>> /\
+    <<EQTS: eqts_eu eu2' eu2>>.
+Proof.
+  generalize (eqts_eu_state_step STEP EQTS). i. des.
+  inv STEP0. inv STEP1. destruct eu1'0 as [st1' lc1' mem1']. ss.
+  eexists (AExecUnit.mk (ExecUnit.mk _ lc1' mem1') _). ss. esplits.
+  - econs; ss.
+    + admit. (* promises not bot? *)
+    + econs; eauto. ss.
+      admit. (* lift_state_step *)
+  - admit. (* lift_state_step *)
+Admitted.
+
+Lemma lift_rtc_eu_state_step
+      tid (eu1 eu2:ExecUnit.t (A:=unit))
+      (STEP: rtc (ExecUnit.state_step tid) eu1 eu2)
+      (eu1': AExecUnit.t)
+      (EQTS: eqts_eu eu1' eu1):
+  exists eu2',
+    <<STEP: rtc (AExecUnit.state_step tid) eu1' eu2'>> /\
+    <<EQTS: eqts_eu eu2' eu2>>.
+Proof.
+  revert eu1' EQTS. induction STEP; eauto. i.
+  exploit lift_eu_state_step; eauto. i. des.
+  exploit IHSTEP; eauto. i. des.
+  esplits.
+  - econs 2; eauto.
+  - ss.
+Qed.
+
+
 Inductive void_taint (v:Taint.t): Prop :=
 | void_taint_intro
     (TAINT: forall from to loc, ~ v (Taint.W from to loc))
@@ -161,6 +262,20 @@ Proof.
   - apply RMAP0.
 Qed.
 
+Lemma void_aeu_init
+      tid eu:
+  void_aeu tid (AExecUnit.init tid eu).
+Proof.
+  econs; ss; eauto using void_taint_bot.
+  - unfold AExecUnit.init_rmap. econs. ii. revert FIND.
+    rewrite IdMap.map_spec. destruct (IdMap.find id (State.rmap (ExecUnit.state eu))); ss.
+    i. inv FIND. econs. eauto using void_view_const.
+  - unfold AExecUnit.init_lc, AExecUnit.init_view.
+    econs; ss; eauto using void_view_const.
+    i. revert FWD. destruct (Local.fwdbank (ExecUnit.local eu) l); ss. i. inv FWD.
+    eauto using void_view_const.
+Qed.
+
 Lemma void_aeu_step
       tid aeu1 aeu2
       (STEP: AExecUnit.state_step tid aeu1 aeu2)
@@ -251,8 +366,15 @@ Lemma rtc_state_step_certify_bot
       (NOPROMISE: eu2.(ExecUnit.local).(Local.promises) = bot):
   certify tid eu1 Lock.init.
 Proof.
-(* TODO:
- - define eqts
- - lift_state_step: eu state step -> aeu state step
- *)
-Admitted.
+  exploit lift_rtc_eu_state_step; eauto.
+  { apply eqts_eu_init. }
+  i. des.
+  exploit void_rtc_aeu_step; eauto.
+  { apply void_aeu_init. }
+  i. econs.
+  - eapply rtc_mon; [|by eauto]. left. ss.
+  - inv EQTS. inv LC. rewrite PROMISES. ss.
+  - funext. i. propext. econs; i; ss. inv H.
+    inv x0. inv TAINT. eapply TAINT0. eauto.
+  - inv x0. rewrite RELEASE. ss.
+Qed.
