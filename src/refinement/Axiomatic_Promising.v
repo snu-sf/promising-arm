@@ -965,7 +965,8 @@ Proof.
           all: try by econs; eauto; eauto using Label.write_is_writing, Label.read_is_reading.
           i. des.
           destruct n.
-          { specialize (FWD eq_refl). des.
+          { (* read from uninit *)
+            specialize (FWD eq_refl). des.
             generalize (SIM_LOCAL.(FWDBANK) (ValA.val (sem_expr armap1 eloc))).
             rewrite FWD0; ss. intro X. exfalso. eapply X. econs; eauto. econs; eauto.
             econs; eauto. econs; eauto. econs; eauto. eapply Label.write_is_writing.
@@ -982,7 +983,8 @@ Proof.
           all: try by econs; eauto; eauto using Label.write_is_writing, Label.read_is_reading.
           i. des.
           destruct n.
-          { specialize (FWD eq_refl). des.
+          { (* read from uninit *)
+            specialize (FWD eq_refl). des.
             contradict RF0. econs; eauto.
           }
           exploit MSG; [lia|]. i. des.
@@ -999,7 +1001,8 @@ Proof.
         }
         i. des. destruct msg. ss. subst.
         destruct n.
-        { specialize (FWD eq_refl). des.
+        { (* read from uninit *)
+          specialize (FWD eq_refl). des.
           assert (view < S ts).
           { eapply view_of_eid_ob_write; eauto.
             - left. left. left. left. right. right. econs.
@@ -1125,7 +1128,8 @@ Proof.
         destruct ex1; cycle 1.
         { apply SIM_LOCAL. }
         destruct n.
-        { specialize (FWD eq_refl). des.
+        { (* read from uninit *)
+          specialize (FWD eq_refl). des.
           econs. splits; eauto.
           - econs; eauto. apply Label.read_is_reading.
           - i. contradict RF. econs. eauto.
