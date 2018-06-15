@@ -9,6 +9,7 @@ Require Import EquivDec.
 Require Import sflib.
 Require Import paco.
 Require Import HahnRelationsBasic.
+Require Import HahnSets.
 
 Require Import Basic.
 Require Import HahnRelationsMore.
@@ -574,7 +575,10 @@ Module Execution.
   Hint Constructors e.
 
   Definition po_loc (ex:t): relation eidT := po ∩ ex.(label_rel) label_loc.
-  Definition fr (ex:t): relation eidT := ex.(rf)⁻¹ ⨾ ex.(co).
+  Definition fr (ex:t): relation eidT :=
+    (ex.(rf)⁻¹ ⨾ ex.(co)) ∪
+    ((ex.(label_rel) label_loc) ∩
+     ((ex.(label_is) Label.is_read) \₁ codom_rel ex.(rf)) × (ex.(label_is) Label.is_write)).
   Definition rfi (ex:t): relation eidT := ex.(rf) ∩ i.
   Definition rfe (ex:t): relation eidT := ex.(rf) ∩ e.
   Definition fre (ex:t): relation eidT := ex.(fr) ∩ e.
@@ -675,12 +679,18 @@ Module Valid.
             <<LABEL: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1)>> /\
             <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) <->
         (eid1 = eid2 \/ ex.(Execution.co) eid1 eid2 \/ ex.(Execution.co) eid2 eid1);
-    RF: forall eid1 loc val,
-        (exists ex1 ord1,
-            <<LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>>) <->
+    RF1:
+      forall eid1 ex1 ord1 loc val
+        (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
+        (<<NORF: ~ codom_rel ex.(Execution.rf) eid1>> /\ <<VAL: val = Val.default>>) \/
         (exists eid2 ex2 ord2,
             <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
             <<RF: ex.(Execution.rf) eid2 eid1>>);
+    RF2: forall eid1 eid2 ex2 ord2 loc val
+          (LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val))
+          (RF: ex.(Execution.rf) eid2 eid1),
+        exists ex1 ord1,
+          <<LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>>;
     RF_WF: functional (ex.(Execution.rf))⁻¹;
     INTERNAL: acyclic ex.(Execution.internal);
     EXTERNAL: acyclic ex.(Execution.ob);
@@ -842,22 +852,31 @@ Module Valid.
 
   Lemma coherence_rr
         p exec
-        eid1 eid2 eid3 eid4 loc
+        eid1 eid2 eid3 loc
         (EX: ex p exec)
         (EID1: exec.(Execution.label_is) (Label.is_reading loc) eid1)
         (EID2: exec.(Execution.label_is) (Label.is_reading loc) eid2)
         (EID3: exec.(Execution.label_is) (Label.is_writing loc) eid3)
-        (EID4: exec.(Execution.label_is) (Label.is_writing loc) eid4)
-        (RF1: exec.(Execution.rf) eid3 eid1)
-        (RF2: exec.(Execution.rf) eid4 eid2)
+        (RF: exec.(Execution.rf) eid3 eid1)
         (PO: Execution.po eid1 eid2):
-    exec.(Execution.co)^? eid3 eid4.
+    exists eid4,
+      <<RF: exec.(Execution.rf) eid4 eid2>> /\
+      <<CO: exec.(Execution.co)^? eid3 eid4>>.
   Proof.
     inv EID1. apply Label.is_reading_inv in LABEL. des. subst.
     inv EID2. apply Label.is_reading_inv in LABEL. des. subst.
     inv EID3. apply Label.is_writing_inv in LABEL. des. subst.
-    inv EID4. apply Label.is_writing_inv in LABEL. des. subst.
-    generalize EX.(CO). intros [CO _]. rewrite EID1 in CO. rewrite EID2 in CO. exploit CO.
+    exploit EX.(RF1); eauto. i. des.
+    { exfalso. eapply EX.(INTERNAL). econs 2; [econs|econs 2; econs].
+      - left. left. right. econs 2. econs; cycle 1.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      - right. eauto.
+      - left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+    }
+    esplits; eauto.
+    generalize EX.(CO). intros [CO _]. rewrite EID1 in CO. rewrite LABEL in CO. exploit CO.
     { esplits; eauto. }
     i. des.
     - subst. eauto.
@@ -865,25 +884,33 @@ Module Valid.
     - exfalso. eapply EX.(INTERNAL). econs 2; [econs|econs 2; econs].
       + left. left. left. econs; eauto. econs; eauto.
         econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
-      + left. left. right. econs; eauto.
+      + left. left. right. left. econs; eauto.
       + right. ss.
   Qed.
 
   Lemma coherence_wr
         p exec
-        eid1 eid2 eid3 loc
+        eid1 eid2 loc
         (EX: ex p exec)
         (EID1: exec.(Execution.label_is) (Label.is_writing loc) eid1)
         (EID2: exec.(Execution.label_is) (Label.is_reading loc) eid2)
-        (EID3: exec.(Execution.label_is) (Label.is_writing loc) eid3)
-        (RF3: exec.(Execution.rf) eid3 eid2)
         (PO: Execution.po eid1 eid2):
-    exec.(Execution.co)^? eid1 eid3.
+    exists eid3,
+      <<RF: exec.(Execution.rf) eid3 eid2>> /\
+      <<CO: exec.(Execution.co)^? eid1 eid3>>.
   Proof.
     inv EID1. apply Label.is_writing_inv in LABEL. des. subst.
     inv EID2. apply Label.is_reading_inv in LABEL. des. subst.
-    inv EID3. apply Label.is_writing_inv in LABEL. des. subst.
-    generalize EX.(CO). intros [CO _]. rewrite EID in CO. rewrite EID1 in CO. exploit CO.
+    exploit EX.(RF1); eauto. i. des.
+    { exfalso. eapply EX.(INTERNAL). econs 2; econs.
+      - left. left. right. econs 2. econs; cycle 1.
+        + econs; eauto. econs; eauto.
+        + econs; eauto. econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+      - left. left. left. econs; eauto. econs; eauto.
+        econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
+    }
+    esplits; eauto.
+    generalize EX.(CO). intros [CO _]. rewrite EID in CO. rewrite LABEL in CO. exploit CO.
     { esplits; eauto. }
     i. des.
     - subst. eauto.
@@ -891,7 +918,7 @@ Module Valid.
     - exfalso. eapply EX.(INTERNAL). econs 2; econs.
       + left. left. left. econs; eauto. econs; eauto.
         econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
-      + left. left. right. econs; eauto.
+      + left. left. right. left. econs; eauto.
   Qed.
 
   Lemma rf_inv_write
@@ -903,8 +930,9 @@ Module Valid.
     exists ex2 ord2,
       <<LABEL: Execution.label eid1 exec = Some (Label.write ex2 ord2 loc val)>>.
   Proof.
-    exploit EX.(RF). intros [RF _]. exploit RF; eauto. clear RF. i. des.
-    exploit EX.(RF_WF); [exact RF3|exact RF0|]. i. subst. eauto.
+    exploit EX.(RF1); eauto. i. des.
+    - contradict NORF. econs. eauto.
+    - exploit EX.(RF_WF); [exact RF3|exact RF|]. i. subst. eauto.
   Qed.
 End Valid.
 
