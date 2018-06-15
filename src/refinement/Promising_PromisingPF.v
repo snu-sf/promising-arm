@@ -77,8 +77,6 @@ Proof.
             esplits; eauto. ii.
             rewrite nth_error_app1 in MSG0; [|lia].
             eapply EX0; eauto.
-            rewrite <- READ. unfold Memory.read. destruct tsx; ss.
-            rewrite nth_error_app1; [|lia]. ss.
           - rewrite <- MSG. unfold Memory.get_msg. destruct ts; ss.
             rewrite nth_error_app1; [|lia]. ss.
           - ss.
@@ -118,8 +116,6 @@ Proof.
             exploit ExecUnit.get_msg_wf; eauto. i.
             ii. des. rewrite nth_error_app1 in MSG0; [|lia].
             eapply EX0; eauto.
-            rewrite <- READ. unfold Memory.read. destruct tsx; ss.
-            rewrite nth_error_app1; ss. lia.
           - apply Memory.get_msg_mon. ss.
         }
         { econs 4; eauto. }

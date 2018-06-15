@@ -154,7 +154,7 @@ Module AExecUnit.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (TS: ts = S (length mem1))
       (WRITABLE: Local.writable ex ord vloc vval tid lc1 mem1 ts view_ext)
-      (DEPENDENT: dep = (ex /\ exists tsx msg, lc1.(Local.exbank) = Some tsx /\ Memory.get_msg tsx mem1 = Some msg /\ msg.(Msg.loc) = loc))
+      (DEPENDENT: dep = (ex /\ exists tsx, lc1.(Local.exbank) = Some (loc, tsx)))
       (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) ((fun _ => dep) ∩₁ (eq (taint_write ord loc aux))))))
       (LC2: lc2 =
             Local.mk
@@ -266,7 +266,9 @@ Module AExecUnit.
           all: try rewrite ExecUnit.expr_wf; eauto.
           all: intuition.
         * i. exploit FWDBANK; eauto. i. des. intuition.
-      + destruct ex; ss. rewrite EXBANK; ss. intuition.
+      + destruct ex; ss.
+        exploit EXBANK; eauto. i. des.
+        eexists. apply Memory.read_mon. eauto.
       + apply Memory.get_msg_snoc_inv in MSG.
         revert TS. rewrite fun_add_spec. condtac.
         { i. des; intuition. }

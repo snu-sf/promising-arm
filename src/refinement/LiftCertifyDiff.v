@@ -62,11 +62,11 @@ Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=Taint.t))): Prop
 .
 Hint Constructors sim_state.
 
-Inductive sim_exbank (tid:Id.t) (mem1 mem2:Memory.t) (ts1 ts2:Time.t): Prop :=
+Inductive sim_exbank (tid:Id.t) (mem1 mem2:Memory.t) (lts1 lts2:Loc.t * Time.t): Prop :=
 | sim_exbank_intro
-    (EXBANK: forall loc,
-        Memory.exclusive tid loc ts2 (length mem2) mem2 ->
-        Memory.exclusive tid loc ts1 (length mem1) mem1)
+    (LOC: lts1.(fst) = lts2.(fst))
+    (EXBANK: Memory.exclusive tid lts2.(fst) lts2.(snd) (length mem2) mem2 ->
+             Memory.exclusive tid lts1.(fst) lts1.(snd) (length mem1) mem1)
 .
 
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem2:Memory.t): Prop :=
@@ -277,7 +277,7 @@ Proof.
   destruct aeu1 as [[[stmts1 rmap1] lc1 mem1] aux1].
   destruct aeu2 as [[[stmts2 rmap2] lc2 mem2] aux2].
   destruct aeu2' as [[[stmts2' rmap2'] lc2' mem2'] aux2'].
-  ss. 
+  ss.
 
   inv SIM; ss; cycle 1.
   { inv STEP; inv STEP0; ss. }
@@ -465,11 +465,10 @@ Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Tai
     (VCAP: sound_view loc lc.(Local.vcap))
     (VREL: sound_view loc lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), sound_view loc fwd.(FwdItem.view))
-    (EXBANK: forall exbank val
+    (EXBANK: forall ts
                (FIRST: is_first_ex)
-               (EXBANK: lc.(Local.exbank) = Some exbank)
-               (READ: Memory.read loc exbank mem = Some val),
-        ~ Memory.exclusive tid loc exbank (length mem) mem)
+               (EXBANK: lc.(Local.exbank) = Some (loc, ts)),
+        ~ Memory.exclusive tid loc ts (length mem) mem)
 .
 
 Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (aeu:AExecUnit.t): Prop :=
@@ -623,6 +622,8 @@ Proof.
   - inv LOCAL. econs; try rewrite app_length; intuition.
     + exploit FWDBANK; eauto. i. des. intuition.
     + exploit FWDBANK; eauto. i. des. intuition.
+    + exploit EXBANK; eauto. i. des.
+      eexists. apply Memory.read_mon. eauto.
     + apply Memory.get_msg_snoc_inv in MSG0. des; eauto.
       subst. ss.
 Qed.
@@ -652,12 +653,13 @@ Proof.
       all: try by econs; econs; ss.
       + i. destruct (Local.fwdbank lc1 l) eqn:FWDL; ss. inv FWD. ss.
         econs. econs. ss.
-      + ii. inv WF. inv LOCAL. ss. exploit EXBANK0; eauto. i.
-        eapply H; cycle 3.
+      + ii. inv WF. inv LOCAL. ss. exploit EXBANK0; eauto. i. des.
+        eapply H; cycle 2.
         { rewrite nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
+        { ss. }
+        { exploit ExecUnit.read_wf; eauto. i. lia. }
+        { rewrite app_length. s. intuition. }
         all: eauto.
-        * intuition.
-        * rewrite app_length. s. intuition.
     - econs. ss.
   }
   ii. destruct lock as [ex release]. ss. subst.
@@ -693,7 +695,6 @@ Proof.
         splits; ss. apply sim_low_view_const. eapply FWDBANK. eauto.
       + destruct lc1. s. destruct exbank; ss. econs.
         econs; eauto. ii. eapply H; eauto.
-        * apply Memory.read_mon. eauto.
         * rewrite app_length. lia.
         * exploit nth_error_Some. rewrite MSG0. intros [X _]. exploit X; ss. i.
           rewrite nth_error_app1; ss.

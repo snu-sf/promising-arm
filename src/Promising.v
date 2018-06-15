@@ -83,8 +83,7 @@ Module Memory.
     Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc) mem.
 
   Definition exclusive (tid:Id.t) (loc:Loc.t) (from to:Time.t) (mem:t): Prop :=
-    forall val (READ: Memory.read loc from mem = Some val),
-      Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem.
+    Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem.
 
   Lemma read_mon ts loc val mem1 mem2
         (READ: Memory.read loc ts mem1 = Some val):
@@ -403,15 +402,15 @@ Section Local.
     vcap: View.t (A:=A);
     vrel: View.t (A:=A);
     fwdbank: Loc.t -> option (FwdItem.t (A:=A));
-    exbank: option Time.t;
+    exbank: option (Loc.t * Time.t);
     promises: Promises.t;
   }.
   Hint Constructors t.
 
-  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) bot bot.
+  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) None bot.
 
   Definition init_with_promises (promises: Promises.t): Local.t :=
-    mk bot bot bot bot bot bot bot (fun _ => None) bot promises.
+    mk bot bot bot bot bot bot bot (fun _ => None) None promises.
 
   Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | promise_intro
@@ -474,7 +473,7 @@ Section Local.
               (join lc1.(vcap) view)
               lc1.(vrel)
               lc1.(fwdbank)
-              (if ex then Some ts else lc1.(exbank))
+              (if ex then Some (loc, ts) else lc1.(exbank))
               lc1.(promises))
   .
   Hint Constructors read.
@@ -494,9 +493,9 @@ Section Local.
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext.(View.ts) ts)
-      (EX: ex -> exists tsx,
-           <<TSX: lc1.(exbank) = Some tsx>> /\
-           <<EX: Memory.exclusive tid loc tsx ts mem1>>)
+      (EX: ex -> exists l tsx,
+           <<TSX: lc1.(exbank) = Some (l, tsx)>> /\
+           <<EX: l = loc -> Memory.exclusive tid loc tsx ts mem1>>)
   .
   Hint Constructors writable.
 
@@ -658,7 +657,7 @@ Section Local.
           lc.(fwdbank) loc = Some fwd ->
           fwd.(FwdItem.ts) <= List.length mem /\
           fwd.(FwdItem.view).(View.ts) <= List.length mem)
-      (EXBANK: forall ts, lc.(exbank) = Some ts -> ts <= List.length mem)
+      (EXBANK: forall l ts, lc.(exbank) = Some (l, ts) -> exists val, Memory.read l ts mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
                    (MSG: Memory.get_msg ts mem = Some msg)
@@ -825,7 +824,7 @@ Section ExecUnit.
         all: try by apply FWD; eauto using read_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
-        * destruct ex0; ss. i. inv H1. eapply read_wf. eauto.
+        * destruct ex0; ss. i. inv H1. eauto.
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
           rewrite fun_add_spec. condtac; ss. inversion e. rewrite H2. ss.
     - inv RES. inv VIEW. inv VVAL. inv VIEW. inv VLOC. inv VIEW.
@@ -887,7 +886,8 @@ Section ExecUnit.
       all: try rewrite List.app_length; s; try lia.
       + i. rewrite COH. lia.
       + i. exploit FWDBANK; eauto. i. des. lia.
-      + i. rewrite EXBANK; ss. lia.
+      + i. exploit EXBANK; eauto. i. des.
+        eexists. eapply Memory.read_mon. eauto.
       + i. revert IN. rewrite Promises.set_o. condtac.
         * inversion e. i. inv IN. lia.
         * i. exploit PROMISES; eauto. lia.
@@ -1042,7 +1042,8 @@ Module Machine.
         all: try rewrite List.app_length; s; try lia.
         * i. rewrite COH. lia.
         * i. exploit FWDBANK; eauto. i. des. lia.
-        * i. rewrite EXBANK; ss. lia.
+        * i. exploit EXBANK; eauto. i. des.
+          eexists. eapply Memory.read_mon. eauto.
         * i. exploit PROMISES; eauto. lia.
         * i. apply Memory.get_msg_snoc_inv in MSG. des.
           { eapply PROMISES0; eauto. }

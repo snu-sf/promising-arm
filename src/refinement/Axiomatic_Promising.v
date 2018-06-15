@@ -659,13 +659,14 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)
       end;
   EXBANK: opt_rel
-            (fun aexbank exbank =>
-               (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v exbank) /\
-               exbank <> bot /\
+            (fun aexbank lts =>
+               ex.(Execution.label_is) (Label.is_reading lts.(fst)) (tid, aexbank) /\
+               (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v lts.(snd)) /\
+               lts.(snd) <> bot /\
                sim_view
                  ex ob
                  (inverse ex.(Execution.rf) (eq (tid, aexbank)))
-                 exbank)
+                 lts.(snd))
             alocal.(ALocal.exbank) local.(Local.exbank);
   PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
       exists n,
@@ -1054,10 +1055,10 @@ Proof.
         }
       * (* sim_local exbank *)
         destruct ex1.
-        { econs. splits.
+        { econs. splits; ss.
+          - econs; eauto. apply Label.read_is_reading.
           - i. exploit EX.(Valid.RF_WF); [exact H|exact RF|]. i. subst.
             rewrite VIEW0 in H0. inv H0. refl.
-          - ss.
           - econs 2; eauto. refl.
         }
         { apply SIM_LOCAL. }
@@ -1179,12 +1180,12 @@ Proof.
       * (* exclusive *)
         i. specialize (EX0 H). des. inv EX1.
         apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
-        generalize (SIM_LOCAL.(EXBANK)). rewrite EX0. intro X. inv X. des.
+        generalize (SIM_LOCAL.(EXBANK)). rewrite EX0. intro X. inv X. des. destruct b. ss.
         exploit List.nth_error_Some. rewrite H1. intros [X _]. exploit X; ss. clear X. intro X.
         exploit LABEL.
         { rewrite List.nth_error_app1; eauto. }
-        intro LABEL_READ. inv REL1; ss. inv EID. exploit REL; eauto. i.
-        assert (v = b) by (apply Time.le_antisymm; ss). subst.
+        intro LABEL_READ. inv REL2; ss. inv EID. exploit REL0; eauto. i.
+        assert (v = t0) by (apply Time.le_antisymm; ss). subst.
         esplits; eauto. destruct ex1; ss. ii.
         exploit in_mem_of_ex; swap 1 2; eauto.
         { eapply Permutation_NoDup; [by symmetry; eauto|].
@@ -1207,7 +1208,7 @@ Proof.
         { rewrite LABEL0. rewrite LABEL1. esplits; eauto. f_equal. f_equal. ss. }
         clear CO. i. des.
         { subst. rewrite VIEW_OF_EID in VIEW3. inv VIEW3. lia. }
-        { cut (S ts < b); [lia|].
+        { cut (S ts < t0); [lia|].
           eapply view_of_eid_ob_write; eauto.
           - left. left. left. right. ss.
           - econs; eauto. apply Label.write_is_writing.
@@ -1853,7 +1854,6 @@ Proof.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
     - econs; eauto; ss.
       + ii. inv H. inv REL1. inv H. inv H1. ss. lia.
-      + econs.
       + i. destruct view; ss. exploit promises_from_mem_inv; eauto. i. des.
         exploit in_mem_of_ex; swap 1 2; eauto.
         { eapply Permutation_NoDup; [by symmetry; eauto|].
