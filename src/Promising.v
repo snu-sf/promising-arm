@@ -195,15 +195,6 @@ Section View.
     bot.(View.ts) = bot.
   Proof. ss. Qed.
 
-  Inductive eqts (v1 v2:t): Prop :=
-  | eqts_intro
-      (TS: v1.(ts) = v2.(ts))
-  .
-  Hint Constructors eqts.
-
-  Global Program Instance eqts_equiv: Equivalence eqts.
-  Next Obligation. econs. inv H1. ss. Qed.
-  Next Obligation. econs. inv H1. inv H2. etrans; eauto. Qed.
 End View.
 End View.
 
@@ -222,21 +213,85 @@ Section FwdItem.
     if andb (fwd.(ts) == tsx) (orb (negb fwd.(ex)) (negb (OrdR.ge ord OrdR.acquire_pc)))
     then fwd.(view)
     else View.mk tsx bot.
+End FwdItem.
+End FwdItem.
 
-  Inductive eqts (fwd1 fwd2:t): Prop :=
-  | eqts_intro
-      (TS: fwd1.(ts) = fwd2.(ts))
-      (VIEW: View.eqts fwd1.(view) fwd2.(view))
-      (EX: fwd1.(ex) = fwd2.(ex))
+Section Eqts.
+  Context `{A: Type, B: Type, _: orderC A eq, _: orderC B eq}.
+
+  Inductive eqts_view (v1: View.t (A:=A)) (v2: View.t (A:=B)): Prop :=
+  | eqts_view_intro
+      (TS: v1.(View.ts) = v2.(View.ts))
   .
-  Hint Constructors eqts.
+  Hint Constructors eqts_view.
 
-  Global Program Instance eqts_equiv: Equivalence eqts.
+  Inductive eqts_fwd (fwd1:FwdItem.t (A:=A)) (fwd2:FwdItem.t (A:=B)): Prop :=
+  | eqts_fwd_intro
+      (TS: fwd1.(FwdItem.ts) = fwd2.(FwdItem.ts))
+      (VIEW: eqts_view fwd1.(FwdItem.view) fwd2.(FwdItem.view))
+      (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
+  .
+  Hint Constructors eqts_fwd.
+
+  Inductive eqts_val (v1:ValA.t (A:=View.t (A:=A))) (v2:ValA.t (A:=View.t (A:=B))): Prop :=
+  | eqts_val_intro
+      (VAL: v1.(ValA.val) = v2.(ValA.val))
+      (VIEW: eqts_view v1.(ValA.annot) v2.(ValA.annot))
+  .
+  Hint Constructors eqts_val.
+
+  Inductive eqts_event: forall (e1:Event.t (A:=View.t (A:=A))) (e2:Event.t (A:=View.t (A:=B))), Prop :=
+  | eqts_event_internal
+      ctrl1 ctrl2
+      (CTRL: eqts_view ctrl1 ctrl2):
+      eqts_event (Event.internal ctrl1) (Event.internal ctrl2)
+  | eqts_event_read
+      ex ord vloc1 vloc2 res1 res2
+      (VLOC: eqts_val vloc1 vloc2)
+      (RES: eqts_val res1 res2):
+      eqts_event (Event.read ex ord vloc1 res1) (Event.read ex ord vloc2 res2)
+  | eqts_event_write
+      ex ord vloc1 vloc2 vval1 vval2 res1 res2
+      (VLOC: eqts_val vloc1 vloc2)
+      (VVAL: eqts_val vval1 vval2)
+      (RES: eqts_val res1 res2):
+      eqts_event (Event.write ex ord vloc1 vval1 res1) (Event.write ex ord vloc2 vval2 res2)
+  | eqts_event_barrier
+      b:
+      eqts_event (Event.barrier b) (Event.barrier b)
+  .
+  Hint Constructors eqts_event.
+End Eqts.
+
+Section EqtsEquiv.
+  Context `{A: Type, _: orderC A eq}.
+
+  Global Program Instance eqts_view_equiv: Equivalence (@eqts_view A A).
+  Next Obligation. econs. ss. Qed.
+  Next Obligation. econs. inv H1. ss. Qed.
+  Next Obligation. econs. inv H1. inv H2. etrans; eauto. Qed.
+
+  Global Program Instance eqts_fwd_equiv: Equivalence (@eqts_fwd A A).
   Next Obligation. econs; ss. Qed.
   Next Obligation. ii. destruct x, y. inv H1. ss. subst. econs; ss. symmetry. ss. Qed.
   Next Obligation. ii. destruct x, y, z. inv H1. inv H2. ss. subst. econs; ss. etrans; eauto. Qed.
-End FwdItem.
-End FwdItem.
+
+  Global Program Instance eqts_val_equiv: Equivalence eqts_val.
+  Next Obligation. econs; ss. Qed.
+  Next Obligation. ii. destruct x, y. inv H1. ss. subst. econs; ss. symmetry. ss. Qed.
+  Next Obligation. ii. destruct x, y, z. inv H1. inv H2. ss. subst. econs; ss. etrans; eauto. Qed.
+
+  Global Program Instance eqts_event_equiv: Equivalence eqts_event.
+  Next Obligation. ii. destruct x; econs; ss. Qed.
+  Next Obligation.
+    ii. inv H1; econs; ss.
+    all: symmetry; ss.
+  Qed.
+  Next Obligation.
+    ii. inv H1; inv H2; econs; ss.
+    all: etrans; eauto.
+  Qed.
+End EqtsEquiv.
 
 Module Promises.
   Definition t := Id.t -> bool.
@@ -729,50 +784,6 @@ Section ExecUnit.
     eapply List.nth_error_Some. congr.
   Qed.
 
-  Inductive eqts_val (v1 v2:ValA.t (A:=View.t (A:=A))): Prop :=
-  | eqts_val_intro
-      (VAL: v1.(ValA.val) = v2.(ValA.val))
-      (VIEW: View.eqts v1.(ValA.annot) v2.(ValA.annot))
-  .
-  Hint Constructors eqts_val.
-
-  Global Program Instance eqts_val_equiv: Equivalence eqts_val.
-  Next Obligation. econs; ss. Qed.
-  Next Obligation. ii. destruct x, y. inv H1. ss. subst. econs; ss. symmetry. ss. Qed.
-  Next Obligation. ii. destruct x, y, z. inv H1. inv H2. ss. subst. econs; ss. etrans; eauto. Qed.
-
-  Inductive eqts_event: forall (e1 e2:Event.t (A:=View.t (A:=A))), Prop :=
-  | eqts_event_internal
-      ctrl:
-      eqts_event (Event.internal ctrl) (Event.internal ctrl)
-  | eqts_event_read
-      ex ord vloc1 vloc2 res1 res2
-      (VLOC: eqts_val vloc1 vloc2)
-      (RES: eqts_val res1 res2):
-      eqts_event (Event.read ex ord vloc1 res1) (Event.read ex ord vloc2 res2)
-  | eqts_event_write
-      ex ord vloc1 vloc2 vval1 vval2 res1 res2
-      (VLOC: eqts_val vloc1 vloc2)
-      (VVAL: eqts_val vval1 vval2)
-      (RES: eqts_val res1 res2):
-      eqts_event (Event.write ex ord vloc1 vval1 res1) (Event.write ex ord vloc2 vval2 res2)
-  | eqts_event_barrier
-      b:
-      eqts_event (Event.barrier b) (Event.barrier b)
-  .
-  Hint Constructors eqts_event.
-
-  Global Program Instance eqts_event_equiv: Equivalence eqts_event.
-  Next Obligation. ii. destruct x; econs; ss. Qed.
-  Next Obligation.
-    ii. inv H1; econs; ss.
-    all: symmetry; ss.
-  Qed.
-  Next Obligation.
-    ii. inv H1; inv H2; econs; ss.
-    all: etrans; eauto.
-  Qed.
-
   Lemma state_step0_wf tid e1 e2 eu1 eu2
         (STEP: state_step0 tid e1 e2 eu1 eu2)
         (EVENT: eqts_event e1 e2)
@@ -797,9 +808,11 @@ Section ExecUnit.
 
     inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
     - inv LC. econs; ss. econs; viewtac.
+      inv CTRL. rewrite <- TS. viewtac.
     - inv LC. econs; ss.
       + eauto using rmap_add_wf, expr_wf.
       + econs; viewtac.
+        inv CTRL. rewrite <- TS. viewtac.
     - inv RES. inv VIEW. inv VLOC. inv VIEW.
       inv STEP. ss. subst.
       econs; ss.
@@ -838,8 +851,10 @@ Section ExecUnit.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
-    - inv LC. econs; ss. econs; viewtac. eauto using expr_wf.
     - inv LC. econs; ss. econs; viewtac.
+      inv CTRL. rewrite <- TS. eauto using expr_wf.
+    - inv LC. econs; ss. econs; viewtac.
+      inv CTRL. rewrite <- TS. viewtac.
   Qed.
 
   Lemma state_step_wf tid eu1 eu2
@@ -1087,7 +1102,7 @@ Module Machine.
                        (ExecUnit.mk sl2.(fst) sl2.(snd) m1.(mem)))
                 m1.(tpool) m2.(tpool))
       (MEM: m1.(mem) = m2.(mem))
-  .      
+  .
 
   Inductive pf_exec (p:program) (m:Machine.t): Prop :=
   | pf_exec_intro

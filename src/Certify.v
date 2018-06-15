@@ -223,7 +223,7 @@ Module AExecUnit.
       init_aux.
 
   Lemma taint_read_event_eqts aux e:
-    ExecUnit.eqts_event (taint_read_event aux e) e.
+    eqts_event (taint_read_event aux e) e.
   Proof.
     destruct e; try refl.
     econs; ss.
