@@ -82,6 +82,57 @@ Section Eqts.
   .
   Hint Constructors eqts_eu.
 
+  Lemma eqts_view_join
+        (l1 l2:View.t (A:=A)) (r1 r2:View.t (A:=B))
+        (EQTS1: eqts_view l1 r1)
+        (EQTS2: eqts_view l2 r2):
+    eqts_view (join l1 l2) (join r1 r2).
+  Proof.
+    inv EQTS1. inv EQTS2. econs. ss. congr.
+  Qed.
+
+  Lemma eqts_view_ifc
+        c (l1:View.t (A:=A)) (r1:View.t (A:=B))
+        (EQTS: eqts_view l1 r1):
+    eqts_view (ifc c l1) (ifc c r1).
+  Proof.
+    destruct c; ss.
+  Qed.
+
+  Lemma eqts_view_bot:
+    eqts_view (A:=A) (B:=B) bot bot.
+  Proof.
+    econs. ss.
+  Qed.
+
+  Lemma eqts_rmap_add
+        (rmap1:RMap.t (A:=View.t (A:=A)))
+        (rmap2:RMap.t (A:=View.t (A:=B)))
+        x
+        (l1:ValA.t (A:=View.t (A:=A)))
+        (l2:ValA.t (A:=View.t (A:=B)))
+        (RMAP: eqts_rmap rmap1 rmap2)
+        (VAL: eqts_val l1 l2):
+    eqts_rmap (RMap.add x l1 rmap1) (RMap.add x l2 rmap2).
+  Proof.
+    inv RMAP. econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
+    condtac; ss. inversion e. subst. econs. ss.
+  Qed.
+
+  Lemma eqts_rmap_expr
+        (rmap1:RMap.t (A:=View.t (A:=A)))
+        (rmap2:RMap.t (A:=View.t (A:=B)))
+        (RMAP: eqts_rmap rmap1 rmap2)
+        e:
+    eqts_val (sem_expr rmap1 e) (sem_expr rmap2 e).
+  Proof.
+    induction e; ss.
+    - inv RMAP. specialize (RMAP0 reg). unfold RMap.find. inv RMAP0; ss.
+    - inv IHe. econs; ss. rewrite VAL. ss.
+    - inv IHe1. inv IHe2. econs; ss; eauto using eqts_view_join.
+      rewrite VAL, VAL0. ss.
+  Qed.
+
   Lemma eqts_eu_state_step
         tid (eu1:ExecUnit.t (A:=A)) (eu2 eu2':ExecUnit.t (A:=B))
         (STEP: ExecUnit.state_step tid eu2 eu2')
@@ -90,10 +141,139 @@ Section Eqts.
       <<STEP: ExecUnit.state_step tid eu1 eu1'>> /\
       <<EQTS: eqts_eu eu1' eu2'>>.
   Proof.
-    destruct eu1 as [st1 lc1 mem1].
-    destruct eu2 as [st2 lc2 mem2].
-    destruct eu2' as [st2' lc2' mem2'].
-  Admitted.
+    destruct eu1 as [[stmts1 rmap1] lc1 mem1].
+    destruct eu2 as [[stmts2 rmap2] lc2 mem2].
+    destruct eu2' as [[stmts2' rmap2'] lc2' mem2'].
+    inv STEP. inv STEP0. ss. subst.
+    inv EQTS. inv ST. inv LC. ss. subst.
+    inv STATE; inv LOCAL; inv EVENT; ss.
+    - inv LC. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 1; ss.
+        * econs 1; ss.
+      + econs; ss. econs; eauto using eqts_view_join, eqts_view_bot.
+    - inv LC. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 2; ss.
+        * econs 1; ss.
+      + econs; ss.
+        * econs; ss. eauto using eqts_rmap_add, eqts_rmap_expr.
+        * econs; eauto using eqts_view_join, eqts_view_bot.
+    - generalize (eqts_rmap_expr RMAP eloc). intro X. inv X.
+      inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 3; ss.
+        * generalize (eqts_rmap_expr RMAP eloc). intro X. inv X.
+          econs 2; ss.
+          rewrite <- COH, <- VAL in COH0. econs; eauto.
+          { match goal with
+            | [H: Memory.latest ?a ?b ?c ?d |- Memory.latest ?e ?f ?g ?h] =>
+              replace (Memory.latest e f g h) with (Memory.latest a b c d); ss
+            end.
+            f_equal; ss. symmetry.
+            f_equal; [by apply VIEW|].
+            f_equal; [by apply VRP|].
+            f_equal. destruct (OrdR.ge ord OrdR.acquire); ss. apply VREL.
+          }
+          { rewrite VAL. eauto. }
+      + assert (FWD: eqts_view
+                       match Local.fwdbank lc1 (ValA.val (sem_expr rmap1 eloc)) with
+                       | Some fwd => FwdItem.read_view fwd ts ord
+                       | None => {| View.ts := ts; View.annot := bot |}
+                       end
+                       match Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)) with
+                       | Some fwd => FwdItem.read_view fwd ts ord
+                       | None => {| View.ts := ts; View.annot := bot |}
+                       end).
+        { rewrite VAL. generalize (FWDBANK (ValA.val (sem_expr rmap2 eloc))). intro X. inv X; ss.
+          inv REL. unfold FwdItem.read_view. rewrite TS, EX. condtac; ss.
+        }
+        econs; ss.
+        * econs; ss. apply eqts_rmap_add; ss.
+          econs; ss. repeat apply eqts_view_join; eauto using eqts_view_ifc, eqts_view_bot.
+        * econs; ss.
+          { i. rewrite ? fun_add_spec, VAL. condtac; ss. }
+          all: repeat (try apply eqts_view_join; try apply eqts_view_ifc; ss).
+          destruct ex0; ss. rewrite VAL. ss.
+    - generalize (eqts_rmap_expr RMAP eloc). intro X. inv X.
+      generalize (eqts_rmap_expr RMAP eval). intro X. inv X.
+      inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 4; ss.
+        * econs 3; ss. econs; ss.
+          { instantiate (2 := ts). inv WRITABLE. econs; ss.
+            - rewrite VAL, COH. ss.
+            - ss.
+              match goal with
+              | [H: ?a < ts |- ?b <ts] =>
+                replace b with a; ss
+              end.
+              repeat (match goal with
+                      | [|- join _ _ = join _ _] => f_equal
+                      | [|- ifc _ _ = ifc _ _] => f_equal
+                      end; ss).
+              + inv VIEW. ss.
+              + inv VIEW0. ss.
+              + inv VCAP. ss.
+              + inv VWP. ss.
+              + inv VRM. destruct (OrdW.ge ord OrdW.release); ss.
+              + inv VWM. destruct (OrdW.ge ord OrdW.release); ss.
+            - rewrite VAL, EXBANK. eauto.
+          }
+          { rewrite MSG. f_equal. f_equal; ss. }
+      + econs; ss.
+        * econs; ss. apply eqts_rmap_add; ss.
+        * econs; ss.
+          { i. rewrite ? fun_add_spec, VAL. condtac; ss. }
+          all: repeat (try apply eqts_view_join; try apply eqts_view_ifc; ss).
+          { i. rewrite ? fun_add_spec, VAL. condtac; ss. econs. econs; eauto using eqts_view_join. }
+          { destruct ex0; ss. }
+          { congr. }
+    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 4; ss.
+        * econs 4; ss.
+      + econs; ss.
+        econs; ss. apply eqts_rmap_add; ss.
+    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 5; ss.
+        * econs 5; ss.
+      + econs; ss.
+        econs; eauto using eqts_view_join, eqts_view_bot.
+    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 5; ss.
+        * econs 6; ss.
+      + econs; ss.
+        econs; eauto using eqts_view_join, eqts_view_bot.
+    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 5; ss.
+        * econs 7; ss.
+      + econs; ss.
+        econs; eauto using eqts_view_join, eqts_view_bot.
+    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 5; ss.
+        * econs 8; ss.
+      + econs; ss.
+        econs; eauto using eqts_view_join, eqts_view_bot.
+    - inv LC. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 6; ss.
+        * econs 1; ss.
+      + generalize (eqts_rmap_expr RMAP cond). intro X. inv X.
+        econs; ss.
+        * econs; ss. rewrite VAL. ss.
+        * econs; ss. eauto using eqts_view_join, eqts_view_bot.
+    - inv LC. eexists (ExecUnit.mk _ _ _). splits.
+      + econs. econs; ss.
+        * econs 7; ss.
+        * econs 1; ss.
+      + econs; ss.
+        econs; eauto using eqts_view_join, eqts_view_bot.
+  Qed.
 End Eqts.
 
 Lemma eqts_eu_init tid eu:
