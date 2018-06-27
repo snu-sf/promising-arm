@@ -291,6 +291,7 @@ Lemma lift_eu_state_step
       tid (eu1 eu2:ExecUnit.t (A:=unit))
       (STEP: ExecUnit.state_step tid eu1 eu2)
       (eu1': AExecUnit.t)
+      (PROMISES: Local.promises (ExecUnit.local eu1') <> bot)
       (EQTS: eqts_eu eu1' eu1):
   exists eu2',
     <<STEP: AExecUnit.state_step tid eu1' eu2'>> /\
@@ -300,9 +301,8 @@ Proof.
   inv STEP0. inv STEP1. destruct eu1'0 as [st1' lc1' mem1']. ss.
   eexists (AExecUnit.mk (ExecUnit.mk _ lc1' mem1') _). ss. esplits.
   - econs; ss.
-    + admit. (* promises not bot? *)
-    + econs; eauto. ss.
-      admit. (* lift_state_step *)
+    econs; eauto. ss.
+    admit. (* lift_state_step *)
   - admit. (* lift_state_step *)
 Admitted.
 
@@ -313,14 +313,17 @@ Lemma lift_rtc_eu_state_step
       (EQTS: eqts_eu eu1' eu1):
   exists eu2',
     <<STEP: rtc (AExecUnit.state_step tid) eu1' eu2'>> /\
-    <<EQTS: eqts_eu eu2' eu2>>.
+    <<EQTS: __guard__ (eqts_eu eu2' eu2 \/ Local.promises (ExecUnit.local eu2') = bot)>>.
 Proof.
-  revert eu1' EQTS. induction STEP; eauto. i.
+  revert eu1' EQTS. induction STEP; i.
+  { esplits; eauto. left. ss. }
+  destruct (classic (Local.promises (ExecUnit.local eu1') = bot)).
+  { esplits; eauto. right. ss. }
   exploit lift_eu_state_step; eauto. i. des.
   exploit IHSTEP; eauto. i. des.
   esplits.
   - econs 2; eauto.
-  - ss.
+  - eauto.
 Qed.
 
 
@@ -553,7 +556,7 @@ Proof.
   { apply void_aeu_init. }
   i. econs.
   - eapply rtc_mon; [|by eauto]. left. ss.
-  - inv EQTS. inv LC. rewrite PROMISES. ss.
+  - unguardH EQTS. des; ss. inv EQTS. inv LC. rewrite PROMISES. ss.
   - funext. i. propext. econs; i; ss. inv H.
     inv x0. inv TAINT. eapply TAINT0. eauto.
   - inv x0. rewrite RELEASE. ss.
