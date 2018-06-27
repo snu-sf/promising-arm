@@ -276,6 +276,15 @@ Section Eqts.
   Qed.
 End Eqts.
 
+Lemma eqts_rmap_refl
+      `{A: Type, _: orderC A eq}
+      (rmap:RMap.t (A:=View.t (A:=A))):
+  eqts_rmap rmap rmap.
+Proof.
+  econs. ii. destruct (IdMap.find id rmap); ss. econs.
+  econs; ss.
+Qed.
+
 Lemma eqts_eu_init tid eu:
   eqts_eu (AExecUnit.init tid eu) eu.
 Proof.
@@ -285,6 +294,37 @@ Proof.
     econs. econs; ss.
   - unfold AExecUnit.init_lc, AExecUnit.init_view. econs; ss.
     i. destruct (Local.fwdbank (ExecUnit.local eu) loc); ss. econs. econs; ss.
+Qed.
+
+Lemma lift_state_step
+      aux (e:Event.t (A:=View.t (A:=Taint.t))) st1 st2
+      (STEP: State.step e st1 st2):
+  exists st2',
+    <<STEP: State.step (AExecUnit.taint_read_event aux e) st1 st2'>> /\
+    <<EQTS: eqts_st st2 st2'>>.
+Proof.
+  inv STEP.
+  - eexists (State.mk _ _). splits.
+    + econs 1; eauto.
+    + econs; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 2; eauto.
+    + econs; ss. apply eqts_rmap_add; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 3; eauto.
+    + econs; ss. apply eqts_rmap_add; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 4; eauto.
+    + econs; ss. apply eqts_rmap_add; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 5; eauto.
+    + econs; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 6; eauto.
+    + econs; ss. apply eqts_rmap_refl.
+  - eexists (State.mk _ _). splits.
+    + econs 7; eauto.
+    + econs; ss. apply eqts_rmap_refl.
 Qed.
 
 Lemma lift_eu_state_step
@@ -299,12 +339,22 @@ Lemma lift_eu_state_step
 Proof.
   generalize (eqts_eu_state_step STEP EQTS). i. des.
   inv STEP0. inv STEP1. destruct eu1'0 as [st1' lc1' mem1']. ss.
+  exploit lift_state_step; eauto. i. des.
   eexists (AExecUnit.mk (ExecUnit.mk _ lc1' mem1') _). ss. esplits.
-  - econs; ss.
-    econs; eauto. ss.
-    admit. (* lift_state_step *)
-  - admit. (* lift_state_step *)
-Admitted.
+  - econs; ss. econs; eauto.
+  - destruct eu2 as [st2 lc2 mem2].
+    inv EQTS0. econs; ss.
+    destruct st1' as [stmts1' rmap1'].
+    destruct st2' as [stmts2' rmap2'].
+    destruct st2 as [stmts2 rmap2].
+    inv EQTS1. inv ST. ss. subst. econs; ss.
+    inv RMAP. inv RMAP0. econs. ii.
+    specialize (RMAP1 id). specialize (RMAP id). revert RMAP1 RMAP.
+    destruct (IdMap.find id rmap1'), (IdMap.find id rmap2'), (IdMap.find id rmap2);
+      i; inv RMAP1; inv RMAP; ss.
+    econs. destruct t, t0, t1. inv REL. inv REL0. ss. subst.
+    econs; ss. inv VIEW. inv VIEW0. econs. congr.
+Qed.
 
 Lemma lift_rtc_eu_state_step
       tid (eu1 eu2:ExecUnit.t (A:=unit))
