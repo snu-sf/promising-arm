@@ -346,7 +346,8 @@ Proof.
             * inv LOCAL0. specialize (COH0 (ValA.val (sem_expr rmap2 eloc))). inv COH0.
               rewrite TS; ss. etrans; eauto.
             * admit. (* hard: coh <= ts0, so no additional messages *)
-            * admit. (* easy: memory read *)
+            * rewrite <- MSG. inv MEM. unfold Memory.read. destruct ts0; ss.
+              rewrite ? nth_error_app1; ss.
           + econs 3; ss.
         - econs; ss. econs; ss.
           + admit. (* sim_state *)
@@ -438,25 +439,21 @@ Admitted.
 
 Inductive sound_taint (loc:Loc.t) (v:Taint.t): Prop :=
 | sound_taint_intro
-    (TAINT: forall from to, ~ v (Taint.W from to loc))
+    (TAINT: forall to, ~ v (Taint.W 0 to loc))
 .
 
-Inductive sound_view (loc:Loc.t) (v:View.t (A:=Taint.t)): Prop :=
-| sound_view_intro
-    (VIEW: sound_taint loc v.(View.annot))
-.
+Definition sound_view (loc:Loc.t) (v:View.t (A:=Taint.t)): Prop :=
+  sound_taint loc v.(View.annot).
 
-Inductive sound_val (loc:Loc.t) (v:ValA.t (A:=View.t (A:=Taint.t))): Prop :=
-| sound_val_intro
-    (VAL: sound_view loc v.(ValA.annot))
-.
+Definition sound_val (loc:Loc.t) (v:ValA.t (A:=View.t (A:=Taint.t))): Prop :=
+  sound_view loc v.(ValA.annot).
 
 Inductive sound_rmap (loc:Loc.t) (rmap:RMap.t (A:=View.t (A:=Taint.t))): Prop :=
 | sound_rmap_intro
     (RMAP: IdMap.Forall (fun _ => sound_val loc) rmap)
 .
 
-Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
+Inductive sound_lc (tid:Id.t) (is_first_ex:Prop) (loc:Loc.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
 | sound_lc_intro
     (VRP: sound_view loc lc.(Local.vrp))
     (VWP: sound_view loc lc.(Local.vwp))
@@ -474,7 +471,7 @@ Inductive sound_lc (tid:Id.t) (is_first_ex:bool) (loc:Loc.t) (lc:Local.t (A:=Tai
 Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (aeu:AExecUnit.t): Prop :=
 | sound_aeu_intro
     (ST: sound_rmap loc aeu.(ExecUnit.state).(State.rmap))
-    (LC: sound_lc tid (aeu.(AExecUnit.aux).(AExecUnit.ex_counter) == 0) loc aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
+    (LC: sound_lc tid (aeu.(AExecUnit.aux).(AExecUnit.ex_counter) = 0) loc aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
     (AUX: sound_taint loc aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
 
@@ -502,7 +499,7 @@ Lemma sound_view_join
       (V2: sound_view loc v2):
   sound_view loc (join v1 v2).
 Proof.
-  inv V1. inv V2. econs. eapply sound_taint_join; eauto.
+  eapply sound_taint_join; eauto.
 Qed.
 
 Lemma sound_view_bot
@@ -510,6 +507,14 @@ Lemma sound_view_bot
   sound_view loc bot.
 Proof.
   econs. apply sound_taint_bot.
+Qed.
+
+Lemma sound_view_ifc
+      loc cond v
+      (V1: sound_view loc v):
+  sound_view loc (ifc cond v).
+Proof.
+  destruct cond; ss. eauto using sound_view_bot.
 Qed.
 
 Lemma sound_rmap_expr
@@ -562,19 +567,45 @@ Proof.
     - inv LC. econs; ss.
       econs; ss.
       eauto using sound_view_join, sound_view_bot.
-    - inv STEP. econs; ss.
-      + apply sound_rmap_add; ss. econs. econs. s.
-        admit. (* sound_view *)
+    - inv STEP.
+      assert (FWD: sound_view loc
+                              match Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc)) with
+                              | Some fwd => FwdItem.read_view fwd ts ord
+                              | None => {| View.ts := ts; View.annot := bot |}
+                              end).
+      { destruct (Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc))) eqn:FWD.
+        - unfold FwdItem.read_view. condtac; eauto.
+          apply sound_taint_bot.
+        - apply sound_taint_bot.
+      }
+      econs; ss.
+      + apply sound_rmap_add; ss. s.
+        repeat apply sound_taint_join; eauto using sound_taint_bot.
+        * apply sound_rmap_expr. ss.
+        * destruct (OrdR.ge ord OrdR.acquire); eauto using sound_taint_bot.
+        * destruct ex; ss. eauto using sound_taint_bot.
       + econs; ss.
-        all: admit. (* sound_view *)
+        all: repeat (try apply sound_view_join;
+                     try apply sound_view_ifc;
+                     eauto using sound_view_bot, sound_rmap_expr).
+        i. destruct ex; ss. apply EXBANK; ss.
       + destruct ex; ss.
-    - inv STEP. econs; ss.
-      + apply sound_rmap_add; ss.
-        admit. (* sound view_ext *)
+    - inv STEP.
+      assert (VIEW_EXT: sound_taint loc (View.annot view_ext)).
+      { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
+        all: try apply sound_rmap_expr; ss.
+        all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
+      }
+      econs; ss.
+      + eauto using sound_rmap_add.
       + econs; ss.
-        all: admit. (* sound_view *)
-      + apply sound_taint_join; ss.
-        admit. (* sound view_ext *)
+        all: repeat apply sound_taint_join; eauto using sound_taint_bot.
+        * apply sound_rmap_expr. ss.
+        * i. revert FWD. rewrite fun_add_spec. condtac; eauto.
+          inversion e. i. inv FWD. s.
+          apply sound_taint_join; apply sound_rmap_expr; ss.
+        * destruct ex; ss.
+      + eauto using sound_taint_join.
     - inv STEP. econs; ss.
       + apply sound_rmap_add; ss. econs. apply sound_view_bot.
       + eauto using sound_taint_join, sound_taint_bot.
@@ -589,13 +620,40 @@ Proof.
   }
   { inv STEP0. ss. subst.
     inv ST. inv LC.
-    inv LOCAL. inv STATE. econs; ss.
-    - apply sound_rmap_add; ss. econs. econs. ss.
-      admit. (* sound_taint *)
+    inv LOCAL. inv STATE.
+    assert (VIEW_EXT: sound_taint loc (View.annot view_ext)).
+    { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
+      all: try apply sound_rmap_expr; ss.
+      all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
+    }
+    assert (TAINT: sound_taint loc
+                               ((fun _ : Taint.elt =>
+                                   ex /\
+                                   (exists tsx : Time.t, Local.exbank lc1 = Some (ValA.val (sem_expr rmap eloc), tsx)))
+                                  ∩ eq (AExecUnit.taint_write ord (ValA.val (sem_expr rmap eloc)) aux1))).
+    { econs. ii. inv H. inv H1. des. destruct ex; ss.
+      inv WRITABLE. exploit EX; eauto. i. des.
+      rewrite TSX in H1. inv H1. specialize (EX0 eq_refl).
+      eapply EXBANK; eauto. ii. eapply EX0; eauto.
+    }
+    econs; ss.
+    - apply sound_rmap_add; ss. apply sound_taint_join; ss.
     - econs; ss.
-      all: admit. (* sound_view *)
+      all: repeat (try apply sound_view_join;
+                   try apply sound_view_ifc;
+                   eauto using sound_view_bot, sound_rmap_expr).
+      + apply sound_rmap_expr. ss.
+      + i. revert FWD. rewrite fun_add_spec. condtac; eauto.
+        inversion e. i. inv FWD. s.
+        repeat apply sound_taint_join; eauto using sound_taint_bot.
+        all: try apply sound_rmap_expr; ss.
+      + destruct ex; ss. ii. rename H into EX. eapply EXBANK; eauto.
+        rewrite app_length in EX. ss.
+        ii. eapply EX; eauto.
+        * clear -TS2. lia.
+        * rewrite nth_error_app1; ss.
   }
-Admitted.
+Qed.
 
 Lemma sound_rtc_aeu_step
       tid loc aeu1 aeu2
