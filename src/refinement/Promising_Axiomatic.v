@@ -915,10 +915,10 @@ Qed.
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
   forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t) (rf: list (nat * Time.t)), Prop :=
 | sim_trace_init
-    st lc aeu
+    st lc stmts
     (FIND: IdMap.find tid (init_with_promises p mem).(Machine.tpool) = Some (st, lc))
-    (AFIND: IdMap.find tid (AMachine.init p) = Some aeu):
-    sim_trace p mem tid [ExecUnit.mk st lc mem] [aeu] nil
+    (STMT: IdMap.find tid p = Some stmts):
+    sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init] nil
 | sim_trace_step
     tr eu1 eu2 atr aeu1 aeu2 rf e rf'
     (STEP: ExecUnit.state_step0 tid e e eu1 eu2)
@@ -961,6 +961,27 @@ Lemma promising_pf_trace
 Proof.
 Admitted.
 
+Lemma promising_pf_valid
+      p m
+      (STEP: Machine.pf_exec p m):
+  exists ex (pre: Valid.pre_ex p ex) (cov: forall (eid: eidT), Time.t) (vext: forall (eid: eidT), Time.t),
+    <<CO: Valid.co ex>> /\
+    <<RF1: Valid.rf1 ex>> /\
+    <<RF2: Valid.rf2 ex>> /\
+    <<RF_WF: Valid.rf_wf ex>> /\
+    <<INTERNAL: forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
+        Time.lt (cov eid1) (cov eid2) \/
+        cov eid1 = cov eid2 /\ Execution.po eid1 eid2>> /\
+    <<EXTERNAL: forall eid1 eid2 (OB: ex.(Execution.ob) eid1 eid2),
+        Time.lt (vext eid1) (vext eid2) \/
+        vext eid1 = vext eid2 /\ Execution.po eid1 eid2>> /\
+    <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
+    <<STATE: IdMap.Forall2
+               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               m.(Machine.tpool) pre.(Valid.aeus)>>.
+Proof.
+Admitted.
+
 Theorem promising_pf_to_axiomatic
         p m
         (STEP: Machine.pf_exec p m):
@@ -968,4 +989,37 @@ Theorem promising_pf_to_axiomatic
     <<TERMINAL: Machine.is_terminal m -> EX.(Valid.is_terminal)>> /\
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
+  exploit promising_pf_valid; eauto. i. des.
+  exists ex. eexists (Valid.mk_ex pre CO RF1 RF2 RF_WF _ _ ATOMIC).
+  s. esplits.
+  - ii. inv H. specialize (STATE tid). inv STATE; try congr.
+    rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
+    exploit TERMINAL; eauto. i. des. inv REL. inv x. congr.
+  - admit.
+Grab Existential Variables.
+{ admit. }
+{ (* external *)
+  clear - EXTERNAL.
+  cut (forall eid1 eid2 (R: ex.(Execution.ob)⁺ eid1 eid2),
+          Time.lt (vext eid1) (vext eid2) \/
+          vext eid1 = vext eid2 /\ Execution.po eid1 eid2).
+  { ii. exploit H; eauto. i. des; [inv x0|inv x1]; lia. }
+  i. induction R; eauto. des.
+  - left. etrans; eauto.
+  - left. rewrite IHR1. auto.
+  - left. rewrite <- IHR2. auto.
+  - right. split; etrans; eauto.
+}
+{ (* internal *)
+  clear - INTERNAL.
+  cut (forall eid1 eid2 (R: ex.(Execution.internal)⁺ eid1 eid2),
+          Time.lt (cov eid1) (cov eid2) \/
+          cov eid1 = cov eid2 /\ Execution.po eid1 eid2).
+  { ii. exploit H; eauto. i. des; [inv x0|inv x1]; lia. }
+  i. induction R; eauto. des.
+  - left. etrans; eauto.
+  - left. rewrite IHR1. auto.
+  - left. rewrite <- IHR2. auto.
+  - right. split; etrans; eauto.
+}
 Admitted.
