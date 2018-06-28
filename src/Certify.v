@@ -101,7 +101,7 @@ Module AExecUnit.
         ex ord vloc
         (ValA.mk _ res.(ValA.val)
                    (View.mk res.(ValA.annot).(View.ts)
-                            (join res.(ValA.annot).(View.annot) (ifc ex (eq (Taint.R (S aux.(ex_counter)) (aux.(st_counter) vloc.(ValA.val))))))))
+                            (join res.(ValA.annot).(View.annot) (ifc ex (eq (Taint.R aux.(ex_counter) (aux.(st_counter) vloc.(ValA.val))))))))
     | _ => e
     end.
 
