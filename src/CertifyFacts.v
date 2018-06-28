@@ -505,8 +505,9 @@ Proof.
     i. inv FIND. econs. eauto using void_view_const.
   - unfold AExecUnit.init_lc, AExecUnit.init_view.
     econs; ss; eauto using void_view_const.
-    i. revert FWD. destruct (Local.fwdbank (ExecUnit.local eu) l); ss. i. inv FWD.
-    eauto using void_view_const.
+    + econs. econs. s. ii. destruct (Local.exbank (ExecUnit.local eu)) as [[]|] eqn:EX; ss.
+    + i. revert FWD. destruct (Local.fwdbank (ExecUnit.local eu) l); ss. i. inv FWD.
+      eauto using void_view_const.
 Qed.
 
 Lemma void_aeu_step

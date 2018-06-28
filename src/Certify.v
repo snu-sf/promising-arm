@@ -62,8 +62,8 @@ End Lock.
 
 Module Taint.
   Inductive elt :=
-  | R (id:nat) (from:nat)
-  | W (id:nat) (to:nat) (loc:Loc.t)
+  | R (id:nat) (loc:Loc.t) (from:nat)
+  | W (id:nat) (loc:Loc.t) (to:nat)
   .
   Hint Constructors elt.
 
@@ -72,8 +72,8 @@ Module Taint.
   Inductive is_locked (taint:t) (lock:Lock.ex_t): Prop :=
   | is_locked_intro
       id
-      (R: taint (R id lock.(Lock.from)))
-      (W: taint (W id lock.(Lock.to) lock.(Lock.loc)))
+      (R: taint (R id lock.(Lock.loc) lock.(Lock.from)))
+      (W: taint (W id lock.(Lock.loc) lock.(Lock.to)))
   .
   Hint Constructors is_locked.
 End Taint.
@@ -101,7 +101,7 @@ Module AExecUnit.
         ex ord vloc
         (ValA.mk _ res.(ValA.val)
                    (View.mk res.(ValA.annot).(View.ts)
-                            (join res.(ValA.annot).(View.annot) (ifc ex (eq (Taint.R aux.(ex_counter) (aux.(st_counter) vloc.(ValA.val))))))))
+                            (join res.(ValA.annot).(View.annot) (ifc ex (eq (Taint.R aux.(ex_counter) vloc.(ValA.val) (aux.(st_counter) vloc.(ValA.val))))))))
     | _ => e
     end.
 
@@ -133,7 +133,7 @@ Module AExecUnit.
   Hint Constructors state_step.
 
   Definition taint_write (ord:OrdW.t) (loc:Loc.t) (aux:aux_t): Taint.elt :=
-    Taint.W aux.(ex_counter) (S (aux.(st_counter) loc)) loc.
+    Taint.W aux.(ex_counter) loc (S (aux.(st_counter) loc)).
 
   Definition write_step_aux (loc:Loc.t) (ord:OrdW.t) (aux:aux_t): aux_t :=
     mk_aux
@@ -146,7 +146,7 @@ Module AExecUnit.
 
   Inductive local_write (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=Taint.t))) (tid:Id.t) (lc1:Local.t) (mem1:Memory.t) (aux:aux_t) (lc2:Local.t): Prop :=
   | fulfill_intro
-      ts loc val dep
+      ts loc val
       view_loc view_val view_ext
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
@@ -154,8 +154,7 @@ Module AExecUnit.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (TS: ts = S (length mem1))
       (WRITABLE: Local.writable ex ord vloc vval tid lc1 mem1 ts view_ext)
-      (DEPENDENT: dep = (ex /\ exists tsx, lc1.(Local.exbank) = Some (loc, tsx)))
-      (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) ((fun _ => dep) ∩₁ (eq (taint_write ord loc aux))))))
+      (RES: res = ValA.mk _ 0 (View.mk bot (join view_ext.(View.annot) ((fun _ => ex) ∩₁ (eq (taint_write ord loc aux))))))
       (LC2: lc2 =
             Local.mk
               (fun_add loc ts lc1.(Local.coh))
@@ -166,7 +165,7 @@ Module AExecUnit.
               (join lc1.(Local.vcap) view_loc)
               (join lc1.(Local.vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
               (fun_add loc (Some (FwdItem.mk ts
-                                             (joins [view_loc; view_val; View.mk bot ((fun _ => dep) ∩₁ (eq (taint_write ord loc aux)))])
+                                             (joins [view_loc; view_val; View.mk bot ((fun _ => ex) ∩₁ (eq (taint_write ord loc aux)))])
                                              ex)) lc1.(Local.fwdbank))
               (if ex then None else lc1.(Local.exbank))
               lc1.(Local.promises))
@@ -200,7 +199,11 @@ Module AExecUnit.
       (init_view lc.(Local.vwp))
       (init_view lc.(Local.vrm))
       (init_view lc.(Local.vwm))
-      (View.mk lc.(Local.vcap).(View.ts) (eq (Taint.R 0 0)))
+      (View.mk lc.(Local.vcap).(View.ts)
+               (match lc.(Local.exbank) with
+                | Some (loc, _) => eq (Taint.R 0 loc 0)
+                | None => bot
+                end))
       (init_view lc.(Local.vrel))
       (fun loc =>
          option_map

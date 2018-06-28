@@ -445,8 +445,8 @@ Inductive sound_data := sd_mk {
 
 Inductive sound_taint (sd:sound_data) (v:Taint.t): Prop :=
 | sound_taint_intro
-    (R: forall id (TAINT: v (Taint.R id 0)), sd.(sd_ids) id)
-    (W: forall id to (TAINT: v (Taint.W id to sd.(sd_loc))), ~ sd.(sd_ids) id /\ id <= sd.(sd_ex_counter))
+    (R: forall id (TAINT: v (Taint.R id sd.(sd_loc) 0)), sd.(sd_ids) id)
+    (W: forall id to (TAINT: v (Taint.W id sd.(sd_loc) to)), ~ sd.(sd_ids) id /\ id <= sd.(sd_ex_counter))
 .
 
 Definition sound_view (sd:sound_data) (v:View.t (A:=Taint.t)): Prop :=
@@ -480,7 +480,7 @@ Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (ids:nat -> Prop) (aeu:AExecUnit.t): 
     sd
     (SD: sd = sd_mk loc ids aeu.(AExecUnit.aux).(AExecUnit.ex_counter))
     (ST: sound_rmap sd aeu.(ExecUnit.state).(State.rmap))
-    (LC: sound_lc tid (aeu.(AExecUnit.aux).(AExecUnit.st_counter) loc = 0) sd aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
+    (LC: sound_lc tid (ids aeu.(AExecUnit.aux).(AExecUnit.ex_counter)) sd aeu.(ExecUnit.local) aeu.(ExecUnit.mem))
     (AUX: sound_taint sd aeu.(AExecUnit.aux).(AExecUnit.taint))
 .
 
@@ -552,6 +552,46 @@ Proof.
   - apply RMAP0.
 Qed.
 
+Lemma sound_taint_proceed
+      loc ids ids' ex taint
+      (SOUND: sound_taint (sd_mk loc ids ex) taint)
+      (IDS': ids ⊆₁ ids' /\ ids' ⊆₁ ids ∪₁ (eq (S ex))):
+  sound_taint (sd_mk loc ids' (S ex)) taint.
+Proof.
+  inv SOUND. econs; ss.
+  - i. apply IDS'. eauto.
+  - i. exploit W; eauto. i. des. splits; [|lia].
+    ii. apply IDS'0 in H. inv H; ss. lia.
+Qed.
+
+Lemma sound_view_proceed
+      loc ids ids' ex view
+      (SOUND: sound_view (sd_mk loc ids ex) view)
+      (IDS': ids ⊆₁ ids' /\ ids' ⊆₁ ids ∪₁ (eq (S ex))):
+  sound_view (sd_mk loc ids' (S ex)) view.
+Proof.
+  eapply sound_taint_proceed; eauto.
+Qed.
+
+Lemma sound_val_proceed
+      loc ids ids' ex val
+      (SOUND: sound_val (sd_mk loc ids ex) val)
+      (IDS': ids ⊆₁ ids' /\ ids' ⊆₁ ids ∪₁ (eq (S ex))):
+  sound_val (sd_mk loc ids' (S ex)) val.
+Proof.
+  eapply sound_view_proceed; eauto.
+Qed.
+
+Lemma sound_rmap_proceed
+      loc ids ids' ex rmap
+      (SOUND: sound_rmap (sd_mk loc ids ex) rmap)
+      (IDS': ids ⊆₁ ids' /\ ids' ⊆₁ ids ∪₁ (eq (S ex))):
+  sound_rmap (sd_mk loc ids' (S ex)) rmap.
+Proof.
+  econs. ii. inv SOUND. exploit RMAP; eauto. i.
+  eapply sound_val_proceed; eauto.
+Qed.
+
 Lemma sound_aeu_step
       tid loc ids aeu1 aeu2
       (STEP: AExecUnit.step tid aeu1 aeu2)
@@ -575,6 +615,44 @@ Proof.
       econs; ss.
       eauto using sound_view_join, sound_view_bot.
     - inv STEP.
+      remember (sd_mk loc
+                      (if ex
+                       then
+                         ids
+                           ∪ (fun id : nat =>
+                                loc = ValA.val (sem_expr rmap eloc) /\
+                                AExecUnit.st_counter aux1 loc = 0 /\ id = S (AExecUnit.ex_counter aux1))
+                       else ids)
+                      (AExecUnit.ex_counter
+                         (if ex
+                          then
+                            {|
+                              AExecUnit.ex_counter := S (AExecUnit.ex_counter aux1);
+                              AExecUnit.st_counter := AExecUnit.st_counter aux1;
+                              AExecUnit.taint := AExecUnit.taint aux1;
+                              AExecUnit.release := AExecUnit.release aux1 |}
+                          else aux1))) as sd' eqn:SD'.
+      assert (IDS:
+                ids
+                  ⊆ ids
+                  ∪ (fun id : nat =>
+                       loc = ValA.val (sem_expr rmap eloc) /\
+                       AExecUnit.st_counter aux1 loc = 0 /\ id = S (AExecUnit.ex_counter aux1)) /\
+                ids
+                  ∪ (fun id : nat =>
+                       loc = ValA.val (sem_expr rmap eloc) /\
+                       AExecUnit.st_counter aux1 loc = 0 /\ id = S (AExecUnit.ex_counter aux1))
+                  ⊆ ids ∪ eq (S (AExecUnit.ex_counter aux1))).
+      { splits.
+        - left. ss.
+        - ii. inv H; [left|right]; des; ss.
+      }
+      assert (TAINT: forall taint (SOUND: sound_taint (sd_mk loc ids (AExecUnit.ex_counter aux1)) taint), sound_taint sd' taint).
+      { subst. destruct ex; ss. i. eapply sound_taint_proceed; eauto. }
+      assert (VIEW: forall view (SOUND: sound_view (sd_mk loc ids (AExecUnit.ex_counter aux1)) view), sound_view sd' view).
+      { subst. destruct ex; ss. i. eapply sound_view_proceed; eauto. }
+      assert (RMAP: sound_rmap sd' rmap).
+      { subst. destruct ex; ss. eapply sound_rmap_proceed; eauto. }
       assert (FWD: sound_view (sd_mk loc ids aux1.(AExecUnit.ex_counter))
                               match Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc)) with
                               | Some fwd => FwdItem.read_view fwd ts ord
@@ -585,47 +663,17 @@ Proof.
           apply sound_taint_bot.
         - apply sound_taint_bot.
       }
-      exists (if ex
-         then ids ∪₁ (fun id => aux1.(AExecUnit.st_counter) (ValA.val (sem_expr rmap eloc)) = 0 /\ id = S aux1.(AExecUnit.ex_counter))
-         else ids).
-      econs; ss.
-      + apply sound_rmap_add; ss.
-        { admit. }
-        repeat apply sound_taint_join; eauto using sound_taint_bot.
-        * apply sound_rmap_expr.
-          admit.
-        * admit.
-        * destruct (OrdR.ge ord OrdR.acquire); eauto using sound_taint_bot.
-          admit.
-        * admit.
-        * destruct ex; ss; eauto using sound_taint_bot.
-          econs; ss. i. inv TAINT.  right. ss.
+      exists sd'.(sd_ids). subst. econs; ss.
+      + apply sound_rmap_add; ss. repeat apply sound_taint_join; eauto using sound_taint_bot.
+        all: try apply VIEW; eauto using sound_view_ifc, sound_rmap_expr.
+        destruct ex; ss. econs; ss. i. inv TAINT0. right. ss.
       + econs; ss.
         all: repeat (try apply sound_view_join;
                      try apply sound_view_ifc;
                      eauto using sound_view_bot, sound_rmap_expr).
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
-        admit.
         i. destruct ex; ss.
-        * inv EXBANK0. ii. eapply EXBANK.
+        * inv EXBANK0. ii. eapply EXBANK; eauto.
+          admit.
           admit.
 (*           inv EXBANK0. *)
 
@@ -643,14 +691,14 @@ Proof.
 (*           ss. *)
 (*           ss. *)
         * apply EXBANK; ss.
-      + destruct ex; ss.
+      + destruct ex; ss. apply TAINT; ss.
     - inv STEP.
-      assert (VIEW_EXT: sound_taint loc (View.annot view_ext)).
+      assert (VIEW_EXT: sound_taint (sd_mk loc ids aux1.(AExecUnit.ex_counter)) (View.annot view_ext)).
       { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
         all: try apply sound_rmap_expr; ss.
         all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
       }
-      econs; ss.
+      exists ids. econs; ss.
       + eauto using sound_rmap_add.
       + econs; ss.
         all: repeat apply sound_taint_join; eauto using sound_taint_bot.
@@ -660,37 +708,37 @@ Proof.
           apply sound_taint_join; apply sound_rmap_expr; ss.
         * destruct ex; ss.
       + eauto using sound_taint_join.
-    - inv STEP. econs; ss.
-      + apply sound_rmap_add; ss. econs. apply sound_view_bot.
+    - inv STEP. exists ids. econs; ss.
+      + apply sound_rmap_add; ss.
       + eauto using sound_taint_join, sound_taint_bot.
-    - inv STEP. econs; ss.
+    - inv STEP. exists ids. econs; ss.
       econs; ss. eauto using sound_view_join.
-    - inv STEP. econs; ss.
+    - inv STEP. exists ids. econs; ss.
       econs; ss. eauto using sound_view_join.
-    - inv STEP. econs; ss.
+    - inv STEP. exists ids. econs; ss.
       econs; ss; eauto using sound_view_join.
-    - inv STEP. econs; ss.
+    - inv STEP. exists ids. econs; ss.
       econs; ss; eauto using sound_view_join, sound_view_bot.
   }
   { inv STEP0. ss. subst.
     inv ST. inv LC.
     inv LOCAL. inv STATE.
-    assert (VIEW_EXT: sound_taint loc (View.annot view_ext)).
+    assert (VIEW_EXT: sound_taint (sd_mk loc ids aux1.(AExecUnit.ex_counter)) (View.annot view_ext)).
     { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
       all: try apply sound_rmap_expr; ss.
       all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
     }
-    assert (TAINT: sound_taint loc
-                               ((fun _ : Taint.elt =>
-                                   ex /\
-                                   (exists tsx : Time.t, Local.exbank lc1 = Some (ValA.val (sem_expr rmap eloc), tsx)))
-                                  ∩ eq (AExecUnit.taint_write ord (ValA.val (sem_expr rmap eloc)) aux1))).
-    { econs. ii. inv H. inv H1. des. destruct ex; ss.
-      inv WRITABLE. exploit EX; eauto. clear EX. i. des.
-      rewrite TSX in H1. inv H1. specialize (EX eq_refl).
-      eapply EXBANK; eauto. ii. eapply EX0; eauto.
+    assert (TAINT: sound_taint (sd_mk loc ids aux1.(AExecUnit.ex_counter))
+                               ((fun _ => ex) ∩₁ (eq (AExecUnit.taint_write ord (ValA.val (sem_expr rmap eloc)) aux1)))).
+    { econs.
+      - i. inv TAINT. inv H0.
+      - i. inv TAINT. destruct ex; ss. inv H0. splits; ss.
+        inv WRITABLE. exploit EX; eauto. clear EX. i. des.
+        admit.
+        (* rewrite TSX in H1. inv H1. specialize (EX eq_refl). *)
+        (* eapply EXBANK; eauto. ii. eapply EX0; eauto. *)
     }
-    econs; ss.
+    exists ids. econs; ss.
     - apply sound_rmap_add; ss. apply sound_taint_join; ss.
     - econs; ss.
       all: repeat (try apply sound_view_join;
@@ -701,21 +749,24 @@ Proof.
         inversion e. i. inv FWD. s.
         repeat apply sound_taint_join; eauto using sound_taint_bot.
         all: try apply sound_rmap_expr; ss.
-      + destruct ex; ss. ii. rename H into EX. eapply EXBANK; eauto.
-        rewrite app_length in EX. ss.
+      + destruct ex; ss. ii. rename H into EX.
+        eapply EXBANK; eauto. rewrite app_length in EX. ss.
         ii. eapply EX; eauto.
         * clear -TS2. lia.
         * rewrite nth_error_app1; ss.
   }
-Qed.
+Admitted.
 
 Lemma sound_rtc_aeu_step
-      tid loc aeu1 aeu2
+      tid loc ids aeu1 aeu2
       (STEP: rtc (AExecUnit.step tid) aeu1 aeu2)
-      (SOUND: sound_aeu tid loc aeu1):
-  sound_aeu tid loc aeu2.
+      (SOUND: sound_aeu tid loc ids aeu1):
+  exists ids', sound_aeu tid loc ids' aeu2.
 Proof.
-  revert SOUND. induction STEP; ss. i. exploit sound_aeu_step; eauto.
+  revert ids SOUND. induction STEP; ss.
+  { esplits; eauto. }
+  i. exploit sound_aeu_step; eauto. i. des.
+  exploit IHSTEP; eauto.
 Qed.
 
 Lemma lift_wf
@@ -755,28 +806,30 @@ Proof.
   destruct eu2 as [st2 lc2 mem2].
   ss. subst. inv CERTIFY.
   exploit sound_rtc_aeu_step; eauto.
-  { instantiate (1 := msg.(Msg.loc)).
-    ss. subst. econs.
+  { instantiate (1 := eq 0).
+    instantiate (1 := msg.(Msg.loc)).
+    econs; eauto.
     - econs. s. ii. revert FIND.
       unfold AExecUnit.init_rmap. rewrite IdMap.map_spec.
       destruct (IdMap.find id (State.rmap st1)); ss. i. inv FIND.
-      econs. ss.
+      econs; ss.
     - s. unfold AExecUnit.init_lc, AExecUnit.init_view. econs; ss.
-      all: try by econs; ss. 
+      + destruct (Local.exbank lc1) as [[]|] eqn:X; ss. econs; ss.
+        i. inv TAINT. ss.
       + i. destruct (Local.fwdbank lc1 l) eqn:FWDL; ss. inv FWD. ss.
-        econs. ss.
       + ii. inv WF. inv LOCAL. ss. exploit EXBANK0; eauto. i. des.
         eapply H; cycle 2.
         { rewrite nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
         { ss. }
         { exploit ExecUnit.read_wf; eauto. i. lia. }
         { rewrite app_length. s. intuition. }
-        all: eauto.
-    - econs. ss.
+    - econs; ss.
   }
-  ii. destruct lock as [ex release]. ss. subst.
+  ii. des. destruct lock as [ex release]. ss. subst.
   inv H. destruct exlock as [loc from to]. ss. subst.
-  inv LOCK. ss. eapply x1. eauto.
+  inv LOCK. ss. inv x1. inv AUX. ss.
+  exploit R0; eauto. i.
+  exploit W0; eauto. i. des. ss.
 Qed.
 
 Lemma lift_certify_diff
