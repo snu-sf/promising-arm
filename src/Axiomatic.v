@@ -488,6 +488,16 @@ Module Execution.
   .
   Hint Constructors label_rel.
 
+  Inductive label_is_rel (ex: t) (pred: Label.t -> Prop) (eid1 eid2: eidT): Prop :=
+  | label_is_rel_intro
+      l1 l2
+      (EID1: label eid1 ex = Some l1)
+      (EID2: label eid2 ex = Some l2)
+      (LABEL1: pred l1)
+      (LABEL2: pred l2)
+  .
+  Hint Constructors label_is_rel.
+
   Inductive label_loc (x y:Label.t): Prop :=
   | label_loc_intro
       loc
@@ -694,13 +704,32 @@ Module Valid.
     exists ex1 ord1,
       <<LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>>.
 
+  Definition rf2' (ex: Execution.t) :=
+    forall eid1 eid2 (RF: ex.(Execution.rf) eid2 eid1),
+    exists ex1 ex2 ord1 ord2 loc val,
+      <<READ: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>> /\
+      <<WRITE: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>>.
+
   Definition rf_wf (ex: Execution.t) := functional (ex.(Execution.rf))⁻¹.
 
+  Lemma rf2'_rf2
+        exec
+        (RF2': rf2' exec):
+    rf2 exec.
+  Proof.
+    unfold rf2, rf2' in *. i.
+    exploit RF2'; eauto. i. des.
+    rewrite LABEL in WRITE. inv WRITE.
+    esplits; eauto.
+  Qed.
+
+  (* rf2' includes rf2, thus, rf2 can be removed *)
   Inductive ex (p:program) (ex:Execution.t) := mk_ex {
     PRE: pre_ex p ex;
     CO: co ex;
     RF1: rf1 ex;
     RF2: rf2 ex;
+    RF2': rf2' ex;
     RF_WF: rf_wf ex;
     INTERNAL: acyclic ex.(Execution.internal);
     EXTERNAL: acyclic ex.(Execution.ob);
@@ -791,6 +820,24 @@ Module Valid.
     - instantiate (1 := (_, _)). econs; ss; eauto.
   Qed.
 
+  Lemma po_label_pre
+        p exec
+        eid1 eid2 label2
+        (PRE: pre_ex p exec)
+        (PO: Execution.po eid1 eid2)
+        (LABEL: Execution.label eid2 exec = Some label2):
+    exists label1, <<LABEL: Execution.label eid1 exec = Some label1>>.
+  Proof.
+    destruct eid1, eid2. inv PO. ss. subst.
+    revert LABEL. unfold Execution.label.
+    rewrite PRE.(LABELS), ? IdMap.map_spec. s.
+    destruct (IdMap.find t0 PRE.(aeus)) eqn:LOCAL; ss.
+    generalize (PRE.(AEUS) t0). rewrite LOCAL. intro X. inv X. des.
+    i. exploit List.nth_error_Some. rewrite LABEL. intros [X _]. exploit X; [congr|]. clear X. i.
+    generalize (List.nth_error_Some t.(AExecUnit.local).(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
+    destruct (List.nth_error t.(AExecUnit.local).(ALocal.labels) n); ss. eauto.
+  Qed.
+
   Lemma po_label
         p exec
         eid1 eid2 label2
@@ -799,14 +846,7 @@ Module Valid.
         (LABEL: Execution.label eid2 exec = Some label2):
     exists label1, <<LABEL: Execution.label eid1 exec = Some label1>>.
   Proof.
-    destruct eid1, eid2. inv PO. ss. subst.
-    revert LABEL. unfold Execution.label.
-    rewrite EX.(LABELS), ? IdMap.map_spec. s.
-    destruct (IdMap.find t0 EX.(aeus)) eqn:LOCAL; ss.
-    generalize (EX.(AEUS) t0). rewrite LOCAL. intro X. inv X. des.
-    i. exploit List.nth_error_Some. rewrite LABEL. intros [X _]. exploit X; [congr|]. clear X. i.
-    generalize (List.nth_error_Some t.(AExecUnit.local).(ALocal.labels) n). intros [_ X]. hexploit X; [lia|]. i.
-    destruct (List.nth_error t.(AExecUnit.local).(ALocal.labels) n); ss. eauto.
+    inv EX. eapply po_label_pre; eauto.
   Qed.
 
   Lemma coherence_rw
@@ -944,6 +984,222 @@ Module Valid.
     - contradict NORF. econs. eauto.
     - exploit EX.(RF_WF); [exact RF3|exact RF|]. i. subst. eauto.
   Qed.
+
+  Ltac obtac :=
+    repeat
+      (try match goal with
+           | [H: Execution.ob _ _ _ |- _] => inv H
+           | [H: Execution.obs _ _ _ |- _] => inv H
+           | [H: Execution.dob _ _ _ |- _] => inv H
+           | [H: Execution.aob _ _ _ |- _] => inv H
+           | [H: Execution.bob _ _ _ |- _] => inv H
+           | [H: Execution.fr _ _ _ |- _] => inv H
+           | [H: Execution.rfe _ _ _ |- _] => inv H
+           | [H: Execution.rfi _ _ _ |- _] => inv H
+           | [H: (_⨾ _) _ _ |- _] => inv H
+           | [H: ⦗_⦘ _ _ |- _] => inv H
+           | [H: (_ ∪ _) _ _ |- _] => inv H
+           | [H: (_ ∩ _) _ _ |- _] => inv H
+           | [H: (_ × _) _ _ |- _] => inv H
+           | [H: (minus_rel _ _) _ |- _] => inv H
+           | [H: Execution.label_is _ _ _ |- _] => inv H
+           | [H: Execution.label_rel _ _ _ _ |- _] => inv H
+           | [H: Execution.label_loc _ _ |- _] => inv H
+           end;
+       des).
+
+  Lemma data_is_po
+        p exec
+        (PRE: pre_ex p exec):
+    exec.(Execution.data) ⊆ Execution.po.
+  Proof.
+  Admitted.
+
+  Lemma ctrl_is_po
+        p exec
+        (PRE: pre_ex p exec):
+    exec.(Execution.ctrl) ⊆ Execution.po.
+  Proof.
+  Admitted.
+
+  Lemma addr_is_po
+        p exec
+        (PRE: pre_ex p exec):
+    exec.(Execution.addr) ⊆ Execution.po.
+  Proof.
+  Admitted.
+
+  Lemma data_no_barrier
+        p exec
+        eid1 eid2 b
+        (PRE: pre_ex p exec)
+        (DATA: exec.(Execution.data) eid1 eid2)
+        (EID1: Execution.label eid1 exec = Some (Label.barrier b) \/
+               Execution.label eid2 exec = Some (Label.barrier b)):
+    False.
+  Proof.
+  Admitted.
+
+  Lemma addr_no_barrier
+        p exec
+        eid1 eid2 b
+        (PRE: pre_ex p exec)
+        (ADDR: exec.(Execution.addr) eid1 eid2)
+        (EID1: Execution.label eid1 exec = Some (Label.barrier b) \/
+               Execution.label eid2 exec = Some (Label.barrier b)):
+    False.
+  Proof.
+  Admitted.
+
+  Lemma barrier_ob_po
+        p exec
+        eid1 eid2 b
+        (PRE: pre_ex p exec)
+        (CO: co exec)
+        (RF2': rf2' exec)
+        (EID1: Execution.label eid1 exec = Some (Label.barrier b))
+        (OB: exec.(Execution.ob) eid1 eid2):
+    Execution.po eid1 eid2.
+  Proof.
+    unfold co, rf2' in *.
+    obtac.
+    - exploit RF2'; eauto. i. des. congr.
+    - exploit RF2'; eauto. i. des. congr.
+    - destruct l1; try congr; ss.
+    - destruct (CO eid1 eid2). exploit H1; eauto. i. des. congr.
+    - exfalso. eapply addr_no_barrier; eauto.
+    - exfalso. eapply data_no_barrier; eauto.
+    - eapply ctrl_is_po; eauto.
+    - etrans; eauto. eapply addr_is_po; eauto.
+    - etrans; eauto. eapply ctrl_is_po; eauto.
+    - etrans; eauto. etrans; eauto. eapply addr_is_po; eauto.
+    - exploit RF2'; eauto. i. des. congr.
+    - etrans; eauto.
+    - auto.
+    - destruct l; try congr; ss.
+    - auto.
+    - etrans; eauto.
+    - auto.
+  Qed.
+
+  Lemma ob_barrier_ob
+        p exec
+        eid1 eid2 eid3 b
+        (PRE: pre_ex p exec)
+        (CO: co exec)
+        (RF2': rf2' exec)
+        (EID2: Execution.label eid2 exec = Some (Label.barrier b))
+        (OB1: exec.(Execution.ob) eid1 eid2)
+        (OB2: exec.(Execution.ob) eid2 eid3):
+    <<OB: exec.(Execution.ob) eid1 eid3>>.
+  Proof.
+    exploit barrier_ob_po; eauto. i.
+    unfold co, rf2' in *. clear OB2.
+    obtac.
+    - exploit RF2'; eauto. i. des. congr.
+    - destruct (CO x eid2). exploit H2; eauto. i. des. congr.
+    - destruct l2; try congr; ss.
+    - destruct (CO eid1 eid2). exploit H1; eauto. i. des. congr.
+    - inv H0.
+      + exfalso. eapply addr_no_barrier; eauto.
+      + inv H. exploit RF2'; eauto. i. des. congr.
+    - inv H0.
+      + exfalso. eapply data_no_barrier; eauto.
+      + inv H. exploit RF2'; eauto. i. des. congr.
+    - destruct l; try congr; ss.
+    - destruct l; try congr; ss.
+    - destruct l; try congr; ss.
+    - destruct l; try congr; ss.
+    - destruct l; try congr; ss.
+    - right. left. left. left. left. left.
+      econs; split; eauto. econs; split; [|etrans; eauto].
+      econs; eauto.
+    - destruct l0; try congr; ss.
+    - right. left. left. left. right.
+      econs; split; try (econs; eauto). split; eauto.
+      econs; split; [|etrans; eauto]. econs; eauto.
+    - right. left. left. right.
+      econs; split; [econs|etrans]; eauto.
+    - destruct l0; try congr; ss.
+    - destruct l; try congr; ss.
+  Qed.
+
+  Lemma addr_label
+        p exec
+        eid1 eid2
+        (PRE: pre_ex p exec)
+        (CTRL: exec.(Execution.addr) eid1 eid2)
+        (EID1: Execution.label eid1 exec = None):
+    False.
+  Proof.
+  Admitted.
+
+  Lemma data_label
+        p exec
+        eid1 eid2
+        (PRE: pre_ex p exec)
+        (CTRL: exec.(Execution.data) eid1 eid2)
+        (EID1: Execution.label eid1 exec = None):
+    False.
+  Proof.
+  Admitted.
+
+  Lemma ctrl_label
+        p exec
+        eid1 eid2
+        (PRE: pre_ex p exec)
+        (CTRL: exec.(Execution.ctrl) eid1 eid2)
+        (EID1: Execution.label eid1 exec = None):
+    False.
+  Proof.
+  Admitted.
+
+  Lemma ob_label
+        p exec
+        eid1 eid2
+        (PRE: pre_ex p exec)
+        (CO: co exec)
+        (RF2': rf2' exec)
+        (OB: exec.(Execution.ob) eid1 eid2)
+        (EID1: Execution.label eid1 exec = None):
+    False.
+  Proof.
+    unfold co, rf2' in *.
+    obtac.
+    - exploit RF2'; eauto. i. des. congr.
+    - exploit RF2'; eauto. i. des. congr.
+    - congr.
+    - destruct (CO eid1 eid2). exploit H1; eauto. i. des. congr.
+    - eapply addr_label; eauto.
+    - eapply data_label; eauto.
+    - eapply ctrl_label; eauto.
+    - eapply addr_label; eauto.
+    - eapply ctrl_label; eauto.
+    - eapply addr_label; eauto.
+    - exploit RF2'; eauto. i. des. congr.
+    - exploit po_label_pre; try exact EID; eauto. i. des. congr.
+    - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
+    - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
+    - congr.
+    - congr.
+    - exploit po_label_pre; try exact EID; eauto. i. des. congr.
+  Qed.
+
+  Lemma ob_cycle
+        p exec eid
+        (PRE: pre_ex p exec)
+        (CO: co exec)
+        (RF2': rf2' exec)
+        (CYCLE: exec.(Execution.ob)⁺ eid eid):
+    <<NONBARRIER:
+      exists eid_nb,
+        (exec.(Execution.ob) ∩ (Execution.label_is_rel exec (join Label.is_read Label.is_write)))⁺ eid_nb eid_nb>> \/
+    <<BARRIER:
+      exists eid_b b,
+        exec.(Execution.ob) eid_b eid_b /\
+        Execution.label eid_b exec = Some (Label.barrier b)>>.
+  Proof.
+  Admitted.
 End Valid.
 
 Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.

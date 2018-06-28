@@ -913,45 +913,61 @@ Proof.
 Qed.
 
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
-  forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t) (rf: list (nat * Time.t)), Prop :=
+  forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t) (rf: nat -> option Time.t) (cov: nat -> Time.t) (vext: nat -> Time.t), Prop :=
 | sim_trace_init
     st lc stmts
     (FIND: IdMap.find tid (init_with_promises p mem).(Machine.tpool) = Some (st, lc))
     (STMT: IdMap.find tid p = Some stmts):
-    sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init] nil
+    sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init] (fun _ => None) (fun _ => Time.bot) (fun _ => Time.bot)
 | sim_trace_step
-    tr eu1 eu2 atr aeu1 aeu2 rf e rf'
+    e tr eu1 eu2 atr aeu1 aeu2 rf rf' cov cov' vext vext'
     (STEP: ExecUnit.state_step0 tid e e eu1 eu2)
     (ASTEP: AExecUnit.step aeu1 aeu2)
     (STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state))
-    (TRACE: sim_trace p mem tid (tr++[eu1]) (atr++[aeu1]) rf)
-    (RF: rf' = rf ++ (match e with
-                      | Event.read _ _ vloc _ =>
-                        [(ALocal.next_eid aeu1.(AExecUnit.local), eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))]
-                      | _ => []
-                      end)):
-    sim_trace p mem tid (tr++[eu1]++[eu2]) (atr++[aeu1]++[aeu2]) rf'.
+    (RF: rf' = match e with
+               | Event.read _ _ vloc _ =>
+                 (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                            then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
+                            else rf eid)
+               | _ => rf
+               end)
+    (COV: cov' = match e with
+                 | Event.read _ _ vloc _
+                 | Event.write _ _ vloc _ _ =>
+                   (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                              then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
+                              else cov eid)
+                 | _ => cov
+                 end)
+    (VEXT: vext' = match e with
+                   | Event.read _ _ _ res =>
+                     (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                                then res.(ValA.annot).(View.ts)
+                                else vext eid)
+                   | Event.write _ _ vloc _ _ =>
+                     (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                                then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
+                                else vext eid)
+                   | _ => vext
+                   end)
+    (TRACE: sim_trace p mem tid (tr++[eu1]) (atr++[aeu1]) rf cov vext):
+    sim_trace p mem tid (tr++[eu1]++[eu2]) (atr++[aeu1]++[aeu2]) rf' cov' vext'.
 
 Definition sim_traces
            (p: program) (mem: Memory.t)
            (trs: IdMap.t (list (ExecUnit.t (A:=unit))))
            (atrs: IdMap.t (list AExecUnit.t))
-           (rfs: IdMap.t (list (nat * Time.t))): Prop :=
-  forall tid,
-    (exists tr atr rf,
-        IdMap.find tid trs = Some tr /\
-        IdMap.find tid atrs = Some atr /\
-        IdMap.find tid rfs = Some rf /\
-        sim_trace p mem tid tr atr rf) \/
-    (IdMap.find tid trs = None /\
-     IdMap.find tid atrs = None /\
-     IdMap.find tid rfs = None).
+           (rfs: IdMap.t (nat -> option Time.t))
+           (covs: IdMap.t (nat -> Time.t))
+           (vexts: IdMap.t (nat -> Time.t))
+  : Prop :=
+  IdMap.Forall5 (sim_trace p mem) trs atrs rfs covs vexts.
 
 Lemma promising_pf_trace
       p m
       (STEP: Machine.pf_exec p m):
-  exists mem trs atrs rfs ex (pre: Valid.pre_ex p ex),
-    sim_traces p mem trs atrs rfs /\
+  exists mem trs atrs rfs covs vexts ex (pre: Valid.pre_ex p ex),
+    sim_traces p mem trs atrs rfs covs vexts /\
     IdMap.Forall2
       (fun tid tr sl => exists l, tr = l ++ [ExecUnit.mk sl.(fst) sl.(snd) mem])
       trs m.(Machine.tpool) /\
@@ -967,12 +983,16 @@ Lemma promising_pf_valid
   exists ex (pre: Valid.pre_ex p ex) (cov: forall (eid: eidT), Time.t) (vext: forall (eid: eidT), Time.t),
     <<CO: Valid.co ex>> /\
     <<RF1: Valid.rf1 ex>> /\
-    <<RF2: Valid.rf2 ex>> /\
+    <<RF2': Valid.rf2' ex>> /\
     <<RF_WF: Valid.rf_wf ex>> /\
-    <<INTERNAL: forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
+    <<INTERNAL:
+      forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
         Time.lt (cov eid1) (cov eid2) \/
         cov eid1 = cov eid2 /\ Execution.po eid1 eid2>> /\
-    <<EXTERNAL: forall eid1 eid2 (OB: ex.(Execution.ob) eid1 eid2),
+    <<EXTERNAL:
+      forall eid1 eid2
+         (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
+         (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
         Time.lt (vext eid1) (vext eid2) \/
         vext eid1 = vext eid2 /\ Execution.po eid1 eid2>> /\
     <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
@@ -990,25 +1010,32 @@ Theorem promising_pf_to_axiomatic
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
-  exists ex. eexists (Valid.mk_ex pre CO RF1 RF2 RF_WF _ _ ATOMIC).
+  exists ex. eexists (Valid.mk_ex pre CO RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
   s. esplits.
   - ii. inv H. specialize (STATE tid). inv STATE; try congr.
     rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
     exploit TERMINAL; eauto. i. des. inv REL. inv x. congr.
   - admit.
 Grab Existential Variables.
-{ admit. }
+{
+  admit.
+}
 { (* external *)
-  clear - EXTERNAL.
-  cut (forall eid1 eid2 (R: ex.(Execution.ob)⁺ eid1 eid2),
-          Time.lt (vext eid1) (vext eid2) \/
-          vext eid1 = vext eid2 /\ Execution.po eid1 eid2).
-  { ii. exploit H; eauto. i. des; [inv x0|inv x1]; lia. }
-  i. induction R; eauto. des.
-  - left. etrans; eauto.
-  - left. rewrite IHR1. auto.
-  - left. rewrite <- IHR2. auto.
-  - right. split; etrans; eauto.
+  ii. exploit Valid.ob_cycle; eauto. i. des.
+  - clear - EXTERNAL NONBARRIER.
+    cut (forall eid1 eid2
+           (R: (Execution.ob ex ∩ (Execution.label_is_rel ex (fun label : Label.t => join Label.is_read Label.is_write label)))⁺ eid1 eid2),
+            Time.lt (vext eid1) (vext eid2) \/
+            vext eid1 = vext eid2 /\ Execution.po eid1 eid2).
+    { ii. exploit H; eauto. i. des; [inv x| inv x0]; lia. }
+    i. induction R.
+    + inv H. inv H1. eapply EXTERNAL; eauto.
+    + des.
+      * left. etrans; eauto.
+      * left. rewrite IHR1. auto.
+      * left. rewrite <- IHR2. auto.
+      * right. split; etrans; eauto.
+  - exploit Valid.barrier_ob_po; eauto. i. inv x1. lia.
 }
 { (* internal *)
   clear - INTERNAL.
