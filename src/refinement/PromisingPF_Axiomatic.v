@@ -988,13 +988,13 @@ Lemma promising_pf_valid
     <<INTERNAL:
       forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
         Time.lt (cov eid1) (cov eid2) \/
-        cov eid1 = cov eid2 /\ Execution.po eid1 eid2>> /\
+        Time.le (cov eid1) (cov eid2) /\ Execution.po eid1 eid2>> /\
     <<EXTERNAL:
       forall eid1 eid2
          (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
          (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
         Time.lt (vext eid1) (vext eid2) \/
-        vext eid1 = vext eid2 /\ Execution.po eid1 eid2>> /\
+        Time.le (vext eid1) (vext eid2) /\ Execution.po eid1 eid2>> /\
     <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
     <<STATE: IdMap.Forall2
                (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
@@ -1026,14 +1026,14 @@ Grab Existential Variables.
     cut (forall eid1 eid2
            (R: (Execution.ob ex ∩ (Execution.label_is_rel ex (fun label : Label.t => join Label.is_read Label.is_write label)))⁺ eid1 eid2),
             Time.lt (vext eid1) (vext eid2) \/
-            vext eid1 = vext eid2 /\ Execution.po eid1 eid2).
-    { ii. exploit H; eauto. i. des; [inv x| inv x0]; lia. }
+            Time.le (vext eid1) (vext eid2) /\ Execution.po eid1 eid2).
+    { ii. exploit H; eauto. i. des; [inv x|inv x0]; lia. }
     i. induction R.
     + inv H. inv H1. eapply EXTERNAL; eauto.
     + des.
       * left. etrans; eauto.
-      * left. rewrite IHR1. auto.
-      * left. rewrite <- IHR2. auto.
+      * left. eapply le_lt_trans; eauto.
+      * left. eapply lt_le_trans; eauto.
       * right. split; etrans; eauto.
   - exploit Valid.barrier_ob_po; eauto. i. inv x1. lia.
 }
@@ -1041,12 +1041,12 @@ Grab Existential Variables.
   clear - INTERNAL.
   cut (forall eid1 eid2 (R: ex.(Execution.internal)⁺ eid1 eid2),
           Time.lt (cov eid1) (cov eid2) \/
-          cov eid1 = cov eid2 /\ Execution.po eid1 eid2).
+          Time.le (cov eid1) (cov eid2) /\ Execution.po eid1 eid2).
   { ii. exploit H; eauto. i. des; [inv x0|inv x1]; lia. }
   i. induction R; eauto. des.
   - left. etrans; eauto.
-  - left. rewrite IHR1. auto.
-  - left. rewrite <- IHR2. auto.
+  - left. eapply le_lt_trans; eauto.
+  - left. eapply lt_le_trans; eauto.
   - right. split; etrans; eauto.
 }
 Admitted.
