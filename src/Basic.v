@@ -98,16 +98,16 @@ Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), P
 .
 Hint Constructors opt_rel.
 
-Inductive opt_rel5 A B C D E (rel5: A -> B -> C -> D -> E -> Prop):
-  forall (a: option A) (b: option B) (c: option C) (d: option D) (e: option E), Prop :=
-| opt_rel5_None:
-    opt_rel5 rel5 None None None None None
-| opt_rel5_Some
-    a b c d e
-    (REL5: rel5 a b c d e):
-    opt_rel5 rel5 (Some a) (Some b) (Some c) (Some d) (Some e)
+Inductive opt_rel6 A B C D E F (rel6: A -> B -> C -> D -> E -> F -> Prop):
+  forall (a: option A) (b: option B) (c: option C) (d: option D) (e: option E) (f: option F), Prop :=
+| opt_rel6_None:
+    opt_rel6 rel6 None None None None None None
+| opt_rel6_Some
+    a b c d e f
+    (REL6: rel6 a b c d e f):
+    opt_rel6 rel6 (Some a) (Some b) (Some c) (Some d) (Some e) (Some f)
 .
-Hint Constructors opt_rel5.
+Hint Constructors opt_rel6.
 
 
 Fixpoint filter_map A B (f: A -> option B) (l: list A): list B :=
@@ -540,15 +540,16 @@ Module IdMap.
     : Prop :=
     forall id, opt_rel (rel id) (find id a) (find id b).
 
-  Definition Forall5 A B C D E
-             (rel5: Id.t -> A -> B -> C -> D -> E -> Prop)
+  Definition Forall6 A B C D E F
+             (rel6: Id.t -> A -> B -> C -> D -> E -> F -> Prop)
              (a: t A)
              (b: t B)
              (c: t C)
              (d: t D)
              (e: t E)
+             (f: t F)
     : Prop :=
-    forall id, opt_rel5 (rel5 id) (find id a) (find id b) (find id c) (find id d) (find id e).
+    forall id, opt_rel6 (rel6 id) (find id a) (find id b) (find id c) (find id d) (find id e) (find id f).
 
   Definition Forall A
              (pred: Id.t -> A -> Prop)

@@ -913,24 +913,34 @@ Proof.
 Qed.
 
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
-  forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t) (rf: nat -> option Time.t) (cov: nat -> Time.t) (vext: nat -> Time.t), Prop :=
+  forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t)
+     (w: list (nat -> option Time.t)) (r: list (nat -> option Time.t))
+     (cov: nat -> Time.t) (vext: nat -> Time.t), Prop :=
 | sim_trace_init
     st lc stmts
     (FIND: IdMap.find tid (init_with_promises p mem).(Machine.tpool) = Some (st, lc))
     (STMT: IdMap.find tid p = Some stmts):
-    sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init] (fun _ => None) (fun _ => Time.bot) (fun _ => Time.bot)
+    sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init]
+              [fun _ => None] [fun _ => None] (fun _ => Time.bot) (fun _ => Time.bot)
 | sim_trace_step
-    e tr eu1 eu2 atr aeu1 aeu2 rf rf' cov cov' vext vext'
+    e tr eu1 eu2 atr aeu1 aeu2 r r1 r2 w w1 w2 cov cov' vext vext'
     (STEP: ExecUnit.state_step0 tid e e eu1 eu2)
     (ASTEP: AExecUnit.step aeu1 aeu2)
     (STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state))
-    (RF: rf' = match e with
+    (R: r2 = match e with
                | Event.read _ _ vloc _ =>
                  (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
                             then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
-                            else rf eid)
-               | _ => rf
+                            else r1 eid)
+               | _ => r1
                end)
+    (W: w2 = match e with
+             | Event.write _ _ vloc _ _ =>
+               (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                         then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
+                         else w1 eid)
+             | _ => w1
+             end)
     (COV: cov' = match e with
                  | Event.read _ _ vloc _
                  | Event.write _ _ vloc _ _ =>
@@ -950,24 +960,102 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                                 else vext eid)
                    | _ => vext
                    end)
-    (TRACE: sim_trace p mem tid (tr++[eu1]) (atr++[aeu1]) rf cov vext):
-    sim_trace p mem tid (tr++[eu1]++[eu2]) (atr++[aeu1]++[aeu2]) rf' cov' vext'.
+    (TRACE: sim_trace p mem tid (eu1::tr) (aeu1::atr) (r1::r) (w1::w) cov vext):
+    sim_trace p mem tid (eu2::eu1::tr) (aeu2::aeu1::atr) (r2::r1::r) (w2::w1::w) cov' vext'.
 
 Definition sim_traces
            (p: program) (mem: Memory.t)
            (trs: IdMap.t (list (ExecUnit.t (A:=unit))))
            (atrs: IdMap.t (list AExecUnit.t))
-           (rfs: IdMap.t (nat -> option Time.t))
+           (rs: IdMap.t (list (nat -> option Time.t)))
+           (ws: IdMap.t (list (Time.t -> option nat)))
            (covs: IdMap.t (nat -> Time.t))
            (vexts: IdMap.t (nat -> Time.t))
   : Prop :=
-  IdMap.Forall5 (sim_trace p mem) trs atrs rfs covs vexts.
+  IdMap.Forall6 (sim_trace p mem) trs atrs rs ws covs vexts.
 
-Lemma promising_pf_trace
+Lemma promising_pf_traces
       p m
       (STEP: Machine.pf_exec p m):
-  exists mem trs atrs rfs covs vexts ex (pre: Valid.pre_ex p ex),
-    sim_traces p mem trs atrs rfs covs vexts /\
+  exists mem trs atrs rs ws covs vexts ex (PRE: Valid.pre_ex p ex),
+    <<SIM: sim_traces p mem trs atrs rs ws covs vexts>> /\
+    <<EUS: IdMap.Forall2
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool)>> /\
+    <<AEUS: IdMap.Forall2
+              (fun tid atr aeu => exists l, atr = aeu :: l)
+              atrs PRE.(Valid.aeus)>>.
+Proof.
+Admitted.
+
+Inductive co_gen (m: Memory.t) (ws: IdMap.t (list (nat -> option Time.t))) (eid1 eid2: eidT): Prop :=
+| co_gen_intro
+    w1 wl1 ts1 loc1 val1 tid1 w2 wl2 ts2 loc2 val2 tid2
+    (WS1: IdMap.find eid1.(fst) ws = Some (w1::wl1))
+    (W1: w1 eid1.(snd) = Some ts1)
+    (WS2: IdMap.find eid2.(fst) ws = Some (w2::wl2))
+    (W2: w2 eid2.(snd) = Some ts2)
+    (GET1: Memory.get_msg ts1 m = Some (Msg.mk loc1 val1 tid1))
+    (GET1: Memory.get_msg ts2 m = Some (Msg.mk loc2 val2 tid2))
+    (LOC: loc1 = loc2)
+    (TS: Time.lt ts1 ts2)
+.
+
+Inductive rf_gen (ws: IdMap.t (list (nat -> option Time.t))) (rs: IdMap.t (list (nat -> option Time.t))) (eid1 eid2: eidT): Prop :=
+| rf_gen_intro
+    w wl ts1 r rl ts2
+    (WS: IdMap.find eid1.(fst) ws = Some (w::wl))
+    (W: w eid1.(snd) = Some ts1)
+    (RS: IdMap.find eid2.(fst) rs = Some (r::rl))
+    (R: r eid2.(snd) = Some ts2)
+    (TS: ts1 = ts2)
+.
+
+Definition v_gen (vs: IdMap.t (nat -> Time.t)) (eid: eidT): Time.t :=
+  match IdMap.find eid.(fst) vs with
+  | Some v => v eid.(snd)
+  | None => Time.bot
+  end
+.
+
+(* Lemma trace_w *)
+(*       p mem tid tr atr rf w cov vext *)
+(*       (SIM: sim_trace p mem tid tr atr rf w cov vext): *)
+(*   exists l st lc, *)
+(*     tr = l ++ [ExecUnit.mk st lc mem] /\ *)
+(*     (forall ts loc val (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)), *)
+(*         (Promises.lookup ts lc.(Local.promises) = true \/ *)
+(*          ts = Time.bot \/ *)
+(*          exists eid, w ts = Some eid)). *)
+(* Proof. *)
+
+Lemma sim_trace_co
+      p m
+      mem trs atrs rs ws covs vexts ex
+      (PROMISE: Machine.no_promise m)
+      (PRE: Valid.pre_ex p ex)
+      (SIM: sim_traces p mem trs atrs rs ws covs vexts)
+      (EUS: IdMap.Forall2
+              (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+              trs m.(Machine.tpool))
+      (AEUS: IdMap.Forall2
+               (fun tid atr aeu => exists l, atr = aeu :: l)
+               atrs PRE.(Valid.aeus)):
+  forall eid1 eid2,
+    (exists loc
+        ex1 ord1 val1
+        ex2 ord2 val2,
+        <<LABEL: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1)>> /\
+        <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) <->
+    (eid1 = eid2 \/ (co_gen mem ws) eid1 eid2 \/ (co_gen mem ws) eid2 eid1).
+Proof.
+Admitted.
+
+Lemma promising_pf_traces
+      p m
+      (STEP: Machine.pf_exec p m):
+  exists mem trs atrs rs ws covs vexts ex (PRE: Valid.pre_ex p ex),
+    sim_traces p mem trs atrs rs ws covs vexts /\
     IdMap.Forall2
       (fun tid tr sl => exists l, tr = l ++ [ExecUnit.mk sl.(fst) sl.(snd) mem])
       trs m.(Machine.tpool) /\
@@ -980,7 +1068,7 @@ Admitted.
 Lemma promising_pf_valid
       p m
       (STEP: Machine.pf_exec p m):
-  exists ex (pre: Valid.pre_ex p ex) (cov: forall (eid: eidT), Time.t) (vext: forall (eid: eidT), Time.t),
+  exists ex (PRE: Valid.pre_ex p ex) (cov: forall (eid: eidT), Time.t) (vext: forall (eid: eidT), Time.t),
     <<CO: Valid.co ex>> /\
     <<RF1: Valid.rf1 ex>> /\
     <<RF2': Valid.rf2' ex>> /\
