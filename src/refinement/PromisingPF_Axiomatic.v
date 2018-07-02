@@ -914,7 +914,7 @@ Qed.
 
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
   forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t)
-     (w: list (nat -> option Time.t)) (r: list (nat -> option Time.t))
+     (wl: list (nat -> option Time.t)) (rl: list (nat -> option Time.t))
      (cov: nat -> Time.t) (vext: nat -> Time.t), Prop :=
 | sim_trace_init
     st lc stmts
@@ -923,17 +923,10 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
     sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init]
               [fun _ => None] [fun _ => None] (fun _ => Time.bot) (fun _ => Time.bot)
 | sim_trace_step
-    e tr eu1 eu2 atr aeu1 aeu2 r r1 r2 w w1 w2 cov cov' vext vext'
+    e tr eu1 eu2 atr aeu1 aeu2 rl r1 r2 wl w1 w2 cov cov' vext vext'
     (STEP: ExecUnit.state_step0 tid e e eu1 eu2)
     (ASTEP: AExecUnit.step aeu1 aeu2)
     (STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state))
-    (R: r2 = match e with
-               | Event.read _ _ vloc _ =>
-                 (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                            then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
-                            else r1 eid)
-               | _ => r1
-               end)
     (W: w2 = match e with
              | Event.write _ _ vloc _ _ =>
                (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
@@ -941,6 +934,13 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                          else w1 eid)
              | _ => w1
              end)
+    (R: r2 = match e with
+               | Event.read _ _ vloc _ =>
+                 (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
+                            then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
+                            else r1 eid)
+               | _ => r1
+               end)
     (COV: cov' = match e with
                  | Event.read _ _ vloc _
                  | Event.write _ _ vloc _ _ =>
@@ -960,25 +960,37 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                                 else vext eid)
                    | _ => vext
                    end)
-    (TRACE: sim_trace p mem tid (eu1::tr) (aeu1::atr) (r1::r) (w1::w) cov vext):
-    sim_trace p mem tid (eu2::eu1::tr) (aeu2::aeu1::atr) (r2::r1::r) (w2::w1::w) cov' vext'.
+    (TRACE: sim_trace p mem tid (eu1::tr) (aeu1::atr) (w1::wl) (r1::rl) cov vext):
+    sim_trace p mem tid (eu2::eu1::tr) (aeu2::aeu1::atr) (w2::w1::wl) (r2::r1::rl) cov' vext'.
 
 Definition sim_traces
            (p: program) (mem: Memory.t)
            (trs: IdMap.t (list (ExecUnit.t (A:=unit))))
            (atrs: IdMap.t (list AExecUnit.t))
+           (ws: IdMap.t (list (nat -> option Time.t)))
            (rs: IdMap.t (list (nat -> option Time.t)))
-           (ws: IdMap.t (list (Time.t -> option nat)))
            (covs: IdMap.t (nat -> Time.t))
            (vexts: IdMap.t (nat -> Time.t))
   : Prop :=
-  IdMap.Forall6 (sim_trace p mem) trs atrs rs ws covs vexts.
+  IdMap.Forall6 (sim_trace p mem) trs atrs ws rs covs vexts.
+
+Lemma sim_trace_last
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists eu tr' aeu atr' w wl' r rl',
+    <<HDTR: tr = eu :: tr'>> /\
+    <<HDATR: atr = aeu :: atr'>> /\
+    <<HDWL: wl = w :: wl'>> /\
+    <<HDRL: rl = r :: rl'>>.
+Proof.
+  inv SIM; esplits; eauto.
+Qed.
 
 Lemma promising_pf_traces
       p m
       (STEP: Machine.pf_exec p m):
-  exists mem trs atrs rs ws covs vexts ex (PRE: Valid.pre_ex p ex),
-    <<SIM: sim_traces p mem trs atrs rs ws covs vexts>> /\
+  exists mem trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
+    <<SIM: sim_traces p mem trs atrs ws rs covs vexts>> /\
     <<EUS: IdMap.Forall2
              (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
              trs m.(Machine.tpool)>> /\
@@ -1018,23 +1030,49 @@ Definition v_gen (vs: IdMap.t (nat -> Time.t)) (eid: eidT): Time.t :=
   end
 .
 
-(* Lemma trace_w *)
-(*       p mem tid tr atr rf w cov vext *)
-(*       (SIM: sim_trace p mem tid tr atr rf w cov vext): *)
-(*   exists l st lc, *)
-(*     tr = l ++ [ExecUnit.mk st lc mem] /\ *)
-(*     (forall ts loc val (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)), *)
-(*         (Promises.lookup ts lc.(Local.promises) = true \/ *)
-(*          ts = Time.bot \/ *)
-(*          exists eid, w ts = Some eid)). *)
-(* Proof. *)
+Lemma w_property
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists eu tr' aeu atr' w wl',
+    tr = eu :: tr' /\
+    atr = aeu :: atr' /\
+    wl = w :: wl' /\
+    <<WPROP1:
+      forall ts loc val
+        (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)),
+        (Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = true \/
+         ts = Time.bot \/
+         exists eid, w eid = Some ts)>> /\
+    <<WPROP2:
+      forall eid ex ord loc val
+        (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)),
+      exists ts,
+        w eid = Some ts /\
+        Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\
+    <<WPROP3:
+      forall eid1 ex1 ord1 loc1 val1 eid2 ex2 ord2 loc2 val2
+        (GET1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid1 = Some (Label.write ex1 ord1 loc1 val1))
+        (GET2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid2 = Some (Label.write ex2 ord2 loc2 val2)),
+      exists ts1 ts2,
+        w eid1 = Some ts1 /\ w eid2 = Some ts2 /\
+        (eid1 = eid2 \/ ts1 <> ts2)>>.
+Proof.
+Admitted.
+
+Ltac simplify :=
+  repeat
+    (try match goal with
+         | [H1: _ = IdMap.find ?id ?m, H2: _ = IdMap.find ?id ?m |- _] =>
+           rewrite <- H1 in H2; inv H2
+         | [H: Some _ = Some _ |- _] => inv H
+         end).
 
 Lemma sim_trace_co
       p m
       mem trs atrs rs ws covs vexts ex
       (PROMISE: Machine.no_promise m)
       (PRE: Valid.pre_ex p ex)
-      (SIM: sim_traces p mem trs atrs rs ws covs vexts)
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
       (EUS: IdMap.Forall2
               (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
               trs m.(Machine.tpool))
@@ -1049,20 +1087,35 @@ Lemma sim_trace_co
         <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) <->
     (eid1 = eid2 \/ (co_gen mem ws) eid1 eid2 \/ (co_gen mem ws) eid2 eid1).
 Proof.
-Admitted.
-
-Lemma promising_pf_traces
-      p m
-      (STEP: Machine.pf_exec p m):
-  exists mem trs atrs rs ws covs vexts ex (PRE: Valid.pre_ex p ex),
-    sim_traces p mem trs atrs rs ws covs vexts /\
-    IdMap.Forall2
-      (fun tid tr sl => exists l, tr = l ++ [ExecUnit.mk sl.(fst) sl.(snd) mem])
-      trs m.(Machine.tpool) /\
-    IdMap.Forall2
-      (fun tid atr aeu => exists l, atr = l ++ [aeu])
-      atrs pre.(Valid.aeus).
-Proof.
+  split.
+  - i. des. destruct PRE, ex. unfold Execution.label in *. ss.
+    destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+    destruct (IdMap.find tid1 labels) eqn:FIND1, (IdMap.find tid2 labels) eqn:FIND2; ss.
+    subst. rewrite IdMap.map_spec in *.
+    generalize (AEUS tid1). intro AEUS1.
+    generalize (AEUS tid2). intro AEUS2.
+    generalize (SIM tid1). intro SIM1. inv SIM1.
+    { inv AEUS1; try congr. rewrite <- H7 in FIND1. ss. }
+    generalize (SIM tid2). intro SIM2. inv SIM2.
+    { inv AEUS2; try congr. rewrite <- H13 in FIND2. ss. }
+    inv AEUS1; inv AEUS2; try congr. des.
+    rewrite <- H13 in *. rewrite <- H15 in *. ss.
+    inv FIND1. inv FIND2.
+    exploit w_property; try exact REL6. i. des.
+    exploit w_property; try exact REL0. i. des.
+    subst. simplify.
+    exploit WPROP2; try exact LABEL; eauto. i. des.
+    exploit WPROP4; try exact LABEL0; eauto. i. des.
+    destruct (Id.eq_dec tid1 tid2) eqn:TID; subst; simplify.
+    + exploit WPROP3; [exact LABEL|exact LABEL0|..]. i. des; auto.
+      rewrite x in x3. inv x3. rewrite x1 in x4. inv x4.
+      specialize (Nat.lt_trichotomy ts1 ts2). i. des; try congr.
+      * right. left. econs; eauto.
+      * right. right. econs; eauto.
+    + specialize (Nat.lt_trichotomy ts ts0). i. des; try congr.
+      * right. left. econs; eauto.
+      * right. right. econs; eauto.
+  - admit.
 Admitted.
 
 Lemma promising_pf_valid
@@ -1086,7 +1139,7 @@ Lemma promising_pf_valid
     <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
     <<STATE: IdMap.Forall2
                (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
-               m.(Machine.tpool) pre.(Valid.aeus)>>.
+               m.(Machine.tpool) PRE.(Valid.aeus)>>.
 Proof.
 Admitted.
 
@@ -1098,7 +1151,7 @@ Theorem promising_pf_to_axiomatic
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
-  exists ex. eexists (Valid.mk_ex pre CO RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
+  exists ex. eexists (Valid.mk_ex PRE CO RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
   s. esplits.
   - ii. inv H. specialize (STATE tid). inv STATE; try congr.
     rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
