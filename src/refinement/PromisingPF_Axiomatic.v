@@ -1000,15 +1000,15 @@ Lemma promising_pf_traces
 Proof.
 Admitted.
 
-Inductive co_gen (m: Memory.t) (ws: IdMap.t (list (nat -> option Time.t))) (eid1 eid2: eidT): Prop :=
+Inductive co_gen (ex: Execution.t) (ws: IdMap.t (list (nat -> option Time.t))) (eid1 eid2: eidT): Prop :=
 | co_gen_intro
-    w1 wl1 ts1 loc1 val1 tid1 w2 wl2 ts2 loc2 val2 tid2
+    w1 wl1 ts1 ex1 ord1 loc1 val1 w2 wl2 ts2 ex2 ord2 loc2 val2
     (WS1: IdMap.find eid1.(fst) ws = Some (w1::wl1))
     (W1: w1 eid1.(snd) = Some ts1)
     (WS2: IdMap.find eid2.(fst) ws = Some (w2::wl2))
     (W2: w2 eid2.(snd) = Some ts2)
-    (GET1: Memory.get_msg ts1 m = Some (Msg.mk loc1 val1 tid1))
-    (GET1: Memory.get_msg ts2 m = Some (Msg.mk loc2 val2 tid2))
+    (LABEL1: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc1 val1))
+    (LABEL1: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc2 val2))
     (LOC: loc1 = loc2)
     (TS: Time.lt ts1 ts2)
 .
@@ -1039,10 +1039,13 @@ Lemma w_property
     wl = w :: wl' /\
     <<WPROP1:
       forall ts loc val
-        (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)),
-        (Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = true \/
-         ts = Time.bot \/
-         exists eid, w eid = Some ts)>> /\
+         (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)),
+        ((Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = true /\
+          forall eid, w eid = None) \/
+         (Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = false /\
+          exists eid ex ord,
+            w eid = Some ts /\
+            List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)))>> /\
     <<WPROP2:
       forall eid ex ord loc val
         (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)),
@@ -1050,12 +1053,35 @@ Lemma w_property
         w eid = Some ts /\
         Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\
     <<WPROP3:
-      forall eid1 ex1 ord1 loc1 val1 eid2 ex2 ord2 loc2 val2
-        (GET1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid1 = Some (Label.write ex1 ord1 loc1 val1))
-        (GET2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid2 = Some (Label.write ex2 ord2 loc2 val2)),
-      exists ts1 ts2,
-        w eid1 = Some ts1 /\ w eid2 = Some ts2 /\
-        (eid1 = eid2 \/ ts1 <> ts2)>>.
+      forall eid ts (GET: w eid = Some ts),
+      exists ex ord loc val,
+        List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val) /\
+        Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\
+    <<WPROP4:
+      forall eid1 eid2 ts (W1: w eid1 = Some ts) (W2: w eid2 = Some ts),
+        eid1 = eid2>>.
+Proof.
+Admitted.
+
+Lemma r_property
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists eu tr' aeu atr' r rl',
+    tr = eu :: tr' /\
+    atr = aeu :: atr' /\
+    rl = r :: rl' /\
+    <<RPROP1:
+      forall eid ex ord loc val
+         (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)),
+      exists ts tid',
+        r eid = Some ts /\
+        ((ts = Time.bot /\ val = Val.default) \/
+         Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\
+    <<RPROP2:
+      forall eid ts (GET: r eid = Some ts),
+      exists ex ord loc val tid',
+        List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
+        Memory.get_msg ts mem = Some (Msg.mk loc val tid')>>.
 Proof.
 Admitted.
 
@@ -1064,18 +1090,18 @@ Ltac simplify :=
     (try match goal with
          | [H1: _ = IdMap.find ?id ?m, H2: _ = IdMap.find ?id ?m |- _] =>
            rewrite <- H1 in H2; inv H2
+         | [H1: IdMap.find ?id ?m = _, H2: IdMap.find ?id ?m = _ |- _] =>
+           rewrite H1 in H2; inv H2
+         | [H1: IdMap.find ?id ?m = _, H2: _ = IdMap.find ?id ?m |- _] =>
+           rewrite H1 in H2; inv H2
          | [H: Some _ = Some _ |- _] => inv H
+         | [H: _::_ = _::_ |- _] => inv H
          end).
 
-Lemma sim_trace_co
-      p m
-      mem trs atrs rs ws covs vexts ex
-      (PROMISE: Machine.no_promise m)
+Lemma sim_traces_co1
+      p mem trs atrs rs ws covs vexts ex
       (PRE: Valid.pre_ex p ex)
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
-      (EUS: IdMap.Forall2
-              (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
-              trs m.(Machine.tpool))
       (AEUS: IdMap.Forall2
                (fun tid atr aeu => exists l, atr = aeu :: l)
                atrs PRE.(Valid.aeus)):
@@ -1084,39 +1110,169 @@ Lemma sim_trace_co
         ex1 ord1 val1
         ex2 ord2 val2,
         <<LABEL: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1)>> /\
-        <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) <->
-    (eid1 = eid2 \/ (co_gen mem ws) eid1 eid2 \/ (co_gen mem ws) eid2 eid1).
+        <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>) ->
+    (eid1 = eid2 \/ (co_gen ex ws) eid1 eid2 \/ (co_gen ex ws) eid2 eid1).
 Proof.
-  split.
-  - i. des. destruct PRE, ex. unfold Execution.label in *. ss.
-    destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
-    destruct (IdMap.find tid1 labels) eqn:FIND1, (IdMap.find tid2 labels) eqn:FIND2; ss.
-    subst. rewrite IdMap.map_spec in *.
-    generalize (AEUS tid1). intro AEUS1.
-    generalize (AEUS tid2). intro AEUS2.
-    generalize (SIM tid1). intro SIM1. inv SIM1.
-    { inv AEUS1; try congr. rewrite <- H7 in FIND1. ss. }
-    generalize (SIM tid2). intro SIM2. inv SIM2.
-    { inv AEUS2; try congr. rewrite <- H13 in FIND2. ss. }
-    inv AEUS1; inv AEUS2; try congr. des.
-    rewrite <- H13 in *. rewrite <- H15 in *. ss.
-    inv FIND1. inv FIND2.
-    exploit w_property; try exact REL6. i. des.
-    exploit w_property; try exact REL0. i. des.
-    subst. simplify.
-    exploit WPROP2; try exact LABEL; eauto. i. des.
-    exploit WPROP4; try exact LABEL0; eauto. i. des.
-    destruct (Id.eq_dec tid1 tid2) eqn:TID; subst; simplify.
-    + exploit WPROP3; [exact LABEL|exact LABEL0|..]. i. des; auto.
-      rewrite x in x3. inv x3. rewrite x1 in x4. inv x4.
-      specialize (Nat.lt_trichotomy ts1 ts2). i. des; try congr.
-      * right. left. econs; eauto.
-      * right. right. econs; eauto.
-    + specialize (Nat.lt_trichotomy ts ts0). i. des; try congr.
-      * right. left. econs; eauto.
-      * right. right. econs; eauto.
-  - admit.
+  i. des. destruct PRE, ex. unfold Execution.label in *. ss.
+  destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+  destruct (IdMap.find tid1 labels) eqn:FIND1, (IdMap.find tid2 labels) eqn:FIND2; ss.
+  subst. rewrite IdMap.map_spec in *.
+  generalize (AEUS tid1). intro AEUS1.
+  generalize (AEUS tid2). intro AEUS2.
+  generalize (SIM tid1). intro SIM1. inv SIM1.
+  { inv AEUS1; try congr. rewrite <- H7 in FIND1. ss. }
+  generalize (SIM tid2). intro SIM2. inv SIM2.
+  { inv AEUS2; try congr. rewrite <- H13 in FIND2. ss. }
+  inv AEUS1; inv AEUS2; try congr. des.
+  rewrite <- H13 in *. rewrite <- H15 in *. ss.
+  inv FIND1. inv FIND2.
+  exploit w_property; try exact REL6. i. des.
+  exploit w_property; try exact REL0. i. des.
+  subst. simplify.
+  exploit WPROP2; try exact LABEL; eauto. intro W1. des.
+  exploit WPROP5; try exact LABEL0; eauto. intro W2. des.
+  destruct (Id.eq_dec tid1 tid2); subst; simplify.
+  - specialize (Nat.lt_trichotomy ts ts0). i. des; subst.
+    + right. left. econs; eauto; unfold Execution.label; ss.
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+    + exploit WPROP4; [exact W1|exact W2|..]. auto.
+    + right. right. econs; eauto; unfold Execution.label; ss.
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+  - specialize (Nat.lt_trichotomy ts ts0). i. des; subst.
+    + right. left. econs; eauto; unfold Execution.label; ss.
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+      { rewrite IdMap.map_spec. rewrite <- H15. eauto. }
+    + congr.
+    + right. right. econs; eauto; unfold Execution.label; ss.
+      { rewrite IdMap.map_spec. rewrite <- H15. eauto. }
+      { rewrite IdMap.map_spec. rewrite <- H13. eauto. }
+Qed.
+
+Lemma sim_traces_co2
+      p ex ws
+      (PRE: Valid.pre_ex p ex):
+  forall eid1 eid2,
+    (co_gen ex ws) eid1 eid2 ->
+    exists loc
+       ex1 ord1 val1
+       ex2 ord2 val2,
+      <<LABEL: Execution.label eid1 ex = Some (Label.write ex1 ord1 loc val1)>> /\
+      <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val2)>>.
+Proof.
+  i. inv H. esplits; eauto.
+Qed.
+
+Lemma sim_traces_memory
+      p mem trs atrs rs ws covs vexts
+      ts loc val tid
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)):
+  exists eu, IdMap.find tid trs = Some eu.
+Proof.
 Admitted.
+
+Lemma sim_traces_rf1
+      p mem trs atrs rs ws covs vexts ex m
+      (PRE: Valid.pre_ex p ex)
+      (NOPROMISE: Machine.no_promise m)
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (EUS: IdMap.Forall2
+              (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+              trs m.(Machine.tpool))
+      (AEUS: IdMap.Forall2
+               (fun tid atr aeu => exists l, atr = aeu :: l)
+               atrs PRE.(Valid.aeus)):
+  forall eid1 ex1 ord1 loc val
+     (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
+    (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default>>) \/
+    (exists eid2 ex2 ord2,
+        <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
+        <<RF: (rf_gen ws rs) eid2 eid1>>).
+Proof.
+  i. destruct eid1 as [tid1 eid1].
+  destruct PRE, ex. unfold Execution.label in *. ss.
+  rewrite LABELS in *. rewrite IdMap.map_spec in *.
+  destruct (IdMap.find tid1 aeus) eqn:FIND1; ss.
+  generalize (AEUS tid1). intro AEUS1. inv AEUS1; try congr.
+  generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
+  des. simplify.
+  exploit r_property; eauto. i. des. simplify.
+  exploit RPROP1; eauto. i. des.
+  - left. split; auto. ii. inv H. inv H1.
+    destruct x2 as [tid2 eid2]. ss. simplify.
+    rewrite R in x. inv x.
+    generalize (SIM tid2). intro SIM1. inv SIM1; try congr.
+    simplify.
+    exploit w_property; try exact REL0; eauto. i. des. simplify.
+    exploit WPROP3; eauto. i. des.
+    unfold Memory.get_msg in x0. ss.
+  - right. exploit sim_traces_memory; eauto. i. des.
+    generalize (EUS tid'). intro EUS2. inv EUS2; try congr.
+    generalize (SIM tid'). intro SIM2. inv SIM2; try congr.
+    des. simplify.
+    exploit w_property; try exact REL0; eauto. i. des. simplify.
+    exploit WPROP1; eauto. i. des; ss.
+    + destruct b. ss. inv NOPROMISE.
+      exploit PROMISES0; eauto. i. rewrite x4 in x1.
+      rewrite Promises.lookup_bot in x1. ss.
+    + generalize (AEUS tid'). intro AEUS2. inv AEUS2; try congr.
+      des. simplify. eexists (tid', eid). esplits; ss.
+      * rewrite IdMap.map_spec. rewrite <- H8. ss. eauto.
+      * econs; eauto.
+Qed.
+
+Lemma sim_traces_rf2
+      p mem trs atrs rs ws covs vexts ex
+      (PRE: Valid.pre_ex p ex)
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (AEUS: IdMap.Forall2
+               (fun tid atr aeu => exists l, atr = aeu :: l)
+               atrs PRE.(Valid.aeus)):
+  forall eid1 eid2 (RF: (rf_gen ws rs) eid2 eid1),
+  exists ex1 ex2 ord1 ord2 loc val,
+    <<READ: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)>> /\
+    <<WRITE: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>>.
+Proof.
+  i. inv RF. destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+  generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
+  generalize (SIM tid2). intro SIM2. inv SIM2; try congr.
+  simplify.
+  exploit w_property; try exact REL0; eauto. i. des. inv x2.
+  exploit r_property; try exact REL6; eauto. i. des. inv x2.
+  exploit WPROP3; eauto. i. des.
+  exploit RPROP2; eauto. i. des.
+  rewrite x2 in x0. inv x0.
+  generalize (AEUS tid1). intro AEUS1. inv AEUS1; try congr.
+  generalize (AEUS tid2). intro AEUS2. inv AEUS2; try congr.
+  des. simplify. destruct PRE, ex. unfold Execution.label. ss.
+  clear WPROP1 WPROP2 WPROP3 WPROP4 RPROP1 RPROP2.
+  rewrite LABELS. repeat rewrite IdMap.map_spec.
+  rewrite <- H8. rewrite <- H13. ss. esplits; eauto.
+Qed.
+
+Lemma sim_traces_rf_wf
+      p mem trs atrs rs ws covs vexts
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts):
+  functional (rf_gen ws rs)⁻¹.
+Proof.
+  ii. inv H. inv H0.
+  destruct y as [tid1 eid1], z as [tid2 eid2]. ss.
+  simplify. rewrite R in R0. inv R0.
+  destruct (Id.eq_dec tid1 tid2); subst; simplify.
+  - specialize (SIM tid2). inv SIM; try congr.
+    exploit w_property; eauto. i. des. simplify.
+    exploit WPROP4; [exact W|exact W0|..]. i. subst. refl.
+  - generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
+    generalize (SIM tid2). intro SIM2. inv SIM2; try congr.
+    exploit w_property; try exact REL6; eauto. i. des.
+    exploit w_property; try exact REL0; eauto. i. des.
+    simplify.
+    exploit WPROP3; eauto. i. des.
+    exploit WPROP6; eauto. i. des.
+    congr.
+Qed.
 
 Lemma promising_pf_valid
       p m
@@ -1149,19 +1305,17 @@ Theorem promising_pf_to_axiomatic
         (STEP: Machine.pf_exec p m):
   exists ex (EX: Valid.ex p ex),
     <<TERMINAL: Machine.is_terminal m -> EX.(Valid.is_terminal)>> /\
-    <<MEM: sim_mem ex m.(Machine.mem)>>.
+    <<STATE: IdMap.Forall2
+               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               m.(Machine.tpool) EX.(Valid.aeus)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
   exists ex. eexists (Valid.mk_ex PRE CO1 CO2 RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
-  s. esplits.
-  - ii. inv H. specialize (STATE tid). inv STATE; try congr.
-    rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
-    exploit TERMINAL; eauto. i. des. inv REL. inv x. congr.
-  - admit.
+  s. esplits; eauto.
+  ii. inv H. specialize (STATE tid). inv STATE; try congr.
+  rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
+  exploit TERMINAL; eauto. i. des. inv REL. inv x. congr.
 Grab Existential Variables.
-{
-  admit.
-}
 { (* external *)
   ii. exploit Valid.ob_cycle; eauto. i. des.
   - clear - EXTERNAL NONBARRIER.
