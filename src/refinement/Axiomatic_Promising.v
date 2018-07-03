@@ -1020,7 +1020,7 @@ Proof.
         exploit EX.(Valid.RF1); eauto. i. des.
         { contradict NORF. econs. eauto. }
         exploit EX.(Valid.RF_WF); [exact RF|exact RF0|]. i. subst.
-        exploit EX.(Valid.CO). intros [CO _]. exploit CO.
+        exploit EX.(Valid.CO1).
         { rewrite LABEL0, LABEL1. esplits; eauto. }
         i. des.
         { subst. rewrite VIEW1 in VIEW2. inv VIEW2. lia. }
@@ -1274,21 +1274,21 @@ Proof.
         }
         i. des. destruct msg. ss. subst.
 
-        exploit EX.(Valid.CO). intros [CO _]. exploit CO.
-        { rewrite LABEL0. rewrite LABEL_LEN. esplits; eauto. f_equal. f_equal. ss. }
-        clear CO. i. des; cycle 2.
+        exploit EX.(Valid.CO1).
+        { rewrite LABEL0, LABEL_LEN. esplits; eauto. f_equal. f_equal. ss. }
+        i. des; cycle 2.
         { cut (S n < S ts); [lia|].
           eapply view_of_eid_ob_write; eauto.
           - left. left. left. right. ss.
           - econs; eauto. apply Label.write_is_writing.
         }
-        { inv x. congr. }
+        { inv x0. congr. }
 
         inv REL1.
         { (* read from uninit *)
           exploit EX.(Valid.RF1); eauto. i. des; cycle 1.
           { exploit label_write_mem_of_ex; eauto. i. des.
-            exploit REL0; eauto. i. inv x0.
+            exploit REL0; eauto. i. inv x.
           }
 
           eapply EX.(Valid.ATOMIC). econs; cycle 1.
@@ -1308,9 +1308,9 @@ Proof.
         assert (v = t0) by (apply Time.le_antisymm; ss). subst.
 
         exploit Valid.rf_inv_write; eauto. i. des.
-        exploit EX.(Valid.CO). intros [CO _]. exploit CO.
-        { rewrite LABEL0. rewrite LABEL1. esplits; eauto. f_equal. f_equal. ss. }
-        clear CO. i. des.
+        exploit EX.(Valid.CO1).
+        { rewrite LABEL0, LABEL1. esplits; eauto. f_equal. f_equal. ss. }
+        i. des.
         { subst. rewrite VIEW_OF_EID in VIEW2. inv VIEW2. lia. }
         { cut (S ts < t0); [lia|].
           eapply view_of_eid_ob_write; eauto.

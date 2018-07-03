@@ -1122,7 +1122,8 @@ Lemma promising_pf_valid
       p m
       (STEP: Machine.pf_exec p m):
   exists ex (PRE: Valid.pre_ex p ex) (cov: forall (eid: eidT), Time.t) (vext: forall (eid: eidT), Time.t),
-    <<CO: Valid.co ex>> /\
+    <<CO1: Valid.co1 ex>> /\
+    <<CO2: Valid.co2 ex>> /\
     <<RF1: Valid.rf1 ex>> /\
     <<RF2': Valid.rf2' ex>> /\
     <<RF_WF: Valid.rf_wf ex>> /\
@@ -1151,7 +1152,7 @@ Theorem promising_pf_to_axiomatic
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
-  exists ex. eexists (Valid.mk_ex PRE CO RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
+  exists ex. eexists (Valid.mk_ex PRE CO1 CO2 RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
   s. esplits.
   - ii. inv H. specialize (STATE tid). inv STATE; try congr.
     rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
