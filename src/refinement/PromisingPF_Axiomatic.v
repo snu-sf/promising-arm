@@ -1286,7 +1286,125 @@ Proof.
     congr.
 Qed.
 
-Lemma promising_pf_valid_aux
+Definition lastn A (n: nat) (l: list A) :=
+  List.rev (List.firstn n (List.rev l)).
+
+Lemma sim_traces_valid_co
+      p mem trs atrs ws rs covs vexts
+      m ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (NOPROMISE: Machine.no_promise m)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2': Valid.rf2' ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  <<CO:
+    forall eid1 eid2
+      (CO: ex.(Execution.co) eid1 eid2),
+      Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
+Proof.
+Admitted.
+
+Lemma sim_traces_valid_thread
+      p mem trs atrs ws rs covs vexts
+      m ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (NOPROMISE: Machine.no_promise m)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2': Valid.rf2' ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid atr
+    (FINDA: IdMap.find tid atrs = Some atr)
+    n aeu atr'
+    (LASTN: lastn (S n) atr = aeu :: atr'),
+    <<PO_LOC_WRITE:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (PO_LOC: ex.(Execution.po_loc) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
+        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<PO_LOC_READ:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (PO_LOC: ex.(Execution.po_loc) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<RF:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (RF: ex.(Execution.rf) eid1 (tid, eid2)),
+        Time.eq ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<RFE:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (RFE: ex.(Execution.rfe) eid1 (tid, eid2)),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<FR:
+      forall eid1 eid2
+        (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (FR: ex.(Execution.fr) (tid, eid1) eid2),
+        Time.lt ((v_gen covs) (tid, eid1)) ((v_gen covs) eid2)>> /\
+    <<AOB_WRITE:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (AOB: ex.(Execution.aob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
+        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<AOB_READ:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (AOB: ex.(Execution.aob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<BOB_WRITE:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (BOB: ex.(Execution.bob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
+        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<BOB_READ:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (BOB: ex.(Execution.bob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<DOB_WRITE:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (DOB: ex.(Execution.dob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
+        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+    <<DOB_READ:
+      forall eid1 eid2
+        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (DOB: ex.(Execution.dob) eid1 (tid, eid2))
+        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>>.
+Proof.
+Admitted.
+
+Lemma sim_traces_valid
       p mem trs atrs ws rs covs vexts
       m ex
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
@@ -1362,7 +1480,7 @@ Proof.
   generalize (sim_traces_rf_wf SIM). intro RF_WF.
   replace (co_gen ws) with (ex'.(Execution.co)) in CO1, CO2;[|subst; ss].
   replace (rf_gen ws rs) with (ex'.(Execution.rf)) in RF1, RF2, RF_WF; [|subst; ss].
-  exploit promising_pf_valid_aux; eauto; try by (subst; ss). i. des.
+  exploit sim_traces_valid; eauto; try by (subst; ss). i. des.
   esplits; eauto.
   { clear - SIM TR ATR.
     ii. generalize (SIM id). i. inv H; ss.
