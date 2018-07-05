@@ -1307,135 +1307,6 @@ Module Valid.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
   Qed.
 
-Inductive rtcn A (R: A -> A -> Prop): forall (n:nat) (a1 a2:A), Prop :=
-| rtcn_nil
-    a:
-    rtcn R 0 a a
-| rtcn_cons
-    a1 a2 a3 n
-    (A12: R a1 a2)
-    (A23: rtcn R n a2 a3):
-    rtcn R (S n) a1 a3
-.
-Hint Constructors rtcn.
-
-Lemma rtcn_rtc A (R: A -> A -> Prop) n a1 a2
-      (RTCN: rtcn R n a1 a2):
-  rtc R a1 a2.
-Proof.
-  induction RTCN; auto. econs; eauto.
-Qed.
-
-Lemma rtc_rtcn A (R: A -> A -> Prop) a1 a2
-      (RTC: rtc R a1 a2):
-  exists n, rtcn R n a1 a2.
-Proof.
-  induction RTC; eauto. i. des.
-  esplits; eauto.
-Qed.
-
-Lemma tc_rtcn A (R: A -> A -> Prop) a1 a2
-      (TC: R⁺ a1 a2):
-  exists n, rtcn R n a1 a2 /\ n > 0.
-Proof.
-  apply t_step_rt in TC. des. apply clos_rt_rt1n in TC0.
-  apply rtc_rtcn in TC0. des. esplits; eauto. lia.
-Qed.
-
-Lemma rtcn_tc A (R: A -> A -> Prop) n a1 a2
-      (RTCN: rtcn R n a1 a2)
-      (N: n > 0):
-  R⁺ a1 a2.
-Proof.
-  inv RTCN; [lia|]. apply t_step_rt. esplits; eauto.
-  apply clos_rt1n_rt. eapply rtcn_rtc. eauto.
-Qed.
-
-Lemma rtcn_snoc A (R: A -> A -> Prop) n a1 a2 a3
-      (RTCN: rtcn R n a1 a2)
-      (REL: R a2 a3):
-  rtcn R (S n) a1 a3.
-Proof.
-  revert a3 REL. induction RTCN; eauto.
-Qed.
-
-Lemma rtcn_app A (R: A -> A -> Prop) n1 n2 a1 a2 a3
-      (RTCN1: rtcn R n1 a1 a2)
-      (RTCN2: rtcn R n2 a2 a3):
-  rtcn R (n1 + n2) a1 a3.
-Proof.
-  revert n1 a1 RTCN1. induction RTCN2.
-  { i. rewrite Nat.add_0_r. ss. }
-  i. exploit rtcn_snoc; try exact A12; eauto. i.
-  exploit IHRTCN2; eauto. replace (n1 + S n) with (S n1 + n) by lia. ss.
-Qed.
-
-Lemma rtcn_inv A (R: A -> A -> Prop) n a1 a2
-      (RTCN: rtcn R n a1 a2):
-  rtcn (fun a b => R b a) n a2 a1.
-Proof.
-  induction RTCN; eauto. eapply rtcn_snoc; eauto.
-Qed.
-
-Lemma rtcn_imply
-      A (R1 R2: A -> A -> Prop) n a1 a2
-      (LE: R1 <2= R2)
-      (RTCN: rtcn R1 n a1 a2):
-  rtcn R2 n a1 a2.
-Proof.
-  induction RTCN; auto. econs; eauto.
-Qed.
-
-  Lemma minimalize_cycle
-        A a
-        (pred: A -> Prop)
-        (rel: relation A)
-        (MERGE: forall a b c, rel a b -> rel b c -> pred b -> rel a c)
-        (CYCLE: rel⁺ a a):
-    (exists a, (fun a b => rel a b /\ ~ pred a /\ ~ pred b)⁺ a a) \/
-    (exists a, pred a /\ rel a a).
-  Proof.
-    apply tc_rtcn in CYCLE. des. revert a CYCLE CYCLE0.
-    induction n using strong_nat_ind. i. rename H into IH.
-    match goal with
-    | [|- ?g] => remember g as goal eqn:GOAL; guardH GOAL
-    end.
-    assert (REDUCE: forall a, rtcn rel n a a -> pred a -> goal).
-    { i. des. inv H; [lia|]. apply rtcn_inv in A23.
-      unguardH GOAL. inv A23; eauto. apply rtcn_inv in A1.
-      exploit IH.
-      2: { econs 2; [|exact A1].  eauto. }
-      all: ss. lia.
-    }
-    destruct (classic (pred a)).
-    { eapply REDUCE; eauto. }
-    rename H into PREDA.
-    cut (goal \/ rtcn (fun a b => rel a b /\ ~ pred a /\ ~ pred b) n a a).
-    { i. des; ss. unguardH GOAL. subst. left. esplits.
-      eapply rtcn_tc; eauto.
-    }
-    cut (n <= n -> goal \/ exists b, rtcn (fun a b => rel a b /\ ~ pred a /\ ~ pred b) n a b /\ rtcn rel (n - n) b a).
-    { i. exploit H; eauto. i. des; eauto.
-      rewrite Nat.sub_diag in *. inv x0. eauto.
-    }
-    generalize n at 1 3 5 as m. induction m.
-    { right. esplits; eauto. rewrite Nat.sub_0_r. ss. }
-    i. exploit IHm; [lia|]. i. des; eauto. inv x0; [lia|].
-    replace n with (S n0 + m) in * by lia. clear H1 H CYCLE0.
-    replace (S n0 + m - S m) with n0 by lia.
-    destruct (classic (pred b)).
-    { left. eapply REDUCE; [|exact H]. eapply rtcn_app; eauto.
-      eapply rtcn_imply; [|exact x]. s. i. des. ss.
-    }
-    destruct (classic (pred a2)).
-    { left. eapply REDUCE; [|exact H0].
-      replace (S n0 + m) with (n0 + S m) by lia.
-      eapply rtcn_app; eauto. eapply rtcn_snoc; eauto.
-      eapply rtcn_imply; [|exact x]. s. i. des. ss.
-    }
-    right. esplits; eauto. eapply rtcn_snoc; eauto.
-  Qed.
-
   Lemma ob_cycle
         p exec eid
         (PRE: pre_ex p exec)
@@ -1451,11 +1322,21 @@ Qed.
         Execution.label_is exec Label.is_barrier eid_b>>.
   Proof.
     exploit minimalize_cycle; eauto.
-    { i. eapply ob_barrier_ob; eauto. }
-    i. des; eauto. left. esplits.
-    eapply clos_trans_mon; eauto. i. inv H. inv H1. econs; ss.
-    admit.
-  Admitted.
+    { instantiate (1 := Execution.label_is exec (join Label.is_read Label.is_write)).
+      i. destruct (Execution.label b exec) eqn:LABEL.
+      - destruct t; try by contradict H1; econs; eauto.
+        eapply ob_barrier_ob; eauto.
+      - exfalso. eapply ob_label; eauto.
+    }
+    i. des.
+    - left. esplits. eapply clos_trans_mon; eauto. s. i. des.
+      econs; ss. inv H0. inv H1. econs; eauto.
+    - right. esplits; eauto.
+      destruct (Execution.label a exec) eqn:LABEL.
+      + destruct t; try by contradict x0; econs; eauto.
+        econs; eauto.
+      + exfalso. eapply ob_label; eauto.
+  Qed.
 
   Lemma internal_rw
         p ex

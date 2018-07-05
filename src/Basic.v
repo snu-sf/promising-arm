@@ -13,6 +13,7 @@ Require Import Permutation.
 Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import sflib.
+Require Import paco.
 Require Import HahnRelationsBasic.
 
 Set Implicit Arguments.
@@ -78,6 +79,86 @@ Lemma rtc_mon
       (LE: forall x y, r1 x y -> r2 x y):
   forall x y, rtc r1 x y -> rtc r2 x y.
 Proof. i. induction H; eauto. Qed.
+
+
+Inductive rtcn A (R: A -> A -> Prop): forall (n:nat) (a1 a2:A), Prop :=
+| rtcn_nil
+    a:
+    rtcn R 0 a a
+| rtcn_cons
+    a1 a2 a3 n
+    (A12: R a1 a2)
+    (A23: rtcn R n a2 a3):
+    rtcn R (S n) a1 a3
+.
+Hint Constructors rtcn.
+
+Lemma rtcn_rtc A (R: A -> A -> Prop) n a1 a2
+      (RTCN: rtcn R n a1 a2):
+  rtc R a1 a2.
+Proof.
+  induction RTCN; auto. econs; eauto.
+Qed.
+
+Lemma rtc_rtcn A (R: A -> A -> Prop) a1 a2
+      (RTC: rtc R a1 a2):
+  exists n, rtcn R n a1 a2.
+Proof.
+  induction RTC; eauto. i. des.
+  esplits; eauto.
+Qed.
+
+Lemma tc_rtcn A (R: A -> A -> Prop) a1 a2
+      (TC: R⁺ a1 a2):
+  exists n, rtcn R n a1 a2 /\ n > 0.
+Proof.
+  apply t_step_rt in TC. des. apply clos_rt_rt1n in TC0.
+  apply rtc_rtcn in TC0. des. esplits; eauto. lia.
+Qed.
+
+Lemma rtcn_tc A (R: A -> A -> Prop) n a1 a2
+      (RTCN: rtcn R n a1 a2)
+      (N: n > 0):
+  R⁺ a1 a2.
+Proof.
+  inv RTCN; [lia|]. apply t_step_rt. esplits; eauto.
+  apply clos_rt1n_rt. eapply rtcn_rtc. eauto.
+Qed.
+
+Lemma rtcn_snoc A (R: A -> A -> Prop) n a1 a2 a3
+      (RTCN: rtcn R n a1 a2)
+      (REL: R a2 a3):
+  rtcn R (S n) a1 a3.
+Proof.
+  revert a3 REL. induction RTCN; eauto.
+Qed.
+
+Lemma rtcn_app A (R: A -> A -> Prop) n1 n2 a1 a2 a3
+      (RTCN1: rtcn R n1 a1 a2)
+      (RTCN2: rtcn R n2 a2 a3):
+  rtcn R (n1 + n2) a1 a3.
+Proof.
+  revert n1 a1 RTCN1. induction RTCN2.
+  { i. rewrite Nat.add_0_r. ss. }
+  i. exploit rtcn_snoc; try exact A12; eauto. i.
+  exploit IHRTCN2; eauto. replace (n1 + S n) with (S n1 + n) by lia. ss.
+Qed.
+
+Lemma rtcn_inv A (R: A -> A -> Prop) n a1 a2
+      (RTCN: rtcn R n a1 a2):
+  rtcn (fun a b => R b a) n a2 a1.
+Proof.
+  induction RTCN; eauto. eapply rtcn_snoc; eauto.
+Qed.
+
+Lemma rtcn_imply
+      A (R1 R2: A -> A -> Prop) n a1 a2
+      (LE: R1 <2= R2)
+      (RTCN: rtcn R1 n a1 a2):
+  rtcn R2 n a1 a2.
+Proof.
+  induction RTCN; auto. econs; eauto.
+Qed.
 
 
 Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=

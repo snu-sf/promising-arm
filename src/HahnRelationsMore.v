@@ -1,3 +1,7 @@
+Require Import NArith.
+Require Import PArith.
+Require Import ZArith.
+Require Import Lia.
 Require Import sflib.
 Require Import HahnRelationsBasic.
 
@@ -133,4 +137,54 @@ Proof.
   econs; intro X.
   - inv X; ss.
   - left. ss.
+Qed.
+
+Lemma minimalize_cycle
+      A a
+      (pred: A -> Prop)
+      (rel: relation A)
+      (MERGE: forall a b c, rel a b -> rel b c -> ~ pred b -> rel a c)
+      (CYCLE: rel⁺ a a):
+  (exists a, (fun a b => rel a b /\ pred a /\ pred b)⁺ a a) \/
+  (exists a, ~ pred a /\ rel a a).
+Proof.
+  apply tc_rtcn in CYCLE. des. revert a CYCLE CYCLE0.
+  induction n using strong_nat_ind. i. rename H into IH.
+  match goal with
+  | [|- ?g] => remember g as goal eqn:GOAL; guardH GOAL
+  end.
+  assert (REDUCE: forall a, rtcn rel n a a -> ~ pred a -> goal).
+  { i. des. inv H; [lia|]. apply rtcn_inv in A23.
+    unguardH GOAL. inv A23; eauto. apply rtcn_inv in A1.
+    exploit IH.
+    2: { econs 2; [|exact A1].  eauto. }
+    all: ss. lia.
+  }
+  destruct (classic (pred a)); cycle 1.
+  { eapply REDUCE; eauto. }
+  rename H into PREDA.
+  cut (goal \/ rtcn (fun a b => rel a b /\ pred a /\ pred b) n a a).
+  { i. des; ss. unguardH GOAL. subst. left. esplits.
+    eapply rtcn_tc; eauto.
+  }
+  cut (n <= n -> goal \/ exists b, rtcn (fun a b => rel a b /\ pred a /\ pred b) n a b /\ rtcn rel (n - n) b a).
+  { i. exploit H; eauto. i. des; eauto.
+    rewrite Nat.sub_diag in *. inv x0. eauto.
+  }
+  generalize n at 1 3 5 as m. induction m.
+  { right. esplits; eauto. rewrite Nat.sub_0_r. ss. }
+  i. exploit IHm; [lia|]. i. des; eauto. inv x0; [lia|].
+  replace n with (S n0 + m) in * by lia. clear H1 H CYCLE0.
+  replace (S n0 + m - S m) with n0 by lia.
+  destruct (classic (pred b)); cycle 1.
+  { left. eapply REDUCE; [|exact H]. eapply rtcn_app; eauto.
+    eapply rtcn_imply; [|exact x]. s. i. des. ss.
+  }
+  destruct (classic (pred a2)); cycle 1.
+  { left. eapply REDUCE; [|exact H0].
+    replace (S n0 + m) with (n0 + S m) by lia.
+    eapply rtcn_app; eauto. eapply rtcn_snoc; eauto.
+    eapply rtcn_imply; [|exact x]. s. i. des. ss.
+  }
+  right. esplits; eauto. eapply rtcn_snoc; eauto.
 Qed.
