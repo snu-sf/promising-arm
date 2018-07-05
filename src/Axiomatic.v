@@ -125,6 +125,14 @@ Module Label.
   Proof.
     destruct l; ss. destruct (equiv_dec loc0 loc); ss. inv e. eauto.
   Qed.
+
+  Lemma join_rw
+        l
+        (RW: join is_read is_write l):
+    is_read l \/ is_write l.
+  Proof.
+    destruct l; ss; auto.
+  Qed.
 End Label.
 
 Module ALocal.
@@ -1306,6 +1314,54 @@ Module Valid.
       exists eid_b b,
         exec.(Execution.ob) eid_b eid_b /\
         Execution.label eid_b exec = Some (Label.barrier b)>>.
+  Proof.
+  Admitted.
+
+  Lemma internal_rw
+        p ex
+        eid1 eid2
+        (PRE: pre_ex p ex)
+        (CO1: co1 ex)
+        (CO2: co2 ex)
+        (RF1: rf1 ex)
+        (RF2: rf2 ex)
+        (RF_WF: rf_wf ex)
+        (INTERNAL: ex.(Execution.internal) eid1 eid2):
+    <<EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1>> /\
+    <<EID2: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid2>>.
+  Proof.
+  Admitted.
+  
+
+  Lemma internal_read_read_po
+        p ex
+        eid1 eid2
+        (PRE: pre_ex p ex)
+        (CO1: co1 ex)
+        (CO2: co2 ex)
+        (RF1: rf1 ex)
+        (RF2: rf2 ex)
+        (RF_WF: rf_wf ex)
+        (INTERNAL: ex.(Execution.internal) eid1 eid2)
+        (EID1: ex.(Execution.label_is) Label.is_read eid1)
+        (EID2: ex.(Execution.label_is) Label.is_read eid2):
+    Execution.po eid1 eid2.
+  Proof.
+  Admitted.
+
+  Lemma ob_read_read_po
+        p ex
+        eid1 eid2
+        (PRE: pre_ex p ex)
+        (CO1: co1 ex)
+        (CO2: co2 ex)
+        (RF1: rf1 ex)
+        (RF2: rf2 ex)
+        (RF_WF: rf_wf ex)
+        (OB: ex.(Execution.ob) eid1 eid2)
+        (EID1: ex.(Execution.label_is) Label.is_read eid1)
+        (EID2: ex.(Execution.label_is) Label.is_read eid2):
+    Execution.po eid1 eid2.
   Proof.
   Admitted.
 End Valid.

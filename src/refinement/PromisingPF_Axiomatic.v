@@ -1370,18 +1370,21 @@ Lemma sim_traces_valid_thread
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
+        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<AOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
+        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
         Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<BOB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (BOB: ex.(Execution.bob) eid1 (tid, eid2))
+        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<BOB_READ:
@@ -1394,14 +1397,71 @@ Lemma sim_traces_valid_thread
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
+        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<DOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
+        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
         Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>>.
+Proof.
+Admitted.
+
+Lemma internal_rw
+      p ex
+      eid1 eid2
+      (PRE: Valid.pre_ex p ex)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (INTERNAL: ex.(Execution.internal) eid1 eid2):
+  <<EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1>> /\
+  <<EID2: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid2>>.
+Proof.
+Admitted.
+  
+
+Lemma internal_read_read_po
+      p ex
+      eid1 eid2
+      (PRE: Valid.pre_ex p ex)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (INTERNAL: ex.(Execution.internal) eid1 eid2)
+      (EID1: ex.(Execution.label_is) Label.is_read eid1)
+      (EID2: ex.(Execution.label_is) Label.is_read eid2):
+  Execution.po eid1 eid2.
+Proof.
+Admitted.
+
+Lemma ob_read_read_po
+      p ex
+      eid1 eid2
+      (PRE: Valid.pre_ex p ex)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (OB: ex.(Execution.ob) eid1 eid2)
+      (EID1: ex.(Execution.label_is) Label.is_read eid1)
+      (EID2: ex.(Execution.label_is) Label.is_read eid2):
+  Execution.po eid1 eid2.
+Proof.
+Admitted.
+
+Lemma join_rw
+      l
+      (RW: join Label.is_read Label.is_write l):
+  Label.is_read l \/ Label.is_write l.
 Proof.
 Admitted.
 
@@ -1425,15 +1485,17 @@ Lemma sim_traces_valid
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
   <<INTERNAL:
-    forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
-      Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2) \/
-      Time.le ((v_gen covs) eid1) ((v_gen covs) eid2) /\ Execution.po eid1 eid2>> /\
+    forall eid1 eid2
+      (INTERNAL: ex.(Execution.internal) eid1 eid2),
+      (Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
+      (Time.le ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
   <<EXTERNAL:
     forall eid1 eid2
-       (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
-       (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
-      Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2) \/
-      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ Execution.po eid1 eid2>> /\
+      (OB: ex.(Execution.ob) eid1 eid2)
+      (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
+      (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
+      (Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
+      (Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
   <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>>.
 Proof.
 Admitted.
@@ -1448,15 +1510,27 @@ Lemma promising_pf_valid
     <<RF2: Valid.rf2 ex>> /\
     <<RF_WF: Valid.rf_wf ex>> /\
     <<INTERNAL:
-      forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
+      forall eid1 eid2
+        (INTERNAL: ex.(Execution.internal)⁺ eid1 eid2),
         Time.lt (cov eid1) (cov eid2) \/
-        Time.le (cov eid1) (cov eid2) /\ Execution.po eid1 eid2>> /\
+        (Time.le (cov eid1) (cov eid2) /\
+         Execution.po eid1 eid2 /\
+         ex.(Execution.label_is) Label.is_read eid1 /\
+         ex.(Execution.label_is) Label.is_read eid2) \/
+        (Time.le (cov eid1) (cov eid2) /\
+         ex.(Execution.label_is) Label.is_write eid1 /\
+         ex.(Execution.label_is) Label.is_read eid2)>> /\
     <<EXTERNAL:
       forall eid1 eid2
-         (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
-         (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
+        (OB: (ex.(Execution.ob) ∩ (ex.(Execution.label_is_rel) (fun label : Label.t => join Label.is_read Label.is_write label)))⁺ eid1 eid2),
         Time.lt (vext eid1) (vext eid2) \/
-        Time.le (vext eid1) (vext eid2) /\ Execution.po eid1 eid2>> /\
+        (Time.le (vext eid1) (vext eid2) /\
+         Execution.po eid1 eid2 /\
+         ex.(Execution.label_is) Label.is_read eid1 /\
+         ex.(Execution.label_is) Label.is_read eid2) \/
+        (Time.le (vext eid1) (vext eid2) /\
+         ex.(Execution.label_is) Label.is_write eid1 /\
+         ex.(Execution.label_is) Label.is_read eid2)>> /\
     <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
     <<STATE: IdMap.Forall2
                (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
@@ -1483,19 +1557,63 @@ Proof.
   replace (rf_gen ws rs) with (ex'.(Execution.rf)) in RF1, RF2, RF_WF; [|subst; ss].
   exploit sim_traces_valid; eauto; try by (subst; ss). i. des.
   esplits; eauto.
-  { clear - SIM TR ATR.
+  - i. induction INTERNAL0.
+    + exploit INTERNAL; eauto. i. des; eauto.
+      { exploit internal_rw; eauto. i. des.
+        inversion EID1. inversion EID2.
+        exploit join_rw; try exact LABEL0. i. des.
+        - exploit join_rw; try exact LABEL. i. des.
+          + exploit internal_read_read_po; eauto. i.
+            right. left. splits; eauto.
+          + right. right. split; eauto.
+        - inversion x1. rewrite EID0 in EID3. inversion EID3.
+          rewrite H1 in *. destruct l1; ss; congr. }
+    + des.
+      * left. etrans; eauto.
+      * left. eapply le_lt_trans; eauto.
+      * left. eapply le_lt_trans; eauto.
+      * left. eapply lt_le_trans; eauto.
+      * right. left. splits; try etrans; eauto.
+      * right. right. splits; try etrans; eauto.
+      * left. eapply lt_le_trans; eauto.
+      * inversion IHINTERNAL0_6. inversion IHINTERNAL0_0.
+        rewrite EID in EID0. inversion EID0. rewrite H0 in *.
+        destruct l0; ss; congr.
+      * inversion IHINTERNAL0_5. inversion IHINTERNAL0_0.
+        rewrite EID in EID0. inversion EID0. rewrite H0 in *.
+        destruct l0; ss; congr.
+  - i. induction OB.
+    + inversion H. inversion H1.
+      exploit EXTERNAL; eauto. i. des; eauto.
+      { destruct l1.
+        - exploit ob_read_read_po; eauto. i.
+          right. left. splits; eauto.
+        - right. right. splits; eauto.
+        - inv LABEL1. }
+    + des.
+      * left. etrans; eauto.
+      * left. eapply le_lt_trans; eauto.
+      * left. eapply le_lt_trans; eauto.
+      * left. eapply lt_le_trans; eauto.
+      * right. left. splits; try etrans; eauto.
+      * right. right. splits; try etrans; eauto.
+      * left. eapply lt_le_trans; eauto.
+      * inversion IHOB6. inversion IHOB0. rewrite EID in EID0.
+        inversion EID0. rewrite H0 in *. ss. destruct l0; ss; congr.
+      * inversion IHOB5. inversion IHOB0. rewrite EID in EID0.
+        inversion EID0. rewrite H0 in *. ss. destruct l0; ss; congr.
+  - clear - SIM TR ATR.
     ii. generalize (SIM id). i. inv H; ss.
-    - generalize (TR id). i. inv H; try congr.
+    + generalize (TR id). i. inv H; try congr.
       generalize (ATR id). i. inv H; try congr.
       econs.
-    - generalize (TR id). i. inv H; try congr.
+    + generalize (TR id). i. inv H; try congr.
       generalize (ATR id). i. inv H; try congr.
       des. simplify. inv REL6; auto.
       { econs. unfold init_with_promises in *. ss.
         rewrite IdMap.mapi_spec in *. rewrite STMT in FIND. ss.
         symmetry in FIND. inv FIND. rewrite H0.
         apply sim_state_weak_init. }
-  }
 Qed.
 
 Theorem promising_pf_to_axiomatic
@@ -1517,30 +1635,17 @@ Grab Existential Variables.
 { (* external *)
   ii. exploit Valid.ob_cycle; eauto. i. des.
   - clear - EXTERNAL NONBARRIER.
-    cut (forall eid1 eid2
-           (R: (Execution.ob ex ∩ (Execution.label_is_rel ex (fun label : Label.t => join Label.is_read Label.is_write label)))⁺ eid1 eid2),
-            Time.lt (vext eid1) (vext eid2) \/
-            Time.le (vext eid1) (vext eid2) /\ Execution.po eid1 eid2).
-    { ii. exploit H; eauto. i. des; [inv x|inv x0]; lia. }
-    i. induction R.
-    + inv H. inv H1. eapply EXTERNAL; eauto.
-    + des.
-      * left. etrans; eauto.
-      * left. eapply le_lt_trans; eauto.
-      * left. eapply lt_le_trans; eauto.
-      * right. split; etrans; eauto.
+    exploit EXTERNAL; eauto. i. des.
+    + inv x; lia.
+    + inv x0. lia.
+    + inv x0. inv x1. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
   - exploit Valid.barrier_ob_po; eauto. i. inv x1. lia.
 }
 { (* internal *)
   clear - INTERNAL.
-  cut (forall eid1 eid2 (R: ex.(Execution.internal)⁺ eid1 eid2),
-          Time.lt (cov eid1) (cov eid2) \/
-          Time.le (cov eid1) (cov eid2) /\ Execution.po eid1 eid2).
-  { ii. exploit H; eauto. i. des; [inv x0|inv x1]; lia. }
-  i. induction R; eauto. des.
-  - left. etrans; eauto.
-  - left. eapply le_lt_trans; eauto.
-  - left. eapply lt_le_trans; eauto.
-  - right. split; etrans; eauto.
+  ii. exploit INTERNAL; eauto. i. des.
+  - inv x0; lia.
+  - inv x1. lia.
+  - inv x1. inv x2. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
 }
 Qed.
