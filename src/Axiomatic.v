@@ -1321,33 +1321,49 @@ Module Valid.
         p ex
         eid1 eid2
         (PRE: pre_ex p ex)
-        (CO1: co1 ex)
         (CO2: co2 ex)
-        (RF1: rf1 ex)
         (RF2: rf2 ex)
-        (RF_WF: rf_wf ex)
         (INTERNAL: ex.(Execution.internal) eid1 eid2):
     <<EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1>> /\
     <<EID2: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid2>>.
   Proof.
-  Admitted.
-  
+    unfold Execution.internal in *. obtac.
+    - inv H. inv H1. inv LABEL. splits.
+      + destruct l1; ss; econs; eauto.
+      + destruct l2; ss; econs; eauto.
+    - exploit CO2; eauto. i. des.
+      exploit RF2; eauto. i. des.
+      splits; econs; eauto.
+    - splits.
+      + destruct l1; ss; econs; eauto.
+      + destruct l2; ss; econs; eauto.
+    - exploit CO2; eauto. i. des.
+      splits; econs; eauto.
+    - exploit RF2; eauto. i. des.
+      splits; econs; eauto.
+  Qed.
 
   Lemma internal_read_read_po
         p ex
         eid1 eid2
         (PRE: pre_ex p ex)
-        (CO1: co1 ex)
         (CO2: co2 ex)
-        (RF1: rf1 ex)
         (RF2: rf2 ex)
-        (RF_WF: rf_wf ex)
         (INTERNAL: ex.(Execution.internal) eid1 eid2)
         (EID1: ex.(Execution.label_is) Label.is_read eid1)
         (EID2: ex.(Execution.label_is) Label.is_read eid2):
     Execution.po eid1 eid2.
   Proof.
-  Admitted.
+    unfold Execution.internal in *. obtac.
+    - inv H. ss.
+    - exploit CO2; eauto. i. des.
+      destruct l; ss. congr.
+    - rewrite EID in EID0. inv EID0. destruct l0; ss.
+    - exploit CO2; eauto. i. des.
+      destruct l; ss. congr.
+    - exploit RF2; eauto. i. des.
+      destruct l0; ss. congr.
+  Qed.
 
   Lemma ob_read_read_po
         p ex
@@ -1363,6 +1379,20 @@ Module Valid.
         (EID2: ex.(Execution.label_is) Label.is_read eid2):
     Execution.po eid1 eid2.
   Proof.
+    inv EID1. inv EID2. destruct l; ss. destruct l0; ss.
+    unfold Execution.ob in *. obtac; try congr.
+    all: try by etrans; eauto.
+    all: try by exploit RF2; eauto; i; des; congr.
+    all: try by exploit CO2; eauto; i; des; congr.
+    - inv H0. rewrite EID0 in EID1. inv EID1. inv LABEL1.
+    - exploit addr_is_po; eauto. i. inv H0; ss. etrans; eauto.
+      admit. (* rfi -> po *)
+    - exploit data_is_po; eauto. i. inv H0; ss. etrans; eauto.
+      admit. (* rfi -> po *)
+    - eapply ctrl_is_po; eauto.
+    - rewrite <- H0. eapply addr_is_po; eauto.
+    - rewrite <- H2. eapply ctrl_is_po; eauto.
+    - rewrite <- H2, <- H0. eapply addr_is_po; eauto.
   Admitted.
 End Valid.
 
