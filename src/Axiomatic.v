@@ -119,7 +119,7 @@ Module Label.
 
   Lemma is_reading_inv
         loc l
-        (WRITING: is_reading loc l):
+        (READING: is_reading loc l):
     exists ex ord val,
       l = read ex ord loc val.
   Proof.
@@ -168,7 +168,7 @@ Module ALocal.
                  (if ex then Some (next_eid alocal1) else alocal1.(exbank)))
   | step_write
       ex ord vloc vval
-      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (eq (next_eid alocal1))))
+      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 bot))
       (EX: ex -> exists n,
            alocal1.(exbank) = Some n /\
            opt_pred (Label.is_reading vloc.(ValA.val)) (List.nth_error alocal1.(labels) n))
@@ -243,17 +243,25 @@ Module AExecUnit.
   .
   Hint Constructors step.
 
-  Definition wf_rmap (rmap: RMap.t (A:=nat -> Prop)) (max:nat): Prop :=
+  Inductive label_is (labels:list Label.t) (pred:Label.t -> Prop) (iid:nat): Prop :=
+  | label_is_intro
+      l
+      (EID: List.nth_error labels iid = Some l)
+      (LABEL: pred l)
+  .
+  Hint Constructors label_is.
+
+  Definition wf_rmap (rmap: RMap.t (A:=nat -> Prop)) (labels:list Label.t): Prop :=
     forall r n
       (N: (RMap.find r rmap).(ValA.annot) n),
-      n < max.
+      label_is labels Label.is_read n.
   Hint Unfold wf_rmap.
 
   Lemma wf_rmap_expr
-        rmap bound e n
-        (WF: wf_rmap rmap bound)
+        rmap labels e n
+        (WF: wf_rmap rmap labels)
         (N: (sem_expr rmap e).(ValA.annot) n):
-    n < bound.
+    label_is labels Label.is_read n.
   Proof.
     revert n N. induction e; ss.
     - i. eapply WF. eauto.
@@ -262,16 +270,58 @@ Module AExecUnit.
 
   Inductive wf (aeu:t): Prop :=
   | wf_intro
-      (REG: wf_rmap aeu.(state).(State.rmap) (length aeu.(local).(ALocal.labels)))
+      (REG: wf_rmap aeu.(state).(State.rmap) aeu.(local).(ALocal.labels))
       (ADDR: aeu.(local).(ALocal.addr) ⊆ lt)
+      (ADDR_LABEL: aeu.(local).(ALocal.addr) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_read) × (label_is aeu.(local).(ALocal.labels) Label.is_read ∪₁ label_is aeu.(local).(ALocal.labels) Label.is_write))
       (DATA: aeu.(local).(ALocal.data) ⊆ lt)
+      (DATA_LABEL: aeu.(local).(ALocal.data) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_read) × (label_is aeu.(local).(ALocal.labels) Label.is_write))
       (CTRL: aeu.(local).(ALocal.ctrl) ⊆ lt)
+      (CTRL_LABEL: aeu.(local).(ALocal.ctrl) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_read) × (fun _ => True))
       (CTRL_MON: aeu.(local).(ALocal.ctrl) ⨾ lt ⊆ aeu.(local).(ALocal.ctrl))
       (RMW: forall n ord loc val
               (LABEL: List.nth_error aeu.(local).(ALocal.labels) n = Some (Label.write true ord loc val)),
           codom_rel aeu.(local).(ALocal.rmw) n)
   .         
   Hint Constructors wf.
+
+  Lemma label_is_lt
+        labels pred iid
+        (LABEL: label_is labels pred iid):
+    iid < length labels.
+  Proof.
+    inv LABEL. apply List.nth_error_Some. congr.
+  Qed.
+
+  Lemma label_is_mon
+        labels1 labels2 pred:
+    label_is labels1 pred <1= label_is (labels1 ++ labels2) pred.
+  Proof.
+    ii. inv PR. econs; eauto.
+    rewrite List.nth_error_app1; ss.
+    apply List.nth_error_Some. congr.
+  Qed.
+
+  Lemma union_mon
+        A
+        (p1 p2 q1 q2: A -> Prop)
+        (P: p1 <1= p2)
+        (Q: q1 <1= q2):
+    (p1 ∪₁ q1) <1= (p2 ∪₁ q2).
+  Proof.
+    ii. inv PR.
+    - left. eauto.
+    - right. eauto.
+  Qed.
+
+  Lemma times_mon
+        A
+        (p1 p2 q1 q2: A -> Prop)
+        (P: p1 <1= p2)
+        (Q: q1 <1= q2):
+    p1 × q1 <2= p2 × q2.
+  Proof.
+    ii. inv PR. econs; eauto.
+  Qed.
 
   Lemma wf_init stmts: wf (mk (State.init stmts) ALocal.init).
   Proof.
@@ -297,7 +347,7 @@ Module AExecUnit.
              | [|- context[_ ∪ bot]] => rewrite union_bot_r
              end.
     - splits.
-      + inv WF. ss.
+      + inv WF. econs; ss.
       + destruct local1. refl.
     - splits.
       + inv WF. econs; ss.
@@ -306,13 +356,29 @@ Module AExecUnit.
       + destruct local1. refl.
     - splits.
       + inv WF. econs; ss.
-        * rewrite List.app_length. s.
-          ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
+        * ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
           { inversion e. subst. i. inv N.
-            unfold ALocal.next_eid. lia.
+            econs.
+            - unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
+            - ss.
           }
-          { i. exploit REG; eauto. lia. }
-        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+          { i. apply label_is_mon. exploit REG; eauto. }
+        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { eapply times_mon; [| |by apply ADDR_LABEL].
+            - apply label_is_mon.
+            - apply union_mon; apply label_is_mon.
+          }
+          { inv H0. econs.
+            - apply label_is_mon. eapply wf_rmap_expr; eauto.
+            - left. econs.
+              + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
+              + ss.
+          }
+        * ii. eapply times_mon; [| |by apply DATA_LABEL].
+          { apply label_is_mon. }
+          { apply label_is_mon. }
+        * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
         * i. destruct (lt_dec n (length local1.(ALocal.labels))).
           { rewrite List.nth_error_app1 in LABEL; ss. eauto. }
           { rewrite List.nth_error_app2 in LABEL; [|lia].
@@ -324,14 +390,34 @@ Module AExecUnit.
         * left. ss.
     - splits.
       + inv WF. econs; ss.
-        * rewrite List.app_length. s.
-          ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
-          { inversion e. subst. i. inv N.
-            unfold ALocal.next_eid. lia.
+        * ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
+          { inversion e. subst. i. inv N. }
+          { i. apply label_is_mon. exploit REG; eauto. }
+        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { eapply times_mon; [| |by apply ADDR_LABEL].
+            - apply label_is_mon.
+            - apply union_mon; apply label_is_mon.
           }
-          { i. exploit REG; eauto. lia. }
-        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
-        * ii. inv H; eauto. inv H0. eapply wf_rmap_expr; eauto.
+          { inv H0. econs.
+            - apply label_is_mon. eapply wf_rmap_expr; eauto.
+            - right. econs.
+              + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
+              + ss.
+          }
+        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { eapply times_mon; [| |by apply DATA_LABEL].
+            - apply label_is_mon.
+            - apply label_is_mon.
+          }
+          { inv H0. econs.
+            - apply label_is_mon. eapply wf_rmap_expr; eauto.
+            - econs.
+              + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
+              + ss.
+          }
+        * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
         * i. destruct (lt_dec n (length local1.(ALocal.labels))).
           { rewrite List.nth_error_app1 in LABEL; ss.
             exploit RMW; eauto. intro X. inv X. econs. left. eauto.
@@ -355,8 +441,14 @@ Module AExecUnit.
       + econs; ss. eexists. rewrite List.app_nil_r. ss.
     - splits.
       + inv WF. econs; ss.
-        * rewrite List.app_length. s.
-          ii. exploit REG; eauto. lia.
+        * ii. apply label_is_mon. exploit REG; eauto.
+        * ii. eapply times_mon; [| |by apply ADDR_LABEL].
+          { apply label_is_mon. }
+          { apply union_mon; apply label_is_mon. }
+        * ii. eapply times_mon; [| |by apply DATA_LABEL].
+          { apply label_is_mon. }
+          { apply label_is_mon. }
+        * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
         * i. destruct (lt_dec n (length local1.(ALocal.labels))).
           { rewrite List.nth_error_app1 in LABEL; ss. eauto. }
           { rewrite List.nth_error_app2 in LABEL; [|lia].
@@ -368,7 +460,9 @@ Module AExecUnit.
       + inv WF. econs; ss.
         * ii. inv H; eauto. inv H0.
           exploit wf_rmap_expr; eauto. i.
+          exploit label_is_lt; eauto. i.
           unfold le, ALocal.next_eid in *. lia.
+        * ii. inv H; eauto. inv H0. econs; ss. eapply wf_rmap_expr; eauto.
         * ii. inv H; eauto. inv H0. inv H.
           { left. apply CTRL_MON. econs; eauto. }
           { inv H0. right. econs; ss. unfold le in *. lia. }
@@ -1017,54 +1111,83 @@ Module Valid.
   Lemma addr_label
         p exec
         eid1 eid2
-        (PRE: pre_ex p exec)
+        (EX: pre_ex p exec)
         (ADDR: exec.(Execution.addr) eid1 eid2):
-    exists ex ord loc val,
-      Execution.label eid1 exec = Some (Label.read ex ord loc val).
+    <<EID1: Execution.label_is exec (Label.is_read) eid1>> /\
+    <<EID2: Execution.label_is exec (Label.is_read \1/ Label.is_write) eid2>>.
   Proof.
-  Admitted.
+    rewrite EX.(Valid.ADDR) in ADDR. inv ADDR.
+    destruct eid1 as [tid1 iid1].
+    destruct eid2 as [tid2 iid2].
+    inv REL. ss. subst.
+    rewrite IdMap.map_spec in RELS. 
+    destruct (IdMap.find tid1 EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(AEUS) tid1). rewrite LOCAL. intro X. inv X.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { apply AExecUnit.wf_init. }
+    s. i. des.
+    inv WF. exploit ADDR_LABEL; eauto. intro X. inv X.
+    esplits.
+    - inv H. econs; eauto.
+      unfold Execution.label. s.
+      rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+    - inv H1; inv H2; econs; eauto.
+      + unfold Execution.label. s.
+        rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+      + unfold Execution.label. s.
+        rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+  Qed.    
 
   Lemma data_label
         p exec
         eid1 eid2
-        (PRE: pre_ex p exec)
+        (EX: pre_ex p exec)
         (DATA: exec.(Execution.data) eid1 eid2):
-    exists ex ord loc val,
-      Execution.label eid1 exec = Some (Label.read ex ord loc val).
+    <<EID1: Execution.label_is exec (Label.is_read) eid1>> /\
+    <<EID2: Execution.label_is exec (Label.is_write) eid2>>.
   Proof.
-  Admitted.
+    rewrite EX.(Valid.DATA) in DATA. inv DATA.
+    destruct eid1 as [tid1 iid1].
+    destruct eid2 as [tid2 iid2].
+    inv REL. ss. subst.
+    rewrite IdMap.map_spec in RELS. 
+    destruct (IdMap.find tid1 EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(AEUS) tid1). rewrite LOCAL. intro X. inv X.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { apply AExecUnit.wf_init. }
+    s. i. des.
+    inv WF. exploit DATA_LABEL; eauto. intro X. inv X.
+    esplits.
+    - inv H. econs; eauto.
+      unfold Execution.label. s.
+      rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+    - inv H1. econs; eauto.
+      unfold Execution.label. s.
+      rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+  Qed.
 
   Lemma ctrl_label
         p exec
         eid1 eid2
-        (PRE: pre_ex p exec)
+        (EX: pre_ex p exec)
         (CTRL: exec.(Execution.ctrl) eid1 eid2):
-    exists ex ord loc val,
-      Execution.label eid1 exec = Some (Label.read ex ord loc val).
+    <<EID1: Execution.label_is exec (Label.is_read) eid1>>.
   Proof.
-  Admitted.
-
-  Lemma data_no_barrier
-        p exec
-        eid1 eid2 b
-        (EX: pre_ex p exec)
-        (DATA: exec.(Execution.data) eid1 eid2)
-        (EID1: Execution.label eid1 exec = Some (Label.barrier b) \/
-               Execution.label eid2 exec = Some (Label.barrier b)):
-    False.
-  Proof.
-  Admitted.
-
-  Lemma addr_no_barrier
-        p exec
-        eid1 eid2 b
-        (EX: pre_ex p exec)
-        (ADDR: exec.(Execution.addr) eid1 eid2)
-        (EID1: Execution.label eid1 exec = Some (Label.barrier b) \/
-               Execution.label eid2 exec = Some (Label.barrier b)):
-    False.
-  Proof.
-  Admitted.
+    rewrite EX.(Valid.CTRL) in CTRL. inv CTRL.
+    destruct eid1 as [tid1 iid1].
+    destruct eid2 as [tid2 iid2].
+    inv REL. ss. subst.
+    rewrite IdMap.map_spec in RELS. 
+    destruct (IdMap.find tid1 EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(AEUS) tid1). rewrite LOCAL. intro X. inv X.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { apply AExecUnit.wf_init. }
+    s. i. des.
+    inv WF. exploit CTRL_LABEL; eauto. intro X. inv X.
+    inv H. econs; eauto.
+    unfold Execution.label. s.
+    rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+  Qed.
 
   Lemma barrier_ob_po
         p exec
@@ -1082,8 +1205,8 @@ Module Valid.
     - exploit RF2; eauto. i. des. congr.
     - destruct l1; try congr; ss.
     - exploit CO2; eauto. i. des. congr.
-    - exfalso. eapply addr_no_barrier; eauto.
-    - exfalso. eapply data_no_barrier; eauto.
+    - eapply addr_label in H1; eauto. des. inv EID0. destruct l; ss. congr.
+    - eapply data_label in H1; eauto. des. inv EID0. destruct l; ss. congr.
     - eapply ctrl_is_po; eauto.
     - etrans; eauto. eapply addr_is_po; eauto.
     - etrans; eauto. eapply ctrl_is_po; eauto.
@@ -1116,10 +1239,10 @@ Module Valid.
     - destruct l2; try congr; ss.
     - exploit CO2; eauto. i. des. congr.
     - inv H0.
-      + exfalso. eapply addr_no_barrier; eauto.
+      + eapply addr_label in H1; eauto. des. inv EID0. destruct l; ss; try congr. des; ss.
       + inv H. exploit RF2; eauto. i. des. congr.
     - inv H0.
-      + exfalso. eapply data_no_barrier; eauto.
+      + eapply data_label in H1; eauto. des. inv EID0. destruct l; ss. congr.
       + inv H. exploit RF2; eauto. i. des. congr.
     - destruct l; try congr; ss.
     - destruct l; try congr; ss.
@@ -1155,12 +1278,12 @@ Module Valid.
     - exploit RF2; eauto. i. des. congr.
     - congr.
     - exploit CO2; eauto. i. des. congr.
-    - exploit addr_label; eauto. i. des. congr.
-    - exploit data_label; eauto. i. des. congr.
-    - exploit ctrl_label; eauto. i. des. congr.
-    - exploit addr_label; eauto. i. des. congr.
-    - exploit ctrl_label; eauto. i. des. congr.
-    - exploit addr_label; eauto. i. des. congr.
+    - exploit addr_label; eauto. i. des. inv EID0. congr.
+    - exploit data_label; eauto. i. des. inv EID0. congr.
+    - exploit ctrl_label; eauto. i. inv x0. congr.
+    - exploit addr_label; eauto. i. des. inv EID0. congr.
+    - exploit ctrl_label; eauto. i. des. inv x1. congr.
+    - exploit addr_label; eauto. i. des. inv EID2. congr.
     - exploit RF2; eauto. i. des. congr.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
     - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
