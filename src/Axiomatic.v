@@ -86,7 +86,13 @@ Module Label.
 
   Definition is_barrier (label:t): bool :=
     match label with
-    | barrier _ => true
+    | barrier b => true
+    | _ => false
+    end.
+
+  Definition is_barrier_c (c:Barrier.t -> bool) (label:t): bool :=
+    match label with
+    | barrier b => c b
     | _ => false
     end.
 
@@ -717,27 +723,36 @@ Module Execution.
     ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗ex.(label_is) Label.is_acquire_pc⦘.
 
   Definition bob (ex:t): relation eidT :=
-    (po ⨾
-     ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-     po) ∪
+    (⦗ex.(label_is) Label.is_read⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) (Label.is_barrier_c Barrier.is_dmb_rr)⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) Label.is_read⦘) ∪
+
+    (⦗ex.(label_is) Label.is_read⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) (Label.is_barrier_c Barrier.is_dmb_rw)⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) Label.is_write⦘) ∪
+
+    (⦗ex.(label_is) Label.is_write⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) Label.is_read⦘) ∪
+
+    (⦗ex.(label_is) Label.is_write⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) (Label.is_barrier_c Barrier.is_dmb_ww)⦘ ⨾
+     po ⨾
+     ⦗ex.(label_is) Label.is_write⦘) ∪
 
     (⦗ex.(label_is) Label.is_release⦘ ⨾
      po ⨾
      ⦗ex.(label_is) Label.is_acquire⦘) ∪
 
-    (⦗ex.(label_is) Label.is_read⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
-     po) ∪
-
     (⦗ex.(label_is) Label.is_acquire_pc⦘ ⨾
      po) ∪
-
-    (⦗ex.(label_is) Label.is_write⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) (eq (Label.barrier Barrier.dmbst))⦘ ⨾
-     po ⨾
-     ⦗ex.(label_is) Label.is_write⦘) ∪
 
     (po ⨾
      ⦗ex.(label_is) Label.is_release⦘).
@@ -1214,7 +1229,8 @@ Module Valid.
     Execution.po eid1 eid2.
   Proof.
     inv EID1. destruct l; ss. unfold co2, rf2 in *.
-    obtac.
+    obtac; ss.
+    all: try by etrans; eauto.
     - exploit RF2; eauto. i. des. congr.
     - exploit RF2; eauto. i. des. congr.
     - destruct l1; try congr; ss.
@@ -1226,12 +1242,6 @@ Module Valid.
     - etrans; eauto. eapply ctrl_is_po; eauto.
     - etrans; eauto. etrans; eauto. eapply addr_is_po; eauto.
     - exploit RF2; eauto. i. des. congr.
-    - etrans; eauto.
-    - auto.
-    - destruct l; try congr; ss.
-    - auto.
-    - etrans; eauto.
-    - auto.
   Qed.
 
   Lemma ob_barrier_ob
@@ -1248,9 +1258,11 @@ Module Valid.
     inv EID2. destruct l; ss. exploit barrier_ob_po; eauto. i.
     unfold co2, rf2 in *. clear OB2.
     obtac.
+    all: try by rewrite EID in EID1; inv EID1; ss.
+    all: try by rewrite EID in EID2; inv EID2; ss. 
+    all: try by destruct l; try congr; ss.
     - exploit RF2; eauto. i. des. congr.
     - exploit CO2; eauto. i. des. congr.
-    - destruct l2; try congr; ss.
     - exploit CO2; eauto. i. des. congr.
     - inv H0.
       + eapply addr_label in H1; eauto. des. inv EID2. destruct l; ss; try congr. des; ss.
@@ -1258,22 +1270,7 @@ Module Valid.
     - inv H0.
       + eapply data_label in H1; eauto. des. inv EID2. destruct l; ss. congr.
       + inv H. exploit RF2; eauto. i. des. congr.
-    - destruct l; try congr; ss.
-    - destruct l; try congr; ss.
-    - destruct l; try congr; ss.
-    - destruct l; try congr; ss.
-    - destruct l; try congr; ss.
-    - right. left. left. left. left. left.
-      econs; split; eauto. econs; split; [|etrans; eauto].
-      econs; eauto.
-    - destruct l0; try congr; ss.
-    - right. left. left. left. right.
-      econs; split; try (econs; eauto). split; eauto.
-      econs; split; [|etrans; eauto]. econs; eauto.
-    - right. left. left. right.
-      econs; split; [econs|etrans]; eauto.
-    - destruct l0; try congr; ss.
-    - destruct l; try congr; ss.
+    - right. left. right. econs. splits; [|by etrans; eauto]. econs; eauto.
   Qed.
 
   Lemma ob_label
@@ -1288,22 +1285,15 @@ Module Valid.
   Proof.
     unfold co2, rf2 in *.
     obtac.
-    - exploit RF2; eauto. i. des. congr.
-    - exploit RF2; eauto. i. des. congr.
-    - congr.
-    - exploit CO2; eauto. i. des. congr.
+    all: try congr.
+    all: try by exploit RF2; eauto; i; des; congr.
+    all: try by exploit CO2; eauto; i; des; congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
     - exploit data_label; eauto. i. des. inv EID0. congr.
     - exploit ctrl_label; eauto. i. inv x0. congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
     - exploit ctrl_label; eauto. i. des. inv x1. congr.
     - exploit addr_label; eauto. i. des. inv EID2. congr.
-    - exploit RF2; eauto. i. des. congr.
-    - exploit po_label_pre; try exact EID; eauto. i. des. congr.
-    - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
-    - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
-    - congr.
-    - congr.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
   Qed.
 

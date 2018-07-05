@@ -208,6 +208,14 @@ Proof.
   econs; ss. apply bot_spec.
 Qed.
 
+Lemma sim_low_view_ifc
+      ts l r c
+      (VIEW: sim_low_view ts l r):
+  sim_low_view ts (ifc c l) (ifc c r).
+Proof.
+  destruct c; ss. apply sim_low_view_bot.
+Qed.
+
 Lemma sim_low_view_const
       ts c
       (TS: c <= ts):
@@ -374,41 +382,24 @@ Proof.
         * s. econs 5.
       + econs; ss. econs; ss.
         inv LOCAL0. econs; ss; eauto using sim_low_view_join, sim_low_view_bot.
-    - (* dmbst *)
+    - (* dmb *)
       inv STEP.
       eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
       + left. econs; ss. econs; ss; cycle 1.
         * econs 6; eauto. econs; eauto.
         * s. econs 5.
       + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss. apply sim_low_view_join; ss. apply sim_view_low_view; ss.
-        rewrite <- VWP, <- join_r. refl.
-    - (* dmbld *)
-      inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
-      + left. econs; ss. econs; ss; cycle 1.
-        * econs 7; eauto. econs; eauto.
-        * s. econs 5.
-      + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss.
-        * apply sim_low_view_join; ss. apply sim_view_low_view; ss.
-          rewrite <- VWP, <- join_r. refl.
-        * apply sim_low_view_join; ss. apply sim_view_low_view; ss.
-          rewrite <- VWP, <- join_r. refl.
-    - (* dmbsy *)
-      inv STEP.
-      eexists (AExecUnit.mk (ExecUnit.mk _ _ _) _). esplits; [econs 2; [|econs 1]|].
-      + left. econs; ss. econs; ss; cycle 1.
-        * econs 8; eauto. econs; eauto.
-        * s. econs 5.
-      + econs; ss. econs; ss.
-        inv LOCAL0. econs; ss.
-        * repeat apply sim_low_view_join; eauto using sim_low_view_bot.
-          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_l. refl. }
-          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_r, <- join_l. refl. }
-        * repeat apply sim_low_view_join; eauto using sim_low_view_bot.
-          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_l. refl. }
-          { apply sim_view_low_view; ss. rewrite <- VWP, <- join_r, <- join_r, <- join_l. refl. }
+        inv LOCAL0. econs; ss; repeat apply sim_low_view_join; eauto.
+        all: try match goal with
+                 | [|- context[ifc ?c _]] => destruct c
+                 end.
+        all: try apply sim_low_view_bot.
+        all: apply sim_view_low_view; ss.
+        all: rewrite <- VWP.
+        * admit. (* due to generalized dmb? *)
+        * admit. (* due to generalized dmb? *)
+        * rewrite <- join_r, <- join_l. refl.
+        * rewrite <- join_r, <- join_r, <- join_l. refl.
   }
   { (* write_step *)
     admit.
@@ -700,11 +691,10 @@ Proof.
     - inv STEP. exists ids. econs; ss.
       econs; ss. eauto using sound_view_join.
     - inv STEP. exists ids. econs; ss.
-      econs; ss. eauto using sound_view_join.
-    - inv STEP. exists ids. econs; ss.
-      econs; ss; eauto using sound_view_join.
-    - inv STEP. exists ids. econs; ss.
-      econs; ss; eauto using sound_view_join, sound_view_bot.
+      econs; ss; repeat apply sound_view_join.
+      all: try apply sound_view_ifc.
+      all: try apply sound_view_bot.
+      all: eauto.
   }
   { inv STEP0. ss. subst.
     inv ST. inv LC.

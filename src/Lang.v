@@ -77,11 +77,33 @@ End OrdW.
 Module Barrier.
   Inductive t :=
   | isb
-  | dmbst
-  | dmbld
-  | dmbsy
+  | dmb (rr rw wr ww:bool)
   .
   Hint Constructors t.
+
+  Definition is_dmb_rr (b:t): bool :=
+    match b with
+    | dmb rr rw wr ww => rr
+    | _ => false
+    end.
+
+  Definition is_dmb_rw (b:t): bool :=
+    match b with
+    | dmb rr rw wr ww => rw
+    | _ => false
+    end.
+
+  Definition is_dmb_wr (b:t): bool :=
+    match b with
+    | dmb rr rw wr ww => wr
+    | _ => false
+    end.
+
+  Definition is_dmb_ww (b:t): bool :=
+    match b with
+    | dmb rr rw wr ww => ww
+    | _ => false
+    end.
 End Barrier.
 
 Inductive instrT :=

@@ -561,13 +561,13 @@ Section Local.
   .
   Hint Constructors isb.
 
-  Inductive dmbst (lc1 lc2:t): Prop :=
-  | dmbst_intro
+  Inductive dmb (rr rw wr ww:bool) (lc1 lc2:t): Prop :=
+  | dmb_intro
       (LC2: lc2 =
             mk
               lc1.(coh)
-              lc1.(vrp)
-              (join lc1.(vwp) lc1.(vwm))
+              (joins [lc1.(vrp); ifc rr lc1.(vrm); ifc wr lc1.(vwm)])
+              (joins [lc1.(vwp); ifc rw lc1.(vrm); ifc ww lc1.(vwm)])
               lc1.(vrm)
               lc1.(vwm)
               lc1.(vcap)
@@ -576,41 +576,7 @@ Section Local.
               lc1.(exbank)
               lc1.(promises))
   .
-  Hint Constructors dmbst.
-
-  Inductive dmbld (lc1 lc2:t): Prop :=
-  | dmbld_intro
-      (LC2: lc2 =
-            mk
-              lc1.(coh)
-              (join lc1.(vrp) lc1.(vrm))
-              (join lc1.(vwp) lc1.(vrm))
-              lc1.(vrm)
-              lc1.(vwm)
-              lc1.(vcap)
-              lc1.(vrel)
-              lc1.(fwdbank)
-              lc1.(exbank)
-              lc1.(promises))
-  .
-  Hint Constructors dmbld.
-
-  Inductive dmbsy (lc1 lc2:t): Prop :=
-  | dmbsy_intro
-      (LC2: lc2 =
-            mk
-              lc1.(coh)
-              (joins [lc1.(vrp); lc1.(vrm); lc1.(vwm)])
-              (joins [lc1.(vwp); lc1.(vrm); lc1.(vwm)])
-              lc1.(vrm)
-              lc1.(vwm)
-              lc1.(vcap)
-              lc1.(vrel)
-              lc1.(fwdbank)
-              lc1.(exbank)
-              lc1.(promises))
-  .
-  Hint Constructors dmbsy.
+  Hint Constructors dmb.
 
   Inductive step (event:Event.t (A:=View.t (A:=A))) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
   | step_internal
@@ -632,15 +598,10 @@ Section Local.
   | step_isb
       (EVENT: event = Event.barrier Barrier.isb)
       (STEP: isb lc1 lc2)
-  | step_dmbst
-      (EVENT: event = Event.barrier Barrier.dmbst)
-      (STEP: dmbst lc1 lc2)
-  | step_dmbld
-      (EVENT: event = Event.barrier Barrier.dmbld)
-      (STEP: dmbld lc1 lc2)
-  | step_dmbsy
-      (EVENT: event = Event.barrier Barrier.dmbsy)
-      (STEP: dmbsy lc1 lc2)
+  | step_dmb
+      rr rw wr ww
+      (EVENT: event = Event.barrier (Barrier.dmb rr rw wr ww))
+      (STEP: dmb rr rw wr ww lc1 lc2)
   .
   Hint Constructors step.
 
@@ -846,8 +807,6 @@ Section ExecUnit.
           }
     - inv STEP. econs; ss. apply rmap_add_wf; viewtac.
       inv RES. inv VIEW. rewrite TS. s. apply bot_spec.
-    - inv STEP. econs; ss. econs; viewtac.
-    - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv STEP. econs; ss. econs; viewtac.
     - inv LC. econs; ss. econs; viewtac.

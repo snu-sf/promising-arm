@@ -86,8 +86,6 @@ Proof.
         { econs 4; eauto. inv STEP. econs; eauto. }
         { econs 5; eauto. inv STEP. econs; eauto. }
         { econs 6; eauto. inv STEP. econs; eauto. }
-        { econs 7; eauto. inv STEP. econs; eauto. }
-        { econs 8; eauto. inv STEP. econs; eauto. }
       * rewrite ? IdMap.add_add. eauto.
   - (* diff thread *)
     inv STEP. inv STEP1. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
@@ -121,8 +119,6 @@ Proof.
         { econs 4; eauto. }
         { econs 5; eauto. }
         { econs 6; eauto. }
-        { econs 7; eauto. }
-        { econs 8; eauto. }
       * apply IdMap.add_add_diff. ss.
 Qed.
 

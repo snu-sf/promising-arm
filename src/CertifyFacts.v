@@ -246,19 +246,7 @@ Section Eqts.
         * econs 5; ss.
         * econs 6; ss.
       + econs; ss.
-        econs; eauto using eqts_view_join, eqts_view_bot.
-    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
-      + econs. econs; ss.
-        * econs 5; ss.
-        * econs 7; ss.
-      + econs; ss.
-        econs; eauto using eqts_view_join, eqts_view_bot.
-    - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
-      + econs. econs; ss.
-        * econs 5; ss.
-        * econs 8; ss.
-      + econs; ss.
-        econs; eauto using eqts_view_join, eqts_view_bot.
+        econs; eauto 10 using eqts_view_join, eqts_view_ifc, eqts_view_bot.
     - inv LC. eexists (ExecUnit.mk _ _ _). splits.
       + econs. econs; ss.
         * econs 6; ss.
@@ -577,11 +565,7 @@ Proof.
   - inv STEP. econs; ss.
     inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
   - inv STEP. econs; ss.
-    inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
-  - inv STEP. econs; ss.
-    inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
-  - inv STEP. econs; ss.
-    inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.
+    inv LC. econs; s; eauto 20 using void_view_join, void_view_ifc, void_view_bot, void_rmap_expr.
 Qed.
 
 Lemma void_rtc_aeu_step
