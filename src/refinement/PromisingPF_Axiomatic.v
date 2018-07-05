@@ -949,12 +949,12 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
 | sim_trace_step
     e ae tr eu1 eu2 atr aeu1 aeu2 rl r1 r2 wl w1 w2 cov cov' vext vext'
     (STEP: ExecUnit.state_step0 tid e e eu1 eu2)
-    (ASTATE: State.step ae aeu1.(AExecUnit.state) aeu2.(AExecUnit.state))
-    (ALOCAL: ALocal.step ae aeu1.(AExecUnit.local) aeu2.(AExecUnit.local))
+    (ASTATE_STEP: State.step ae aeu1.(AExecUnit.state) aeu2.(AExecUnit.state))
+    (ALOCAL_STEP: ALocal.step ae aeu1.(AExecUnit.local) aeu2.(AExecUnit.local))
     (EVENT: sim_event e ae)
     (STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state))
     (W: w2 = match e with
-             | Event.write _ _ vloc _ _ =>
+             | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
                          then Some (vloc.(ValA.val), (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)))
                          else w1 eid)
@@ -969,7 +969,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                end)
     (COV: cov' = match e with
                  | Event.read _ _ vloc _
-                 | Event.write _ _ vloc _ _ =>
+                 | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                    (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
                               then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
                               else cov eid)
@@ -980,7 +980,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                      (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
                                 then res.(ValA.annot).(View.ts)
                                 else vext eid)
-                   | Event.write _ _ vloc _ _ =>
+                   | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                      (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
                                 then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
                                 else vext eid)
@@ -1311,6 +1311,73 @@ Qed.
 Definition lastn A (n: nat) (l: list A) :=
   List.rev (List.firstn n (List.rev l)).
 
+Lemma sim_trace_vext_cov
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists w wl' aeu atr',
+    wl = w :: wl' /\
+    atr = aeu :: atr' /\
+    forall eid ts (W: w eid = Some ts),
+      (exists ex ord loc val,
+          List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)) /\
+      cov eid = ts.(snd) /\
+      vext eid = ts.(snd).
+Proof.
+  induction SIM.
+  - esplits; eauto. i. ss.
+  - esplits; eauto. i. des. inv IHSIM. inv IHSIM0.
+    inv EVENT.
+    + exploit IHSIM1; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+    + des_ifs; eauto.
+      * exfalso.
+        rewrite Nat.eqb_eq in Heq. subst.
+        exploit IHSIM1; eauto. i. des.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None)
+          by (ii; congr).
+        rewrite List.nth_error_Some in H. lia.
+      * exploit IHSIM1; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + des_ifs; eauto.
+      * destruct eu1. destruct eu2.
+        destruct aeu. destruct aeu2. ss.
+        inv STATE. inv STEP. inv STATE; ss.
+        rewrite Nat.eqb_eq in Heq. subst.
+        inv LOCAL; ss.
+        { inv STEP. ss. splits; eauto.
+          inv EVENT. inv ALOCAL_STEP; ss.
+          - esplits. unfold ALocal.next_eid.
+            rewrite List.nth_error_app2.
+            rewrite <- Minus.minus_n_n. ss. lia.
+          - inv EVENT. inv FAILURE. }
+        { inv STEP. ss. }
+      * exploit IHSIM1; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM1; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM1; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + exploit IHSIM1; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+      { rewrite List.nth_error_app1; eauto.
+        eapply List.nth_error_Some. ii. congr. }
+Qed.
+
 Lemma sim_traces_valid_co
       p mem trs atrs ws rs covs vexts
       m ex
@@ -1335,75 +1402,17 @@ Lemma sim_traces_valid_co
       (CO: ex.(Execution.co) eid1 eid2),
       Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
 Proof.
-Admitted.
-
-Lemma sim_trace_vext_cov
-      p mem tid tr atr wl rl cov vext
-      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
-  exists w wl' aeu atr',
-    wl = w :: wl' /\
-    atr = aeu :: atr' /\
-    forall eid ts (W: w eid = Some ts),
-      (exists ex ord loc val,
-          List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)) /\
-      cov eid = ts.(snd) /\
-      vext eid = ts.(snd).
-Proof.
-  (* induction SIM. *)
-  (* - esplits; eauto. i. ss. *)
-  (* - esplits; eauto. i. des. inv IHSIM. inv IHSIM0. *)
-  (*   destruct e; eauto. *)
-  (*   + exploit IHSIM1; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. inv ASTEP. *)
-  (*     inv LOCAL; ss; inv ALOCAL; esplits; eauto. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-  (*   + des_ifs; eauto. *)
-  (*     * exfalso. *)
-  (*       rewrite Nat.eqb_eq in Heq. subst. *)
-  (*       exploit IHSIM1; eauto. i. des. unfold ALocal.next_eid in *. *)
-  (*       assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None) *)
-  (*         by (ii; congr). *)
-  (*       rewrite List.nth_error_Some in H. lia. *)
-  (*     * exploit IHSIM1; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. inv ASTEP. *)
-  (*       inv LOCAL; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + des_ifs; eauto. *)
-  (*     * (* destruct eu1. destruct eu2. *) *)
-  (*       (* destruct aeu. destruct aeu2. ss. *) *)
-  (*       (* inv STATE. inv STEP. inv STATE; ss. *) *)
-  (*       (* inv ASTEP. inv LOCAL; ss. *) *)
-  (*       (* rewrite Nat.eqb_eq in Heq. subst. *) *)
-  (*       admit. *)
-  (*     * exploit IHSIM1; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. inv ASTEP. *)
-  (*       inv LOCAL; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + exploit IHSIM1; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. inv ASTEP. *)
-  (*     inv LOCAL; ss; inv ALOCAL; esplits; eauto. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-  (*     * rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. *)
-Admitted.
+  ii. rewrite CO in *. inv CO0.
+  destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+  generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
+  generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
+  exploit sim_trace_vext_cov; try exact REL6. i. des.
+  exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
+  exploit x2; eauto. i. des.
+  exploit x5; eauto. i. des.
+  unfold v_gen. ss. rewrite <- H4. rewrite <- H10.
+  rewrite x0. rewrite x4. auto.
+Qed.
 
 Lemma sim_traces_valid_thread
       p mem trs atrs ws rs covs vexts
