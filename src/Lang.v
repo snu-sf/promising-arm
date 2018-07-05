@@ -11,6 +11,21 @@ Require Import Order.
 Set Implicit Arguments.
 
 
+Inductive archT :=
+| armv8
+| riscv
+.
+
+Program Instance archT_eqdec: EqDec archT eq.
+Next Obligation.
+  destruct x, y;
+    (try by left);
+    (try by right; i; ss).
+Defined.
+
+(* The architecture is given as a parameter. *)
+Parameter arch: archT.
+
 Module Val.
   Include Z.
 

@@ -930,7 +930,7 @@ Proof.
           rewrite VIEW1 in TS. inv TS.
           apply Bool.andb_false_iff in X. des.
           { unfold Time.t in *. destruct (equiv_dec (S n) (S n)); ss. congr. }
-          apply Bool.orb_false_iff in X. des. destruct ex0; ss. apply Bool.negb_false_iff in X0.
+          apply Bool.negb_false_iff, Bool.andb_true_iff in X. des. destruct ex0; ss.
           inv WRITE. inv WRITE0. apply Label.is_writing_inv in LABEL1. des. subst.
           rewrite EID in LABEL0. inv LABEL0.
           exploit EX0; eauto. clear EX0. intro Y. inv Y. rewrite EID in EID0. inv EID0.
@@ -939,7 +939,9 @@ Proof.
           { econs; eauto. econs; eauto. }
           econs. splits.
           * econs; eauto.
-          * econs; eauto.
+          * econs; eauto. apply Bool.orb_true_iff in X0. des.
+            { destruct (equiv_dec arch riscv); ss. inv e. left. ss. }
+            right. econs; eauto.
       - (* fwdbank = None *)
         i. eapply view_of_eid_ob; eauto.
         destruct eid2. destruct (t == tid); cycle 1.

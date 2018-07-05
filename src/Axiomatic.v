@@ -720,7 +720,7 @@ Module Execution.
       (⦗ex.(label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾ po ⨾ ⦗ex.(label_is) Label.is_read⦘))).
 
   Definition aob (ex:t): relation eidT :=
-    ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗ex.(label_is) Label.is_acquire_pc⦘.
+    ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗fun eid => arch = riscv \/ ex.(label_is) Label.is_acquire_pc eid⦘.
 
   Definition bob (ex:t): relation eidT :=
     (⦗ex.(label_is) Label.is_read⦘ ⨾
@@ -1242,6 +1242,7 @@ Module Valid.
     - etrans; eauto. eapply ctrl_is_po; eauto.
     - etrans; eauto. etrans; eauto. eapply addr_is_po; eauto.
     - exploit RF2; eauto. i. des. congr.
+    - exploit RF2; eauto. i. des. congr.
   Qed.
 
   Lemma ob_barrier_ob
@@ -1270,7 +1271,8 @@ Module Valid.
     - inv H0.
       + eapply data_label in H1; eauto. des. inv EID2. destruct l; ss. congr.
       + inv H. exploit RF2; eauto. i. des. congr.
-    - right. left. right. econs. splits; [|by etrans; eauto]. econs; eauto.
+    - exploit RF2; eauto. i. des. congr.
+    - right. left. right. econs. splits; [by econs; eauto|]. etrans; eauto.
   Qed.
 
   Lemma ob_label
