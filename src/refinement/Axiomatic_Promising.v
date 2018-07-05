@@ -297,7 +297,8 @@ Proof.
   - inv H1. splits.
     + econs 2; [econs|].
       { right. eauto. }
-      exploit EX.(Valid.RF2); eauto. i. des.
+      exploit EX.(Valid.RF2'); eauto. i. des.
+      rewrite EID0 in WRITE. inv WRITE.
       econs. left. left. left. econs; eauto.
     + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
 Qed.
@@ -978,7 +979,8 @@ Proof.
           - eapply view_of_eid_ob; eauto. left. left. left. right. eauto.
         }
         { inv H1.
-          exploit EX.(Valid.RF2); eauto. i. des.
+          exploit EX.(Valid.RF2'); eauto. i. des.
+          rewrite EID in WRITE. inv WRITE.
           exploit Valid.coherence_rr; try exact H0; eauto.
           all: try by econs; eauto; eauto using Label.write_is_writing, Label.read_is_reading.
           i. des.
@@ -1179,7 +1181,8 @@ Proof.
           - econs; eauto. apply Label.write_is_writing.
         }
         { inv H1.
-          exploit EX.(Valid.RF2); eauto. i. des.
+          exploit EX.(Valid.RF2'); eauto. i. des.
+          rewrite EID in WRITE. inv WRITE.
           exploit Valid.coherence_rw; try exact H0; eauto.
           all: try by econs; eauto; eauto using Label.write_is_writing, Label.read_is_reading.
           i. eapply view_of_eid_ob_write; eauto.

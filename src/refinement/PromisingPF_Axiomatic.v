@@ -298,6 +298,7 @@ Proof.
     + econs 2; [econs|].
       { right. eauto. }
       exploit EX.(Valid.RF2); eauto. i. des.
+      rewrite EID0 in WRITE. inv WRITE.
       econs. left. left. left. econs; eauto.
     + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
 Qed.
@@ -1300,7 +1301,7 @@ Lemma sim_traces_valid_co
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
-      (RF2': Valid.rf2' ex)
+      (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
              (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
@@ -1326,7 +1327,7 @@ Lemma sim_traces_valid_thread
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
-      (RF2': Valid.rf2' ex)
+      (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
              (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
@@ -1415,7 +1416,7 @@ Lemma sim_traces_valid
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
-      (RF2': Valid.rf2' ex)
+      (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
              (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
@@ -1444,7 +1445,7 @@ Lemma promising_pf_valid
     <<CO1: Valid.co1 ex>> /\
     <<CO2: Valid.co2 ex>> /\
     <<RF1: Valid.rf1 ex>> /\
-    <<RF2': Valid.rf2' ex>> /\
+    <<RF2: Valid.rf2 ex>> /\
     <<RF_WF: Valid.rf_wf ex>> /\
     <<INTERNAL:
       forall eid1 eid2 (INTERNAL: ex.(Execution.internal) eid1 eid2),
@@ -1507,7 +1508,7 @@ Theorem promising_pf_to_axiomatic
                m.(Machine.tpool) EX.(Valid.aeus)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
-  exists ex. eexists (Valid.mk_ex PRE CO1 CO2 RF1 (Valid.rf2'_rf2 RF2') RF2' RF_WF _ _ ATOMIC).
+  exists ex. eexists (Valid.mk_ex PRE CO1 CO2 RF1 RF2 RF_WF _ _ ATOMIC).
   s. esplits; eauto.
   ii. inv H. specialize (STATE tid). inv STATE; try congr.
   rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
