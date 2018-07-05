@@ -1410,61 +1410,6 @@ Lemma sim_traces_valid_thread
 Proof.
 Admitted.
 
-Lemma internal_rw
-      p ex
-      eid1 eid2
-      (PRE: Valid.pre_ex p ex)
-      (CO1: Valid.co1 ex)
-      (CO2: Valid.co2 ex)
-      (RF1: Valid.rf1 ex)
-      (RF2: Valid.rf2 ex)
-      (RF_WF: Valid.rf_wf ex)
-      (INTERNAL: ex.(Execution.internal) eid1 eid2):
-  <<EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1>> /\
-  <<EID2: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid2>>.
-Proof.
-Admitted.
-  
-
-Lemma internal_read_read_po
-      p ex
-      eid1 eid2
-      (PRE: Valid.pre_ex p ex)
-      (CO1: Valid.co1 ex)
-      (CO2: Valid.co2 ex)
-      (RF1: Valid.rf1 ex)
-      (RF2: Valid.rf2 ex)
-      (RF_WF: Valid.rf_wf ex)
-      (INTERNAL: ex.(Execution.internal) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_read eid1)
-      (EID2: ex.(Execution.label_is) Label.is_read eid2):
-  Execution.po eid1 eid2.
-Proof.
-Admitted.
-
-Lemma ob_read_read_po
-      p ex
-      eid1 eid2
-      (PRE: Valid.pre_ex p ex)
-      (CO1: Valid.co1 ex)
-      (CO2: Valid.co2 ex)
-      (RF1: Valid.rf1 ex)
-      (RF2: Valid.rf2 ex)
-      (RF_WF: Valid.rf_wf ex)
-      (OB: ex.(Execution.ob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_read eid1)
-      (EID2: ex.(Execution.label_is) Label.is_read eid2):
-  Execution.po eid1 eid2.
-Proof.
-Admitted.
-
-Lemma join_rw
-      l
-      (RW: join Label.is_read Label.is_write l):
-  Label.is_read l \/ Label.is_write l.
-Proof.
-Admitted.
-
 Lemma sim_traces_valid
       p mem trs atrs ws rs covs vexts
       m ex
@@ -1559,11 +1504,11 @@ Proof.
   esplits; eauto.
   - i. induction INTERNAL0.
     + exploit INTERNAL; eauto. i. des; eauto.
-      { exploit internal_rw; eauto. i. des.
+      { exploit Valid.internal_rw; eauto. i. des.
         inversion EID1. inversion EID2.
-        exploit join_rw; try exact LABEL0. i. des.
-        - exploit join_rw; try exact LABEL. i. des.
-          + exploit internal_read_read_po; eauto. i.
+        exploit Label.join_rw; try exact LABEL0. i. des.
+        - exploit Label.join_rw; try exact LABEL. i. des.
+          + exploit Valid.internal_read_read_po; eauto. i.
             right. left. splits; eauto.
           + right. right. split; eauto.
         - inversion x1. rewrite EID0 in EID3. inversion EID3.
@@ -1586,7 +1531,7 @@ Proof.
     + inversion H. inversion H1.
       exploit EXTERNAL; eauto. i. des; eauto.
       { destruct l1.
-        - exploit ob_read_read_po; eauto. i.
+        - exploit Valid.ob_read_read_po; eauto. i.
           right. left. splits; eauto.
         - right. right. splits; eauto.
         - inv LABEL1. }
