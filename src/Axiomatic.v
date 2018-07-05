@@ -1018,9 +1018,9 @@ Module Valid.
         p exec
         eid1 eid2
         (PRE: pre_ex p exec)
-        (CTRL: exec.(Execution.addr) eid1 eid2)
-        (EID1: Execution.label eid1 exec = None):
-    False.
+        (ADDR: exec.(Execution.addr) eid1 eid2):
+    exists ex ord loc val,
+      Execution.label eid1 exec = Some (Label.read ex ord loc val).
   Proof.
   Admitted.
 
@@ -1028,9 +1028,9 @@ Module Valid.
         p exec
         eid1 eid2
         (PRE: pre_ex p exec)
-        (CTRL: exec.(Execution.data) eid1 eid2)
-        (EID1: Execution.label eid1 exec = None):
-    False.
+        (DATA: exec.(Execution.data) eid1 eid2):
+    exists ex ord loc val,
+      Execution.label eid1 exec = Some (Label.read ex ord loc val).
   Proof.
   Admitted.
 
@@ -1038,9 +1038,9 @@ Module Valid.
         p exec
         eid1 eid2
         (PRE: pre_ex p exec)
-        (CTRL: exec.(Execution.ctrl) eid1 eid2)
-        (EID1: Execution.label eid1 exec = None):
-    False.
+        (CTRL: exec.(Execution.ctrl) eid1 eid2):
+    exists ex ord loc val,
+      Execution.label eid1 exec = Some (Label.read ex ord loc val).
   Proof.
   Admitted.
 
@@ -1155,12 +1155,12 @@ Module Valid.
     - exploit RF2; eauto. i. des. congr.
     - congr.
     - exploit CO2; eauto. i. des. congr.
-    - eapply addr_label; eauto.
-    - eapply data_label; eauto.
-    - eapply ctrl_label; eauto.
-    - eapply addr_label; eauto.
-    - eapply ctrl_label; eauto.
-    - eapply addr_label; eauto.
+    - exploit addr_label; eauto. i. des. congr.
+    - exploit data_label; eauto. i. des. congr.
+    - exploit ctrl_label; eauto. i. des. congr.
+    - exploit addr_label; eauto. i. des. congr.
+    - exploit ctrl_label; eauto. i. des. congr.
+    - exploit addr_label; eauto. i. des. congr.
     - exploit RF2; eauto. i. des. congr.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
     - exploit po_label_pre; try exact EID0; eauto. i. des. congr.
