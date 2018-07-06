@@ -1574,6 +1574,7 @@ Module Valid.
     - rewrite <- H0. eapply addr_is_po; eauto.
     - rewrite <- H2. eapply ctrl_is_po; eauto.
     - rewrite <- H2, <- H0. eapply addr_is_po; eauto.
+    - revert H0. unfold ifc. condtac; ss. eapply rmw_spec. eauto.
   Qed.
 End Valid.
 

@@ -304,13 +304,14 @@ Proof.
 Qed.
 
 Definition sim_local_vrp ex :=
-  (Execution.po ⨾
-   ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-   Execution.po) ∪
-
   (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
    Execution.po ⨾
-   ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
+   ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rr)⦘ ⨾
+   Execution.po) ∪
+
+  (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
+   Execution.po ⨾
+   ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘ ⨾
    Execution.po) ∪
 
   ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
@@ -323,12 +324,13 @@ Definition sim_local_vrp ex :=
 Lemma sim_local_vrp_step ex:
   sim_local_vrp ex =
   (sim_local_vrp ex ∪
-   ((Execution.po ⨾
-    ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘) ∪
-
-    (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
+   ((⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
      Execution.po ⨾
-     ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘) ∪
+     ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rr)⦘) ∪
+
+   (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
+     Execution.po ⨾
+     ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘) ∪
 
     ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
      ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘) ∪
@@ -362,27 +364,30 @@ Proof.
   repeat match goal with
          | [H: (_ ∪ _) _ _ |- _] => inv H
          end.
-  - right. left. left. left. left. left. ss.
-  - right. left. left. left. right. ss.
+  - right. left. left. left. left. left. left. left.
+    inv H. des. econs. splits; eauto.
+    rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
+    rewrite <- ? seq_assoc. ss.
+  - right. left. left. left. left. left. right.
+    inv H. des. econs. splits; eauto.
+    rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
+    rewrite <- ? seq_assoc. ss.
   - left. left. right. right.
     inv H0. des. econs. splits; eauto.
     right. rewrite seq_assoc. econs. splits; eauto. econs; ss. econs; eauto.
-  - right. left. left. right. ss.
+  - right. left. left. right.
+    inv H. des. econs. splits; eauto.
 Qed.
 
 Definition sim_local_vwp ex :=
-  (Execution.po ⨾
-   ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘ ⨾
-   Execution.po) ∪
-
   (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
    Execution.po ⨾
-   ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘ ⨾
+   ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rw)⦘ ⨾
    Execution.po) ∪
 
   (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
    Execution.po ⨾
-   ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbst))⦘ ⨾
+   ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_ww)⦘ ⨾
    Execution.po) ∪
 
   (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘ ⨾
@@ -391,22 +396,19 @@ Definition sim_local_vwp ex :=
 Lemma sim_local_vwp_step ex:
   sim_local_vwp ex =
   (sim_local_vwp ex ∪
-   ((Execution.po ⨾
-     ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbsy))⦘) ∪
-
-    (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
+   ((⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
      Execution.po ⨾
-     ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbld))⦘) ∪
+     ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rw)⦘) ∪
 
-    (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
+   (⦗ex.(Execution.label_is) Label.is_write⦘ ⨾
      Execution.po ⨾
-     ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.dmbst))⦘) ∪
+     ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_ww)⦘) ∪
 
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
   Execution.po_adj.
 Proof.
   unfold sim_local_vwp. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
-  rewrite Execution.po_po_adj at 2 4 6 7.
+  rewrite Execution.po_po_adj at 2 4 5.
   rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
   funext. i. funext. i. propext. econs; i.
@@ -418,6 +420,29 @@ Proof.
            | [H: (_ ∪ _) _ _ |- _] => inv H
            end;
       eauto 10 using union_l, union_r.
+Qed.
+
+Lemma sim_local_vwp_spec
+      p ex eid1 eid2
+      (EX: Valid.ex p ex)
+      (EID2: Execution.label_is ex Label.is_write eid2)
+      (VWP: sim_local_vwp ex eid1 eid2):
+  <<OB: ex.(Execution.ob) eid1 eid2>>.
+Proof.
+  inv EID2. destruct l; inv LABEL. unfold sim_local_vwp in VWP.
+  repeat match goal with
+         | [H: (_ ∪ _) _ _ |- _] => inv H
+         end.
+  - right. left. left. left. left. left. left. right.
+    inv H0. des. econs. splits; eauto.
+    rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
+    rewrite <- ? seq_assoc. ss.
+  - right. left. left. left. left. right.
+    inv H0. des. econs. splits; eauto.
+    rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
+    rewrite <- ? seq_assoc. ss.
+  - right. left. left. right.
+    inv H. des. econs. splits; eauto.
 Qed.
 
 Definition sim_local_vrm ex :=
@@ -495,8 +520,8 @@ Lemma sim_local_vrel_spec
   <<OB: ex.(Execution.ob) eid1 eid2>>.
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vrel in VREL.
-  - right. left. left. left. left. right.
-    rewrite seq_assoc. econs. splits; eauto. econs; eauto.
+  right. left. left. left. right.
+  rewrite seq_assoc. econs. splits; eauto. econs; eauto.
 Qed.
 
 Inductive sim_local_fwd ex (loc:Loc.t) (eid1 eid2:eidT): Prop :=
@@ -658,13 +683,17 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)
       end;
   EXBANK: opt_rel
-            (fun aexbank lts =>
-               ex.(Execution.label_is) (Label.is_reading lts.(fst)) (tid, aexbank) /\
-               (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v lts.(snd)) /\
+            (fun aeb eb =>
+               ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\
+               (forall eid v, ex.(Execution.rf) eid (tid, aeb) -> view_of_eid ex ob eid = Some v -> le v eb.(Exbank.ts)) /\
                sim_view
                  ex ob
-                 (inverse ex.(Execution.rf) (eq (tid, aexbank)))
-                 lts.(snd))
+                 (inverse ex.(Execution.rf) (eq (tid, aeb)))
+                 eb.(Exbank.ts) /\
+               sim_view
+                 ex ob
+                 (eq (tid, aeb))
+                 eb.(Exbank.view).(View.ts))
             alocal.(ALocal.exbank) local.(Local.exbank);
   PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
       exists n,
