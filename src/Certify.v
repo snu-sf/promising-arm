@@ -201,7 +201,7 @@ Module AExecUnit.
       (init_view lc.(Local.vwm))
       (View.mk lc.(Local.vcap).(View.ts)
                (match lc.(Local.exbank) with
-                | Some (loc, _, _) => eq (Taint.R 0 loc 0)
+                | Some eb => eq (Taint.R 0 eb.(Exbank.loc) 0)
                 | None => bot
                 end))
       (init_view lc.(Local.vrel))
@@ -210,7 +210,7 @@ Module AExecUnit.
            (fun fwd => FwdItem.mk fwd.(FwdItem.ts) (init_view fwd.(FwdItem.view)) fwd.(FwdItem.ex))
            (lc.(Local.fwdbank) loc))
       (match lc.(Local.exbank) with
-       | Some (l, tsx, vx) => Some (l, tsx, init_view vx)
+       | Some eb => Some (Exbank.mk eb.(Exbank.loc) eb.(Exbank.ts) (init_view eb.(Exbank.view)))
        | None => None
        end)
       lc.(Local.promises).
@@ -315,7 +315,7 @@ Module AExecUnit.
     - inv LOCAL. econs; ss.
       + i. destruct (Local.fwdbank lc loc) eqn:FWD; inv H. ss.
         exploit FWDBANK; eauto.
-      + i. destruct lc; ss. destruct exbank as [[[]]|]; ss. inv H. eauto.
+      + i. destruct lc; ss. destruct exbank; ss. inv H. eauto.
   Qed.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.

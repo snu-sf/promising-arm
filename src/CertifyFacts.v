@@ -69,7 +69,12 @@ Section Eqts.
       (VCAP: eqts_view lc1.(Local.vcap) lc2.(Local.vcap))
       (VREL: eqts_view lc1.(Local.vrel) lc2.(Local.vrel))
       (FWDBANK: forall loc, opt_rel eqts_fwd (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
-      (EXBANK: lc1.(Local.exbank) = lc2.(Local.exbank))
+      (EXBANK: opt_rel
+                 (fun eb1 eb2 =>
+                    eb1.(Exbank.loc) = eb2.(Exbank.loc) /\
+                    eb1.(Exbank.ts) = eb2.(Exbank.ts) /\
+                    eqts_view eb1.(Exbank.view) eb2.(Exbank.view))
+                 lc1.(Local.exbank) lc2.(Local.exbank))
       (PROMISES: lc1.(Local.promises) = lc2.(Local.promises))
   .
   Hint Constructors eqts_lc.
@@ -194,7 +199,8 @@ Section Eqts.
         * econs; ss.
           { i. rewrite ? fun_add_spec, VAL. condtac; ss. }
           all: repeat (try apply eqts_view_join; try apply eqts_view_ifc; ss).
-          destruct ex0; ss. rewrite VAL. ss.
+          destruct ex0; ss. econs. splits; ss.
+          repeat apply eqts_view_join; eauto using eqts_view_ifc, eqts_view_bot.
     - generalize (eqts_rmap_expr RMAP eloc). intro X. inv X.
       generalize (eqts_rmap_expr RMAP eval). intro X. inv X.
       inv STEP. eexists (ExecUnit.mk _ _ _). splits.
@@ -218,7 +224,12 @@ Section Eqts.
               + inv VWP. ss.
               + inv VRM. destruct (OrdW.ge ord OrdW.release); ss.
               + inv VWM. destruct (OrdW.ge ord OrdW.release); ss.
-            - rewrite VAL, EXBANK. eauto.
+              + rewrite ? View.ts_ifc. destruct ex0; ss. f_equal.
+                exploit EX; eauto. i. des. inv EXBANK; ss. des. rewrite TSX in H5. inv H5.
+                symmetry. apply REL1.
+            - intro X. specialize (EX X). des. inv EXBANK; [congr|]. des.
+              rewrite TSX in H5. inv H5. esplits; eauto. i.
+              destruct a, eb. ss. subst. rewrite VAL. eauto.
           }
           { rewrite MSG. f_equal. f_equal; ss. }
       + econs; ss.
@@ -234,7 +245,7 @@ Section Eqts.
         * econs 4; ss.
         * econs 4; ss.
       + econs; ss.
-        econs; ss. apply eqts_rmap_add; ss.
+        econs; ss. apply eqts_rmap_add; ss. econs; ss.
     - inv STEP. eexists (ExecUnit.mk _ _ _). splits.
       + econs. econs; ss.
         * econs 5; ss.
@@ -281,7 +292,8 @@ Proof.
     rewrite IdMap.map_spec. destruct (IdMap.find id (State.rmap (ExecUnit.state eu))); ss.
     econs. econs; ss.
   - unfold AExecUnit.init_lc, AExecUnit.init_view. econs; ss.
-    i. destruct (Local.fwdbank (ExecUnit.local eu) loc); ss. econs. econs; ss.
+    + i. destruct (Local.fwdbank (ExecUnit.local eu) loc); ss. econs. econs; ss.
+    + destruct (Local.exbank (ExecUnit.local eu)); ss. econs. ss.
 Qed.
 
 Lemma lift_state_step
@@ -394,6 +406,7 @@ Inductive void_lc (tid:Id.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
     (VCAP: void_view lc.(Local.vcap))
     (VREL: void_view lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), void_view fwd.(FwdItem.view))
+    (EXBANK: forall eb (EB: lc.(Local.exbank) = Some eb), void_view eb.(Exbank.view))
 .
 
 Inductive void_aeu (tid:Id.t) (aeu:AExecUnit.t): Prop :=
@@ -493,9 +506,11 @@ Proof.
     i. inv FIND. econs. eauto using void_view_const.
   - unfold AExecUnit.init_lc, AExecUnit.init_view.
     econs; ss; eauto using void_view_const.
-    + econs. econs. s. ii. destruct (Local.exbank (ExecUnit.local eu)) as [[]|] eqn:EX; ss.
+    + econs. econs. s. ii. destruct (Local.exbank (ExecUnit.local eu)) as [[[]]|] eqn:EX; ss.
     + i. revert FWD. destruct (Local.fwdbank (ExecUnit.local eu) l); ss. i. inv FWD.
       eauto using void_view_const.
+    + destruct (Local.exbank (ExecUnit.local eu)); ss. i. inv EB.
+      apply void_view_const.
 Qed.
 
 Lemma void_aeu_step
@@ -527,7 +542,7 @@ Proof.
     { destruct (Local.fwdbank lc1 (ValA.val (sem_expr rmap eloc))) eqn:FWD;
         eauto using void_view_const.
       unfold FwdItem.read_view. condtac; eauto using void_view_const.
-      eapply LC. eauto.
+      inv LC. eapply FWDBANK. eauto.
     }
     econs; ss.
     + apply void_rmap_add; ss. econs. econs. s.
@@ -540,6 +555,8 @@ Proof.
       * destruct ex; ss. apply void_taint_bot.
     + inv LC. econs; s; repeat apply void_view_join;
         eauto 10 using void_view_join, void_view_ifc, void_view_bot, void_rmap_expr.
+      i. destruct ex; eauto. inv EB.
+      eauto 10 using void_view_join, void_view_ifc, void_view_bot, void_rmap_expr.
     + destruct ex; ss.
     + destruct ex; ss.
   - inv STEP. ss.
@@ -550,6 +567,9 @@ Proof.
       all: try (unfold ifc; condtac).
       all: try by apply void_taint_bot.
       all: try by apply LC.
+      destruct (Local.exbank lc1) eqn:EXBANK; cycle 1.
+      { apply void_taint_bot. }
+      destruct ex; ss. exploit EX; eauto. i. des. inv TSX. eapply LC. eauto.
     }
     econs; ss.
     + apply void_rmap_add; ss.
@@ -557,10 +577,11 @@ Proof.
       i. revert FWD. rewrite fun_add_spec. condtac; eauto. i.
       inversion e. inv FWD. s.
       eauto using void_view_join, void_view_bot, void_view_const, void_rmap_expr.
+      i. destruct ex; eauto. ss.
     + apply void_taint_join; ss.
   - inv STEP. econs; ss.
     + apply void_rmap_add; ss. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
-    + inv LC. econs; eauto using void_view_join, void_view_bot, void_rmap_expr.
+    + inv LC. econs; eauto using void_view_join, void_view_bot, void_rmap_expr. ss.
     + eauto using void_taint_join, void_taint_bot.
   - inv STEP. econs; ss.
     inv LC. econs; s; eauto using void_view_join, void_view_bot, void_rmap_expr.

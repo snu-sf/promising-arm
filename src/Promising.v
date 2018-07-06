@@ -215,6 +215,19 @@ Section FwdItem.
 End FwdItem.
 End FwdItem.
 
+Module Exbank.
+Section Exbank.
+  Context `{A: Type, _: orderC A eq}.
+
+  Inductive t := mk {
+    loc: Loc.t;
+    ts: Time.t;
+    view: View.t (A:=A);
+  }.
+  Hint Constructors t.
+End Exbank.
+End Exbank.
+
 Section Eqts.
   Context `{A: Type, B: Type, _: orderC A eq, _: orderC B eq}.
 
@@ -402,7 +415,7 @@ Section Local.
     vcap: View.t (A:=A);
     vrel: View.t (A:=A);
     fwdbank: Loc.t -> option (FwdItem.t (A:=A));
-    exbank: option (Loc.t * Time.t * View.t (A:=A));
+    exbank: option (Exbank.t (A:=A));
     promises: Promises.t;
   }.
   Hint Constructors t.
@@ -473,7 +486,7 @@ Section Local.
               (join lc1.(vcap) view)
               lc1.(vrel)
               lc1.(fwdbank)
-              (if ex then Some (loc, ts, view_ext2) else lc1.(exbank))
+              (if ex then Some (Exbank.mk loc ts view_ext2) else lc1.(exbank))
               lc1.(promises))
   .
   Hint Constructors read.
@@ -492,15 +505,15 @@ Section Local.
                                 ifc (OrdW.ge ord OrdW.release) lc1.(vwm);
                                 ifc (ex && (arch == riscv))
                                     (match lc1.(exbank) with
-                                     | Some (_, _, vx) => vx
+                                     | Some exbank => exbank.(Exbank.view)
                                      | None => bot
                                      end)
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext.(View.ts) ts)
-      (EX: ex -> exists l tsx vx,
-           <<TSX: lc1.(exbank) = Some (l, tsx, vx)>> /\
-           <<EX: l = loc -> Memory.exclusive tid loc tsx ts mem1>>)
+      (EX: ex -> exists eb,
+           <<TSX: lc1.(exbank) = Some eb>> /\
+           <<EX: eb.(Exbank.loc) = loc -> Memory.exclusive tid loc eb.(Exbank.ts) ts mem1>>)
   .
   Hint Constructors writable.
 
@@ -623,7 +636,7 @@ Section Local.
           lc.(fwdbank) loc = Some fwd ->
           fwd.(FwdItem.ts) <= List.length mem /\
           fwd.(FwdItem.view).(View.ts) <= List.length mem)
-      (EXBANK: forall l tsx vx, lc.(exbank) = Some (l, tsx, vx) -> exists val, Memory.read l tsx mem = Some val)
+      (EXBANK: forall eb, lc.(exbank) = Some eb -> exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
                    (MSG: Memory.get_msg ts mem = Some msg)

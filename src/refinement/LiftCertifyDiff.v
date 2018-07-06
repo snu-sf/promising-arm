@@ -62,11 +62,12 @@ Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=Taint.t))): Prop
 .
 Hint Constructors sim_state.
 
-Inductive sim_exbank (tid:Id.t) (mem1 mem2:Memory.t) (lts1 lts2:Loc.t * Time.t): Prop :=
+Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank.t (A:=Taint.t)): Prop :=
 | sim_exbank_intro
-    (LOC: lts1.(fst) = lts2.(fst))
-    (EXBANK: Memory.exclusive tid lts2.(fst) lts2.(snd) (length mem2) mem2 ->
-             Memory.exclusive tid lts1.(fst) lts1.(snd) (length mem1) mem1)
+    (LOC: eb1.(Exbank.loc) = eb2.(Exbank.loc))
+    (EXBANK: Memory.exclusive tid eb2.(Exbank.loc) eb2.(Exbank.ts) (length mem2) mem2 ->
+             Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) (length mem1) mem1)
+    (EBVIEW: sim_view ts eb1.(Exbank.view) eb2.(Exbank.view))
 .
 
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem2:Memory.t): Prop :=
@@ -86,7 +87,7 @@ Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem
               sim_low_view ts fwd1.(FwdItem.view) fwd2.(FwdItem.view) /\
               fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex)))
           (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
-    (EXBANK: opt_rel (sim_exbank tid mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
+    (EXBANK: opt_rel (sim_exbank tid ts mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
     (PROMISES: lc1.(Local.promises) = lc2.(Local.promises))
     (PROMISES_TS: forall mid (FIND: Promises.lookup mid lc1.(Local.promises)), mid <= ts)
 .
@@ -460,10 +461,10 @@ Inductive sound_lc (tid:Id.t) (is_first:Prop) (sd:sound_data) (lc:Local.t (A:=Ta
     (VCAP: sound_view sd lc.(Local.vcap))
     (VREL: sound_view sd lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), sound_view sd fwd.(FwdItem.view))
-    (EXBANK: forall loc ts
+    (EXBANK: forall eb
                (FIRST: is_first)
-               (EXBANK: lc.(Local.exbank) = Some (loc, ts)),
-        loc = sd.(sd_loc) /\ ~ Memory.exclusive tid loc ts (length mem) mem)
+               (EXBANK: lc.(Local.exbank) = Some eb),
+        eb.(Exbank.loc) = sd.(sd_loc) /\ ~ Memory.exclusive tid eb.(Exbank.loc) eb.(Exbank.ts) (length mem) mem)
 .
 
 Inductive sound_aeu (tid:Id.t) (loc:Loc.t) (ids:nat -> Prop) (aeu:AExecUnit.t): Prop :=
@@ -674,6 +675,8 @@ Proof.
       { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
         all: try apply sound_rmap_expr; ss.
         all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
+        - admit.
+        - admit.
       }
       exists ids. econs; ss.
       + eauto using sound_rmap_add.
@@ -703,6 +706,8 @@ Proof.
     { inv WRITABLE. repeat apply sound_taint_join; eauto using sound_taint_bot.
       all: try apply sound_rmap_expr; ss.
       all: destruct (OrdW.ge ord OrdW.release); eauto using sound_taint_bot.
+      - admit.
+      - admit.
     }
     assert (TAINT: sound_taint (sd_mk loc ids aux1.(AExecUnit.ex_counter))
                                ((fun _ => ex) ∩₁ (eq (AExecUnit.taint_write ord (ValA.val (sem_expr rmap eloc)) aux1)))).
@@ -710,8 +715,8 @@ Proof.
       - i. inv TAINT. inv H0.
       - i. inv TAINT. destruct ex; ss. inv H0. splits; ss.
         inv WRITABLE. exploit EX; eauto. clear EX. ii. des.
-        exploit EXBANK; eauto. i. des. subst. specialize (EX eq_refl).
-        apply x0. ii. eapply EX; eauto.
+        exploit EXBANK; eauto. i. des. specialize (EX x).
+        apply x0. ii. eapply EX; eauto. rewrite <- x. ss.
     }
     exists ids. econs; ss.
     - apply sound_rmap_add; ss. apply sound_taint_join; ss.
@@ -781,7 +786,7 @@ Proof.
   destruct eu2 as [st2 lc2 mem2].
   ss. subst. inv CERTIFY.
   exploit sound_rtc_aeu_step; eauto.
-  { instantiate (1 := (fun id => id = 0 /\ exists ts, lc1.(Local.exbank) = Some (msg.(Msg.loc), ts))).
+  { instantiate (1 := (fun id => id = 0 /\ exists ts view, lc1.(Local.exbank) = Some (Exbank.mk msg.(Msg.loc) ts view))).
     instantiate (1 := msg.(Msg.loc)).
     econs; eauto.
     - econs. s. ii. revert FIND.
@@ -792,8 +797,8 @@ Proof.
       + destruct (Local.exbank lc1) as [[]|] eqn:X; ss. econs; ss.
         i. inv TAINT. esplits; ss.
       + i. destruct (Local.fwdbank lc1 l) eqn:FWDL; ss. inv FWD. ss.
-      + ii. des. rewrite EXBANK in FIRST0. inv FIRST0.
-        inv WF. inv LOCAL. ss. exploit EXBANK0; eauto. i. des.
+      + ii. des. rewrite FIRST0 in EXBANK. inv EXBANK. s.
+        inv WF. inv LOCAL. ss. exploit EXBANK; eauto. i. des.
         splits; ss. ii. eapply H; cycle 2.
         { rewrite nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
         { ss. }
