@@ -402,7 +402,7 @@ Section Local.
     vcap: View.t (A:=A);
     vrel: View.t (A:=A);
     fwdbank: Loc.t -> option (FwdItem.t (A:=A));
-    exbank: option (Loc.t * Time.t);
+    exbank: option (Loc.t * Time.t * View.t (A:=A));
     promises: Promises.t;
   }.
   Hint Constructors t.
@@ -473,7 +473,7 @@ Section Local.
               (join lc1.(vcap) view)
               lc1.(vrel)
               lc1.(fwdbank)
-              (if ex then Some (loc, ts) else lc1.(exbank))
+              (if ex then Some (loc, ts, view_ext2) else lc1.(exbank))
               lc1.(promises))
   .
   Hint Constructors read.
@@ -489,12 +489,17 @@ Section Local.
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwp);
                                 ifc (OrdW.ge ord OrdW.release) lc1.(vrm);
-                                ifc (OrdW.ge ord OrdW.release) lc1.(vwm)
+                                ifc (OrdW.ge ord OrdW.release) lc1.(vwm);
+                                ifc (ex && (arch == riscv))
+                                    (match lc1.(exbank) with
+                                     | Some (_, _, vx) => vx
+                                     | None => bot
+                                     end)
                              ])
       (COH: lt (lc1.(coh) loc) ts)
       (EXT: lt view_ext.(View.ts) ts)
-      (EX: ex -> exists l tsx,
-           <<TSX: lc1.(exbank) = Some (l, tsx)>> /\
+      (EX: ex -> exists l tsx vx,
+           <<TSX: lc1.(exbank) = Some (l, tsx, vx)>> /\
            <<EX: l = loc -> Memory.exclusive tid loc tsx ts mem1>>)
   .
   Hint Constructors writable.
@@ -618,7 +623,7 @@ Section Local.
           lc.(fwdbank) loc = Some fwd ->
           fwd.(FwdItem.ts) <= List.length mem /\
           fwd.(FwdItem.view).(View.ts) <= List.length mem)
-      (EXBANK: forall l ts, lc.(exbank) = Some (l, ts) -> exists val, Memory.read l ts mem = Some val)
+      (EXBANK: forall l tsx vx, lc.(exbank) = Some (l, tsx, vx) -> exists val, Memory.read l tsx mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
                    (MSG: Memory.get_msg ts mem = Some msg)

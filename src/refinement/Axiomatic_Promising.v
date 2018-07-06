@@ -364,18 +364,18 @@ Proof.
   repeat match goal with
          | [H: (_ ∪ _) _ _ |- _] => inv H
          end.
-  - right. left. left. left. left. left. left.
+  - right. left. left. left. left. left. left. left.
     inv H. des. econs. splits; eauto.
     rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
     rewrite <- ? seq_assoc. ss.
-  - right. left. left. left. left. right.
+  - right. left. left. left. left. left. right.
     inv H. des. econs. splits; eauto.
     rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
     rewrite <- ? seq_assoc. ss.
   - left. left. right. right.
     inv H0. des. econs. splits; eauto.
     right. rewrite seq_assoc. econs. splits; eauto. econs; ss. econs; eauto.
-  - right. left. right.
+  - right. left. left. right.
     inv H. des. econs. splits; eauto.
 Qed.
 
@@ -433,15 +433,15 @@ Proof.
   repeat match goal with
          | [H: (_ ∪ _) _ _ |- _] => inv H
          end.
-  - right. left. left. left. left. left. right.
+  - right. left. left. left. left. left. left. right.
     inv H0. des. econs. splits; eauto.
     rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
     rewrite <- ? seq_assoc. ss.
-  - right. left. left. left. right.
+  - right. left. left. left. left. right.
     inv H0. des. econs. splits; eauto.
     rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
     rewrite <- ? seq_assoc. ss.
-  - right. left. right.
+  - right. left. left. right.
     inv H. des. econs. splits; eauto.
 Qed.
 
@@ -520,7 +520,7 @@ Lemma sim_local_vrel_spec
   <<OB: ex.(Execution.ob) eid1 eid2>>.
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vrel in VREL.
-  right. left. left. right.
+  right. left. left. left. right.
   rewrite seq_assoc. econs. splits; eauto. econs; eauto.
 Qed.
 
@@ -683,13 +683,18 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)
       end;
   EXBANK: opt_rel
-            (fun aexbank lts =>
-               ex.(Execution.label_is) (Label.is_reading lts.(fst)) (tid, aexbank) /\
-               (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v lts.(snd)) /\
+            (fun aexbank exbank =>
+               let '(l, tsx, vx) := (exbank: Loc.t * Time.t * (View.t (A:=unit))) in
+               ex.(Execution.label_is) (Label.is_reading l) (tid, aexbank) /\
+               (forall eid v, ex.(Execution.rf) eid (tid, aexbank) -> view_of_eid ex ob eid = Some v -> le v tsx) /\
                sim_view
                  ex ob
                  (inverse ex.(Execution.rf) (eq (tid, aexbank)))
-                 lts.(snd))
+                 tsx /\
+               sim_view
+                 ex ob
+                 (eq (tid, aexbank))
+                 vx.(View.ts))
             alocal.(ALocal.exbank) local.(Local.exbank);
   PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
       exists n,
@@ -1162,6 +1167,7 @@ Proof.
           econs. splits; eauto.
           - econs; eauto. apply Label.read_is_reading.
           - i. contradict RF. econs. eauto.
+          - admit.
         }
         exploit MSG; [lia|]. i. des.
         exploit EX.(Valid.RF1); eauto. i. des.
@@ -1173,6 +1179,7 @@ Proof.
           rewrite VIEW1 in H0. inv H0. refl.
         }
         { econs 2; eauto. refl. }
+        { admit. }
       * (* sim_local promises *)
         i. exploit SIM_LOCAL.(PROMISES); eauto. i. des.
         esplits; cycle 1; eauto.
@@ -1258,7 +1265,7 @@ Proof.
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - inv REL. des. inv H.
-            right. right. econs. splits; eauto. econs; eauto.
+            right. left. right. econs. splits; eauto. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
         { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
@@ -1268,15 +1275,16 @@ Proof.
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - inv REL. des. inv H.
-            right. right. econs. splits; eauto. econs; eauto.
+            right. left. right. econs. splits; eauto. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
+        { admit. }
         { apply bot_spec. }
       * (* exclusive *)
         i. specialize (EX0 H). des. inv EX1.
         apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
         generalize (SIM_LOCAL.(EXBANK)). rewrite EX0. intro X. inv X. des.
-        destruct b. esplits; eauto. i. subst.
+        destruct b as [[]]. esplits; eauto. i. subst.
         exploit List.nth_error_Some. rewrite H1. intros [X _]. exploit X; ss. clear X. intro X.
         exploit LABEL.
         { rewrite List.nth_error_app1; eauto. }
@@ -1577,7 +1585,7 @@ Proof.
     + econs; ss.
       inv SIM_LOCAL; econs; eauto. s.
       apply sim_view_join; ss. econs. ss.
-Qed.
+Admitted.
 
 Lemma sim_eu_rtc_step
       p ex ob tid aeu1 eu1 aeu2

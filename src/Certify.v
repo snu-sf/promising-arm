@@ -201,7 +201,7 @@ Module AExecUnit.
       (init_view lc.(Local.vwm))
       (View.mk lc.(Local.vcap).(View.ts)
                (match lc.(Local.exbank) with
-                | Some (loc, _) => eq (Taint.R 0 loc 0)
+                | Some (loc, _, _) => eq (Taint.R 0 loc 0)
                 | None => bot
                 end))
       (init_view lc.(Local.vrel))
@@ -209,7 +209,10 @@ Module AExecUnit.
          option_map
            (fun fwd => FwdItem.mk fwd.(FwdItem.ts) (init_view fwd.(FwdItem.view)) fwd.(FwdItem.ex))
            (lc.(Local.fwdbank) loc))
-      lc.(Local.exbank)
+      (match lc.(Local.exbank) with
+       | Some (l, tsx, vx) => Some (l, tsx, init_view vx)
+       | None => None
+       end)
       lc.(Local.promises).
 
   Definition init_aux: aux_t := mk_aux 0 (fun _ => 0) bot bot.
@@ -309,9 +312,10 @@ Module AExecUnit.
     - inv STATE. econs. i. specialize (RMAP r). revert RMAP.
       unfold RMap.find, init_rmap. rewrite IdMap.map_spec.
       destruct (IdMap.find r (State.rmap st)); ss.
-    - inv LOCAL. econs; ss. i.
-      destruct (Local.fwdbank lc loc) eqn:FWD; inv H. ss.
-      exploit FWDBANK; eauto.
+    - inv LOCAL. econs; ss.
+      + i. destruct (Local.fwdbank lc loc) eqn:FWD; inv H. ss.
+        exploit FWDBANK; eauto.
+      + i. destruct lc; ss. destruct exbank as [[[]]|]; ss. inv H. eauto.
   Qed.
 End AExecUnit.
 Coercion AExecUnit.eu: AExecUnit.t >-> ExecUnit.t.
