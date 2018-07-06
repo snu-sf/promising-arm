@@ -1395,6 +1395,7 @@ Module Valid.
         (RF1: rf1 ex)
         (RF2: rf2 ex)
         (RF_WF: rf_wf ex)
+        (INTERNAL: acyclic ex.(Execution.internal))
         (OB: ex.(Execution.ob) eid1 eid2)
         (EID1: ex.(Execution.label_is) Label.is_read eid1)
         (EID2: ex.(Execution.label_is) Label.is_read eid2):
@@ -1407,14 +1408,44 @@ Module Valid.
     all: try by exploit CO2; eauto; i; des; congr.
     - inv H0. rewrite EID0 in EID1. inv EID1. inv LABEL1.
     - exploit addr_is_po; eauto. i. inv H0; ss. etrans; eauto.
-      admit. (* rfi -> po *)
+      cut (Execution.po x eid2 \/ Execution.po eid2 x).
+      { i. inv H. des; auto.
+        exfalso. eapply INTERNAL. econs 2.
+        - econs. right. eauto.
+        - exploit RF2; eauto. i. des.
+          econs. repeat left. repeat (econs; eauto); ss.
+          + instantiate (1 := loc1).
+            unfold equiv_dec. unfold Z_eqdec. unfold proj_sumbool.
+            des_ifs; ss.
+          + unfold equiv_dec. unfold Z_eqdec. unfold proj_sumbool.
+            des_ifs; ss. }
+      inv H. inv H2. destruct x as [t1 e1], eid2 as [t2 e2]. ss.
+      exploit RF2; eauto. i. des.
+      generalize (Nat.lt_trichotomy e1 e2). i. des; try congr.
+      + left. econs; eauto.
+      + right. econs; eauto.
     - exploit data_is_po; eauto. i. inv H0; ss. etrans; eauto.
-      admit. (* rfi -> po *)
+      cut (Execution.po x eid2 \/ Execution.po eid2 x).
+      { i. inv H. des; auto.
+        exfalso. eapply INTERNAL. econs 2.
+        - econs. right. eauto.
+        - exploit RF2; eauto. i. des.
+          econs. repeat left. repeat (econs; eauto); ss.
+          + instantiate (1 := loc1).
+            unfold equiv_dec. unfold Z_eqdec. unfold proj_sumbool.
+            des_ifs; ss.
+          + unfold equiv_dec. unfold Z_eqdec. unfold proj_sumbool.
+            des_ifs; ss. }
+      inv H. inv H2. destruct x as [t1 e1], eid2 as [t2 e2]. ss.
+      exploit RF2; eauto. i. des.
+      generalize (Nat.lt_trichotomy e1 e2). i. des; try congr.
+      + left. econs; eauto.
+      + right. econs; eauto.
     - eapply ctrl_is_po; eauto.
     - rewrite <- H0. eapply addr_is_po; eauto.
     - rewrite <- H2. eapply ctrl_is_po; eauto.
     - rewrite <- H2, <- H0. eapply addr_is_po; eauto.
-  Admitted.
+  Qed.
 End Valid.
 
 Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.

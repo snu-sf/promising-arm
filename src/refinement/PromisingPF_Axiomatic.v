@@ -1543,6 +1543,25 @@ Lemma sim_traces_valid
 Proof.
 Admitted.
 
+Lemma internal_acyclic
+      ex cov
+      (INTERNAL: forall eid1 eid2 (INTERNAL: ex.(Execution.internal)⁺ eid1 eid2),
+          Time.lt (cov eid1) (cov eid2) \/
+          (Time.le (cov eid1) (cov eid2) /\
+           Execution.po eid1 eid2 /\
+           ex.(Execution.label_is) Label.is_read eid1 /\
+           ex.(Execution.label_is) Label.is_read eid2) \/
+          (Time.le (cov eid1) (cov eid2) /\
+           ex.(Execution.label_is) Label.is_write eid1 /\
+           ex.(Execution.label_is) Label.is_read eid2)):
+  acyclic ex.(Execution.internal).
+Proof.
+  ii. exploit INTERNAL; eauto. i. des.
+  - inv x0; lia.
+  - inv x1. lia.
+  - inv x1. inv x2. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
+Qed.
+
 Lemma promising_pf_valid
       p m
       (STEP: Machine.pf_exec p m):
@@ -1599,8 +1618,16 @@ Proof.
   replace (co_gen ws) with (ex'.(Execution.co)) in CO1, CO2;[|subst; ss].
   replace (rf_gen ws rs) with (ex'.(Execution.rf)) in RF1, RF2, RF_WF; [|subst; ss].
   exploit sim_traces_valid; eauto; try by (subst; ss). i. des.
-  esplits; eauto.
-  - i. induction INTERNAL0.
+  assert (INTERNAL': forall eid1 eid2 (INTERNAL: ex'.(Execution.internal)⁺ eid1 eid2),
+             Time.lt (v_gen covs eid1) (v_gen covs eid2) \/
+             (Time.le (v_gen covs eid1) (v_gen covs eid2) /\
+              Execution.po eid1 eid2 /\
+              ex'.(Execution.label_is) Label.is_read eid1 /\
+              ex'.(Execution.label_is) Label.is_read eid2) \/
+             (Time.le (v_gen covs eid1) (v_gen covs eid2) /\
+              ex'.(Execution.label_is) Label.is_write eid1 /\
+              ex'.(Execution.label_is) Label.is_read eid2)).
+  { i. induction INTERNAL0.
     + exploit INTERNAL; eauto. i. des; eauto.
       { exploit Valid.internal_rw; eauto. i. des.
         inversion EID1. inversion EID2.
@@ -1624,8 +1651,10 @@ Proof.
         destruct l0; ss; congr.
       * inversion IHINTERNAL0_5. inversion IHINTERNAL0_0.
         rewrite EID in EID0. inversion EID0. rewrite H0 in *.
-        destruct l0; ss; congr.
-  - i. induction OB.
+        destruct l0; ss; congr. }
+  esplits; eauto.
+  - generalize (internal_acyclic _ INTERNAL'). intro ACYCLIC.
+    clear INTERNAL'. i. induction OB.
     + inversion H. inversion H1.
       exploit EXTERNAL; eauto. i. des; eauto.
       { destruct l1.
@@ -1686,9 +1715,6 @@ Grab Existential Variables.
 }
 { (* internal *)
   clear - INTERNAL.
-  ii. exploit INTERNAL; eauto. i. des.
-  - inv x0; lia.
-  - inv x1. lia.
-  - inv x1. inv x2. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
+  eapply internal_acyclic. auto.
 }
 Qed.
