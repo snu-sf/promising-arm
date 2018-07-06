@@ -1288,14 +1288,16 @@ Proof.
         }          
         { apply bot_spec. }
       * (* exclusive *)
-        i. specialize (EX0 H). des. inv EX1.
-        apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
+        i. specialize (EX0 H). des. inv EX1. des.
+        destruct a; ss. destruct ex0; ss. symmetry in H1.
         generalize (SIM_LOCAL.(EXBANK)). rewrite EX0. intro X. inv X. des.
+        inv REL. apply Label.is_reading_inv in LABEL0. des. subst.
         esplits; eauto. i. subst.
         exploit List.nth_error_Some. rewrite H1. intros [X _]. exploit X; ss. clear X. intro X.
         exploit LABEL.
         { rewrite List.nth_error_app1; eauto. }
         intro LABEL_READ. destruct ex1; ss.
+        rewrite EID in LABEL_READ. inv LABEL_READ.
         ii. exploit in_mem_of_ex; swap 1 2; eauto.
         { eapply Permutation_NoDup; [by symmetry; eauto|].
           eapply Execution.eids_spec; eauto.
@@ -1324,7 +1326,7 @@ Proof.
             - econs.
               + right. econs; cycle 1.
                 * econs; eauto. econs; eauto.
-                * econs; eauto. rewrite VAL.
+                * econs; eauto. rewrite H0.
                   econs; eauto using Label.read_is_accessing, Label.write_is_accessing.
               + econs. s. congr.
             - econs; eauto.
@@ -1332,7 +1334,7 @@ Proof.
           { apply RMW. econs; eauto. right. econs; eauto. }
         }
 
-        inv EID. exploit REL0; eauto. i.
+        inv EID0. exploit REL0; eauto. i.
         replace v with b.(Exbank.ts) in * by (apply Time.le_antisymm; ss).
 
         exploit Valid.rf_inv_write; eauto. i. des.

@@ -191,7 +191,7 @@ Module ALocal.
       (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 bot))
       (EX: ex -> exists n,
            alocal1.(exbank) = Some n /\
-           opt_pred (Label.is_reading vloc.(ValA.val)) (List.nth_error alocal1.(labels) n))
+           opt_pred (fun l => Label.is_read l /\ Label.is_ex l) (List.nth_error alocal1.(labels) n))
       (ALOCAL: alocal2 =
                mk
                  (alocal1.(labels) ++ [Label.write ex ord vloc.(ValA.val) vval.(ValA.val)])
@@ -308,6 +308,10 @@ Module AExecUnit.
             <<LABEL1: List.nth_error aeu.(local).(ALocal.labels) a = Some (Label.read true ord1 loc1 val1)>> /\
             <<LABEL2: List.nth_error aeu.(local).(ALocal.labels) b = Some (Label.write true ord2 loc2 val2)>> /\
             <<BETWEEN: forall c ord3 loc3 val3 (C: a < c < b), List.nth_error aeu.(local).(ALocal.labels)c <> Some (Label.read true ord3 loc3 val3)>>)
+      (EXBANK: forall eb c ord3 loc3 val3
+                 (EB: aeu.(local).(ALocal.exbank) = Some eb)
+                 (C: eb < c),
+          List.nth_error aeu.(local).(ALocal.labels) c <> Some (Label.read true ord3 loc3 val3))
   .
   Hint Constructors wf.
 
@@ -450,6 +454,15 @@ Module AExecUnit.
           { apply nth_error_singleton_inv in LABEL0. des. congr. }
         * i. exploit RMW2; eauto. i. des. esplits; eauto using nth_error_app_mon.
           i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr.
+        * ii. apply nth_error_app_inv in H. des.
+          { destruct ex0.
+            { inv EB. unfold ALocal.next_eid in *. lia. }
+            eapply EXBANK; eauto.
+          }
+          { apply nth_error_singleton_inv in H0. des. inv H1.
+            replace c with (length (ALocal.labels local1)) in * by lia.
+            inv EB. unfold ALocal.next_eid in *. lia.
+          }
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -499,13 +512,19 @@ Module AExecUnit.
             - apply nth_error_app_mon. eauto.
             - i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr.
           }
-          { destruct ex0; ss. inv H. exploit EX; eauto. i. des. inv x0.
-            rewrite H0 in x. inv x. apply Label.is_reading_inv in PRED. des. subst. symmetry in H1.
+          { destruct ex0; ss. inv H. exploit EX; eauto. i. des. inv x0. des.
+            destruct a0; ss. destruct ex; ss.
+            rewrite H0 in x. inv x. symmetry in H1.
             esplits.
-            - admit.
-            - unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
-            - admit.
+            - apply nth_error_app_mon. eauto.
+            - rewrite List.nth_error_app2, Nat.sub_diag; ss.
+            - ii. apply nth_error_app_inv in H. des.
+              + eapply EXBANK; eauto.
+              + unfold ALocal.next_eid in *. lia.
           }
+        * ii. destruct ex0; ss. apply nth_error_app_inv in H. des.
+          { eapply EXBANK; eauto. }
+          { apply nth_error_singleton_inv in H0. des. inv H1. }
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -532,6 +551,9 @@ Module AExecUnit.
           { apply nth_error_app_mon. eauto. }
           { apply nth_error_app_mon. eauto. }
           { i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr. }
+        * ii. apply nth_error_app_inv in H. des.
+          { eapply EXBANK; eauto. }
+          { apply nth_error_singleton_inv in H0. des. inv H1. }
       + econs; ss. eexists; eauto.
     - splits.
       + inv WF. econs; ss.
@@ -549,7 +571,7 @@ Module AExecUnit.
     - splits.
       + inv WF. econs; ss.
       + destruct local1. refl.
-  Admitted.
+  Qed.
 
   Lemma rtc_step_future
         eu1 eu2
