@@ -409,46 +409,7 @@ Module AExecUnit.
           { apply label_is_mon. }
           { apply label_is_mon. }
         * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
-        *
-
-          (* TODO: move *)
-          Lemma nth_error_app_inv
-                A
-                (l1 l2:list A)
-                n a
-                (FIND: List.nth_error (l1 ++ l2) n = Some a):
-            (n < length l1 /\ List.nth_error l1 n = Some a) \/
-            (n >= length l1 /\ List.nth_error l2 (n - (length l1)) = Some a).
-          Proof.
-            destruct (lt_dec n (length l1)).
-            - left. splits; ss. rewrite List.nth_error_app1 in FIND; ss.
-            - right. splits; [lia|]. rewrite List.nth_error_app2 in FIND; [|lia]. ss.
-          Qed.
-
-          (* TODO: move *)
-          Lemma nth_error_singleton_inv
-                A
-                n (a b:A)
-                (FIND: List.nth_error [a] n = Some b):
-            n = 0 /\ a = b.
-          Proof.
-            destruct n; ss.
-            - inv FIND. ss.
-            - destruct n; ss.
-          Qed.
-
-          (* TODO: move *)
-          Lemma nth_error_app_mon
-                A
-                (l1 l2:list A)
-                n a
-                (FIND: List.nth_error l1 n = Some a):
-            List.nth_error (l1 ++ l2) n = Some a.
-          Proof.
-            rewrite List.nth_error_app1; ss. apply List.nth_error_Some. congr.
-          Qed.
-
-          i. apply nth_error_app_inv in LABEL. des.
+        * i. apply nth_error_app_inv in LABEL. des.
           { eapply RMW1. eauto. }
           { apply nth_error_singleton_inv in LABEL0. des. congr. }
         * i. exploit RMW2; eauto. i. des. esplits; eauto using nth_error_app_mon.
