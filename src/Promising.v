@@ -527,7 +527,7 @@ Section Local.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_ext)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
-      (RES: res = ValA.mk _ 0 (View.mk bot view_ext.(View.annot)))
+      (RES: res = ValA.mk _ 0 (View.mk (ifc (arch == riscv) ts) view_ext.(View.annot)))
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
@@ -809,7 +809,7 @@ Section ExecUnit.
     - inv RES. inv VIEW. inv VVAL. inv VIEW. inv VLOC. inv VIEW.
       inv STEP. inv WRITABLE. econs; ss.
       + apply rmap_add_wf; viewtac.
-        rewrite TS. apply bot_spec.
+        rewrite TS. unfold ifc. condtac; [|by apply bot_spec]. eapply get_msg_wf. eauto.
       + econs; viewtac; rewrite <- ? TS0, <- ? TS1; eauto using get_msg_wf, expr_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
         * i. revert H1. rewrite fun_add_spec. condtac; viewtac.

@@ -1357,7 +1357,9 @@ Proof.
         }
         { apply RMW. econs; eauto. right. econs; eauto. }
     + econs; ss.
-      { econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss. }
+      { econs; ss. apply sim_rmap_add; ss. econs; ss.
+        unfold ifc. condtac; [|econs 1]. econs 2; eauto; ss. refl.
+      }
       econs; ss.
       * i. rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_coh_step. rewrite inverse_step.

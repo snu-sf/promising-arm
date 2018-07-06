@@ -919,7 +919,8 @@ Hint Constructors sim_state_weak.
 Lemma sim_state_weak_init stmts:
   sim_state_weak (State.init stmts) (State.init stmts).
 Proof.
-Admitted.
+  econs; ss. econs. ii. unfold RMap.init. rewrite ? IdMap.gempty. econs.
+Qed.
 
 Lemma sim_rmap_weak_add
       rmap armap reg vala avala
@@ -1497,21 +1498,21 @@ Lemma sim_traces_valid_thread
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
+        (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<AOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
+        (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
         Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<BOB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (BOB: ex.(Execution.bob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
+        (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<BOB_READ:
@@ -1524,14 +1525,14 @@ Lemma sim_traces_valid_thread
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
+        (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<DOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) (join Label.is_read Label.is_write) eid1)
+        (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
         Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>>.
 Proof.
@@ -1564,8 +1565,8 @@ Lemma sim_traces_valid
   <<EXTERNAL:
     forall eid1 eid2
       (OB: ex.(Execution.ob) eid1 eid2)
-      (LABEL1: Execution.label_is ex (join Label.is_read Label.is_write) eid1)
-      (LABEL2: Execution.label_is ex (join Label.is_read Label.is_write) eid2),
+      (LABEL1: Execution.label_is ex Label.is_access eid1)
+      (LABEL2: Execution.label_is ex Label.is_access eid2),
       (Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
       (Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
   <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>>.
@@ -1613,7 +1614,7 @@ Lemma promising_pf_valid
          ex.(Execution.label_is) Label.is_read eid2)>> /\
     <<EXTERNAL:
       forall eid1 eid2
-        (OB: (ex.(Execution.ob) ∩ (ex.(Execution.label_is_rel) (fun label : Label.t => join Label.is_read Label.is_write label)))⁺ eid1 eid2),
+        (OB: (ex.(Execution.ob) ∩ (ex.(Execution.label_is_rel) Label.is_access))⁺ eid1 eid2),
         Time.lt (vext eid1) (vext eid2) \/
         (Time.le (vext eid1) (vext eid2) /\
          Execution.po eid1 eid2 /\
@@ -1660,13 +1661,13 @@ Proof.
     + exploit INTERNAL; eauto. i. des; eauto.
       { exploit Valid.internal_rw; eauto. i. des.
         inversion EID1. inversion EID2.
-        exploit Label.join_rw; try exact LABEL0. i. des.
-        - exploit Label.join_rw; try exact LABEL. i. des.
+        destruct l0; ss.
+        - destruct l; ss.
           + exploit Valid.internal_read_read_po; eauto. i.
             right. left. splits; eauto.
           + right. right. split; eauto.
         - inversion x1. rewrite EID0 in EID3. inversion EID3.
-          rewrite H1 in *. destruct l1; ss; congr. }
+          rewrite H1 in *. destruct l0; ss; congr. }
     + des.
       * left. etrans; eauto.
       * left. eapply le_lt_trans; eauto.
