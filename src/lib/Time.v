@@ -5,8 +5,8 @@ Require Import Lia.
 Require Import EquivDec.
 Require Import sflib.
 
-Require Import Basic.
-Require Import Order.
+Require Import PromisingArch.lib.Basic.
+Require Import PromisingArch.lib.Order.
 
 Set Implicit Arguments.
 

@@ -12,12 +12,12 @@ Require Import FSetPositive.
 Require Import EquivDec.
 Require Import sflib.
 
-Require Import Basic.
-Require Import Order.
-Require Import Time.
-Require Import Lang.
-Require Import Promising.
-Require Import StateExecFacts.
+Require Import PromisingArch.lib.Basic.
+Require Import PromisingArch.lib.Order.
+Require Import PromisingArch.lib.Time.
+Require Import PromisingArch.lib.Lang.
+Require Import PromisingArch.promising.Promising.
+Require Import PromisingArch.promising.StateExecFacts.
 
 Set Implicit Arguments.
 

@@ -8,7 +8,7 @@ Require Import EquivDec.
 Require Import List.
 Require Import sflib.
 
-Require Import Basic.
+Require Import PromisingArch.lib.Basic.
 
 Set Implicit Arguments.
 

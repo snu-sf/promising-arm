@@ -1,5 +1,6 @@
-COQMODULE    := promising
-COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v lib/hahn/*.v $(shell find src -name '*.v' -print)
+COQMODULE    := PromisingArch
+COQDIRS      := lib promising axiomatic lcertify
+COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v lib/hahn/*.v $(foreach dir, $(COQDIRS), src/$(dir)/*.v)
 
 .PHONY: all theories clean
 
@@ -28,7 +29,7 @@ Makefile.coq: Makefile $(COQTHEORIES)
    echo "-R lib/paco/src Paco"; \
    echo "-R lib/hahn Top"; \
    \
-   echo "-R src $(COQMODULE)"; \
+   echo $(foreach dir, $(COQDIRS), "-R src/$(dir) $(COQMODULE).$(dir)"); \
    \
    echo $(COQTHEORIES)) > _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq

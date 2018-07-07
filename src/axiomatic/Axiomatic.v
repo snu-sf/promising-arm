@@ -11,11 +11,11 @@ Require Import paco.
 Require Import HahnRelationsBasic.
 Require Import HahnSets.
 
-Require Import Basic.
-Require Import HahnRelationsMore.
-Require Import Order.
-Require Import Time.
-Require Import Lang.
+Require Import PromisingArch.lib.Basic.
+Require Import PromisingArch.lib.HahnRelationsMore.
+Require Import PromisingArch.lib.Order.
+Require Import PromisingArch.lib.Time.
+Require Import PromisingArch.lib.Lang.
 
 Set Implicit Arguments.
 
