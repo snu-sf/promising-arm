@@ -125,6 +125,30 @@ Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank
     (EBVIEW: sim_view ts eb1.(Exbank.view) eb2.(Exbank.view))
 .
 
+Inductive sim_fwdbank
+          (ts:Time.t) (loc:Loc.t) (coh1 coh2:Loc.t -> Time.t)
+          (mem1 mem2:Memory.t)
+          (fwd1 fwd2:FwdItem.t (A:=unit)): Prop :=
+| sim_fwdbank_below
+    (TS: fwd2.(FwdItem.ts) <= ts)
+    (FWD: fwd1 = fwd2)
+| sim_fwdbank_above
+    (TS1: fwd1.(FwdItem.ts) > ts)
+    (TS2: fwd2.(FwdItem.ts) > ts)
+    (VIEW2: fwd2.(FwdItem.view).(View.ts) > ts)
+| sim_fwdbank_above_mid
+    (TS1: fwd1.(FwdItem.ts) > ts)
+    (TS2: fwd2.(FwdItem.ts) > ts)
+    (VIEW1: fwd1.(FwdItem.view).(View.ts) <= ts)
+    (VIEW2: fwd2.(FwdItem.view).(View.ts) <= ts)
+    (COH1: coh1 loc = fwd1.(FwdItem.ts))
+    (COH2: coh2 loc = fwd2.(FwdItem.ts))
+    (LATEST1: forall ts', Memory.latest loc fwd1.(FwdItem.ts) ts' mem1)
+    (LATEST2: forall ts', Memory.latest loc fwd2.(FwdItem.ts) ts' mem2)
+    (VIEW: fwd1.(FwdItem.view) = fwd2.(FwdItem.view))
+    (READ: Memory.read loc fwd1.(FwdItem.ts) mem1 = Memory.read loc fwd2.(FwdItem.ts) mem2)
+.
+
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
 | sim_lc_intro
     (COH: forall loc, sim_time ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
@@ -134,14 +158,8 @@ Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=unit)) (mem1 mem2:M
     (VWM: sim_view ts lc1.(Local.vwm) lc2.(Local.vwm))
     (VCAP: sim_view ts lc1.(Local.vcap) lc2.(Local.vcap))
     (VREL: sim_view ts lc1.(Local.vrel) lc2.(Local.vrel))
-    (FWDBANK: forall loc,
-        opt_rel
-          (fun fwd1 fwd2 =>
-             fwd2.(FwdItem.view).(View.ts) <= ts ->
-             Memory.read loc fwd1.(FwdItem.ts) mem1 = Memory.read loc fwd2.(FwdItem.ts) mem2 /\
-             sim_view ts fwd1.(FwdItem.view) fwd2.(FwdItem.view) /\
-             fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
-          (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
+    (FWDBANK: forall loc, sim_fwdbank ts loc lc1.(Local.coh) lc2.(Local.coh) mem1 mem2
+                                 (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
     (EXBANK: opt_rel (sim_exbank tid ts mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
     (PROMISES: lc1.(Local.promises) = lc2.(Local.promises))
     (PROMISES_TS: forall mid (FIND: Promises.lookup mid lc2.(Local.promises)), mid <= ts)
@@ -264,10 +282,8 @@ Lemma sim_eu_step
       (SIM: sim_eu tid ts eu1 eu2)
       (STEP: certify_step tid eu2 eu2')
       (WF1: ExecUnit.wf tid eu1)
-      (WF2: ExecUnit.wf tid eu2):
-      (* TODO: remove *)
-      (* (VWP: eu2'.(ExecUnit.local).(Local.vwp).(View.ts) <= ts) *)
-      (* (VCAP: eu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts): *)
+      (WF2: ExecUnit.wf tid eu2)
+      (VCAP: eu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts):
   exists eu1',
     <<STEP: certify_step tid eu1 eu1'>> /\
     <<SIM: sim_eu tid ts eu1' eu2'>>.
@@ -321,37 +337,6 @@ Proof.
                 apply SIM. ss.
               Qed.
 
-              
-      inv STEP.
-      match goal with
-      | [|- context[join (joins ?l) ?f]] =>
-        remember (join (joins l) f) as post eqn:POST
-      end.
-      destruct (le_dec post.(View.ts) ts).
-      { (* read's post-view <= ts. *)
-        rename l into TS0.
-        exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
-        { rewrite <- TS0. s. rewrite <- join_l, <- join_l. eauto. }
-        intro ELOC. clear TS.
-        
-
-
-        eexists (ExecUnit.mk _ _ _). esplits.
-        + econs 1. econs. econs; ss; cycle 1.
-          * econs 2; eauto. econs.
-            4: instantiate (1 :=
-                              match Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)) with
-                              | Some fwd => 
-                              ts0).
-            1: instantiate (1 := (sem_expr rmap1 eloc)).
-            all: ss.
-            { rewrite ELOC. exploit sim_time_eq.
-              { inv LOCAL. eapply COH0. }
-              { rewrite <- TS0. admit. }
-              intro COH'. rewrite COH'. ss.
-            }
-            { admit. (* latest *) }
-            {
               (* TODO: move *)
               Lemma sim_mem_read
                     tid ts mem1 mem2 loc ts0
@@ -362,74 +347,165 @@ Proof.
                 inv SIM. generalize (EQUIV _ TS0). unfold Memory.get_msg, Memory.read. destruct ts0; ss.
                 intro X. rewrite X. ss.
               Qed.
-
-              rewrite ELOC,  <- MSG. revert TS0.
-              destruct (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc))) as [[]|] eqn:FWD; cycle 1.
-              { i. eapply sim_mem_read; eauto. rewrite <- TS0, <- join_r. ss. }
-              unfold FwdItem.read_view. s. condtac; cycle 1.
-              { i. eapply sim_mem_read; eauto. rewrite <- TS0, <- join_r. ss. }
-              i. destruct (equiv_dec ts1 ts0); ss. inv e.
-              inv LOCAL. specialize (FWDBANK (ValA.val (sem_expr rmap2 eloc))). inv FWDBANK; [congr|].
-              rewrite FWD in H. inv H. ss. exploit REL.
-              { rewrite <- TS0, <- join_r. ss. }
-              i. des.
-              unfold FwdItem.read_view. ss. 
               
-              ; s; cycle 1.
-              { rewrite <- TS0, <- join_r. ss. }
-              
-              { rewrite <- TS0, <- join_r. ss. }
-              inv e. 
+        (* TODO: move *)
+        Lemma get_latest
+              loc mem:
+          exists ts val,
+            (forall ts', Memory.latest loc ts ts' mem) /\
+            Memory.read loc ts mem = Some val.
+        Proof.
+          induction mem using List.rev_ind.
+          { exists 0, Val.default. splits; ss.
+            ii. destruct ts; ss.
+          }
+          destruct (loc == x.(Msg.loc)).
+          { inversion e. subst. exists (S (length mem)), x.(Msg.val). splits.
+            - ii. apply nth_error_app_inv in MSG. des.
+              { lia. }
+              apply nth_error_singleton_inv in MSG0. des. subst.
+              replace ts with (length mem) in * by lia. lia.
+            - unfold Memory.read. ss. rewrite nth_error_app2, Nat.sub_diag; ss. condtac; ss.
+          }
+          des. exists ts, val. splits.
+          - ii. subst. apply nth_error_app_inv in MSG. des.
+            { eapply IHmem; eauto. }
+            apply nth_error_singleton_inv in MSG0. des. subst. congr.
+          - apply Memory.read_mon. ss.
+        Qed.
 
-inv WF2. inv LOCAL0. ss. exploit FWDBANK; eauto. s. i. des.
-              rewrite x. inv LOCAL. apply COH1. 
-                
-
-  FWD : Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)) =
-        Some {| FwdItem.ts := ts1; FwdItem.view := view; FwdItem.ex := ex |}
-                
-              - rewrite <- join_r. ss.
-            }
-              inv MEM. specialize (MEM (S ts0).
-              admit. }
+      inv STEP.
+      match goal with
+      | [|- context[join (joins ?l) ?f]] =>
+        remember (join (joins l) f) as post eqn:POST
+      end.
+      guardH POST.
+      exploit sim_rmap_expr; eauto. instantiate (1 := eloc). intro X. inv X. exploit TS.
+      { rewrite <- VCAP. s. rewrite <- join_r. ss. }
+      intro ELOC. clear TS.
+      destruct (le_lt_dec post.(View.ts) ts); cycle 1.
+      { (* read's post-view > ts. *)
+        exploit get_latest; eauto. i. des.
+        eexists (ExecUnit.mk _ _ _). esplits.
+        + econs 1. econs. econs; ss; cycle 1.
+          * econs 2; eauto. econs; eauto.
+            admit. (* coh <= latest *)
           * econs 3; ss.
         + econs; ss.
-          * admit.
-          * admit.
+          * econs; ss. apply sim_rmap_add; ss. econs. s. i. lia.
+          * econs; ss; i; try by apply LOCAL.
+            all: rewrite ? ELOC.
+            all: repeat ((try apply sim_view_join); (try apply sim_view_ifc)); ss.
+            all: rewrite ? fun_add_spec.
+            all: try condtac.
+            all: try by apply LOCAL.
+            { inversion e. subst.
+              admit. (* sim_coh *)
+            }
+            { admit. }
+            { admit. }
+            { admit. }
+            { admit. }
+            { destruct ex0; econs; ss.
+              admit. (* sim_exbank *)
+            }
+      }              
+      (* read's post-view <= ts. *)
+      rename l into POST0. guardH POST.
+      destruct (le_lt_dec ts0 ts).
+      { (* actually read <= ts *)
+        eexists (ExecUnit.mk _ _ _). esplits.
+        + econs 1. econs. econs; ss; cycle 1.
+          * econs 2; eauto. econs.
+            4: instantiate (1 := ts0).
+            1: instantiate (1 := (sem_expr rmap1 eloc)).
+            all: ss.
+            { rewrite ELOC. exploit sim_time_eq.
+              { inv LOCAL. eapply COH0. }
+              { etrans; eauto. }
+              intro COH'. rewrite COH'. ss.
+            }
+            { ii.
+              assert (VRP: lc1.(Local.vrp) = lc2.(Local.vrp)).
+              { inv LOCAL. inv VRP. rewrite TS; ss. rewrite <- POST0, POST.
+                s. rewrite <- join_l, <- join_r, <- join_l. ss.
+              }
+              assert (VREL: OrdR.ge ord OrdR.acquire = true ->
+                            lc1.(Local.vrel) = lc2.(Local.vrel)).
+              { i. inv LOCAL. inv VREL. rewrite TS; ss. rewrite <- POST0, POST.
+                s. rewrite <- join_l, <- join_r, <- join_r, H0, <- join_l. ss.
+              }
+              eapply LATEST; eauto.
+              - rewrite TS2, ELOC. unfold ifc. viewtac.
+                + rewrite <- join_l. ss.
+                + rewrite <- join_r, <- join_l, VRP. ss.
+                + condtac; [|apply bot_spec]. rewrite <- join_r, <- join_r, <- join_l, X, VREL; ss.
+              - rewrite <- MSG0. inv MEM.
+                exploit (EQUIV (S ts1)).
+                { rewrite TS2, <- POST0, POST. s. viewtac.
+                  - rewrite <- join_l, <- join_l, <- ELOC. ss.
+                  - rewrite <- join_l, <- join_r, <- join_l, VRP. ss.
+                  - rewrite <- join_l, <- join_r, <- join_r, <- join_l, VREL; ss.
+                }
+                unfold Memory.get_msg, Memory.read. ss.
+              - congr.
+            }
+            { rewrite ELOC, <- MSG. eapply sim_mem_read; eauto. }
+          * econs 3; ss.
+        + econs; ss.
+          * econs; ss. apply sim_rmap_add; ss. rewrite POST.
+
+            (* TODO: move *)
+            Lemma sim_view_val
+                  ts c v1 v2
+                  (SIM: sim_view ts v1 v2):
+              sim_val ts (ValA.mk _ c v1) (ValA.mk _ c v2).
+            Proof.
+              inv SIM. econs. s. i. rewrite TS; ss.
+            Qed.
+            apply sim_view_val. repeat apply sim_view_join; viewtac.
+            all: rewrite ? ELOC.
+            all: try apply sim_view_ifc.
+            all: try by apply LOCAL.
+            { econs. ss. }
+            inv LOCAL. generalize (FWDBANK (ValA.val (sem_expr rmap2 eloc))). i.
+
+            (* TODO: move *)
+            Lemma sim_fwd_view ts loc lc1 lc2 mem1 mem2 fwd1 fwd2 t l
+                  (T: t <= ts)
+                  (FWD: sim_fwdbank ts loc lc1 lc2 mem1 mem2 fwd1 fwd2):
+              sim_view ts (FwdItem.read_view fwd1 t l) (FwdItem.read_view fwd2 t l).
+            Proof.
+              unfold FwdItem.read_view. inv FWD; ss; repeat condtac; ss.
+              all: try by  destruct (equiv_dec (FwdItem.ts fwd1) t); ss; inv e; lia.
+              all: try by  destruct (equiv_dec (FwdItem.ts fwd2) t); ss; inv e; lia.
+            Qed.
+
+            eapply sim_fwd_view; ss.
+          * inv LOCAL. econs; ss; i.
+            all: rewrite ? fun_add_spec, ? ELOC, ? POST.
+            all: repeat ((try apply sim_view_join); (try apply sim_view_ifc)); ss.
+            all: try condtac; ss.
+            all: try by eapply sim_fwd_view; eauto.
+            { generalize (FWDBANK loc). intro X. inv X; [econs 1|econs 2|econs 3]; ss.
+              - admit.
+              - admit.
+            }
+            { econs. econs; ss. repeat apply sim_view_join; viewtac.
+              all: repeat ((try apply sim_view_join); (try apply sim_view_ifc)); ss.
+              all: try by eapply sim_fwd_view; eauto.
+            }
       }
-      { (* read's post-view > ts. *)
+      { (* read > ts from fwdbank, and post-view <= ts *)
+        revert POST0. rewrite POST. unfold FwdItem.read_view. condtac; ss; cycle 1.
+        { i. cut (ts0 < ts0); [lia|]. eapply le_lt_trans; [|by eauto].
+          rewrite <- POST0, <- join_r. ss.
+        }
+        apply andb_true_iff in X. des.
+        destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts0); ss.
+        inversion e. subst. i.
         admit.
       }
-      (*       1, 2, 3: eauto. *)
-      (*       econs; eauto. *)
-      (*     * s. econs 2. ss. *)
-      (*   + econs; ss. econs; ss; try by apply LOCAL. *)
-      (*     * apply sim_rmap_add; ss. apply sim_rmap_expr. ss. *)
-      (*     * rewrite bot_join; [|by apply View.order]. destruct lc1. ss. *)
-
-      (*   eexists (ExecUnit.mk _ _ _). esplits; [econs 2; [|econs 1]|]. *)
-      (*   - left. econs; ss. *)
-      (*     assert (ELOC: sem_expr rmap1 eloc = sem_expr rmap2 eloc). *)
-      (*     { eapply sim_rmap_expr; eauto. rewrite <- VCAP, <- join_r. refl. } *)
-      (*     econs; ss; cycle 1. *)
-      (*     + econs 2; eauto. econs. *)
-      (*       4: instantiate (1 := ts0). *)
-      (*       1: instantiate (1 := (sem_expr rmap1 eloc)). *)
-      (*       all: ss. *)
-      (*       all: rewrite ELOC. *)
-      (*       * inv LOCAL0. specialize (COH0 (ValA.val (sem_expr rmap2 eloc))). inv COH0. *)
-      (*         rewrite TS; ss. etrans; eauto. *)
-      (*       * admit. (* hard: coh <= ts0, so no additional messages *) *)
-      (*       * rewrite <- MSG. inv MEM. unfold Memory.read. destruct ts0; ss. *)
-      (*         rewrite ? nth_error_app1; ss. *)
-      (*     + econs 3; ss. *)
-      (*   - econs; ss. econs; ss. *)
-      (*     + admit. (* sim_state *) *)
-      (*     + admit. (* sim_lc *) *)
-      (* } *)
-      (* { (* read from new msg. *) *)
-      (*   admit. *)
-      (* } *)
     - (* fulfill *)
       inv STEP.
       assert (TS0: ts0 <= ts).
@@ -463,7 +539,78 @@ inv WF2. inv LOCAL0. ss. exploit FWDBANK; eauto. s. i. des.
               { inv LOCAL. eapply COH0. }
               { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
               i. congr.
-            - admit. (* exclusive on old message *)
+            - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
+              destruct a, eb. inv REL. ss. subst.
+              esplits; eauto. s. ii. subst.
+              eapply EX0; eauto. 
+              assert (TS1': ts1 <= ts) by lia.
+              replace ts2 with ts1 in *; cycle 1; ss.
+              { inv TS'. rewrite TS3; ss. }
+              eapply EX0; eauto. rewrite <- MSG0. inv MEM.
+              exploit (EQUIV (S ts3)).
+              { lia. }
+              unfold Memory.get_msg, Memory.read. ss.
+          }
+        * econs 4; ss.
+      + econs; ss; eauto using sim_rmap_add, sim_val_const.
+        inv LOCAL. econs; ss; i.
+        all: repeat rewrite fun_add_spec.
+        all: repeat apply sim_view_join; ss.
+        * condtac; ss.
+        * condtac; ss.
+          { splits; ss.
+            inv MEM. exploit (EQUIV ts0); ss.
+            unfold Memory.get_msg, Memory.read. destruct ts0; ss.
+            i. rewrite x1. ss.
+          }
+          { exploit FWDBANK; eauto.
+            rewrite <- H, fun_add_spec. condtac; ss.
+          }
+        * destruct ex0; ss.
+        * congr.
+        * revert FIND. rewrite Promises.unset_o. condtac; ss. eauto.      inv STEP.
+          assert (TS0: ts0 <= ts).
+          { inv WRITABLE. inv LOCAL. exploit PROMISES_TS; eauto. }
+          exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
+          { rewrite <- TS0. inv WRITABLE. etrans; [|by apply Time.lt_le_incl; eauto].
+            s. rewrite <- join_l. eauto.
+          }
+          intro ELOC. clear TS.
+          exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
+          { rewrite <- TS0. inv WRITABLE. etrans; [|by apply Time.lt_le_incl; eauto].
+            s. rewrite <- join_r, <- join_l. eauto.
+          }
+          intro EVAL. clear TS.
+          eexists (ExecUnit.mk _ _ _). esplits.
+      + econs 1. econs. econs; ss; cycle 1.
+        * econs 3; eauto. econs; eauto; cycle 1.
+          { rewrite <- MSG. apply MEM. ss. }
+          { inv LOCAL. rewrite PROMISES. eauto. }
+          { instantiate (1 := view_ext).
+            instantiate (1 := ord).
+            instantiate (1 := ex0).
+            inv WRITABLE. econs; eauto.
+            - symmetry. eapply sim_view_eq; cycle 1.
+              { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
+              s. repeat apply sim_view_join; ss.
+              all: try apply sim_view_ifc.
+              all: try by apply LOCAL.
+              inv LOCAL. inv EXBANK; ss. inv REL. ss.
+            - exploit sim_time_eq.
+              { inv LOCAL. eapply COH0. }
+              { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
+              i. congr.
+            - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
+              destruct a, eb. inv REL. ss. subst.
+              esplits; eauto. s. ii. subst.
+
+              assert (TS1': ts1 <= ts) by lia.
+              replace ts2 with ts1 in *; cycle 1; ss.
+              { inv TS. rewrite TS3; ss. }
+              eapply EX0; eauto. rewrite <- MSG0. inv MEM.
+              exploit (EQUIV (S ts3)).
+              { lia. }
+              unfold Memory.get_msg, Memory.read. ss.
           }
         * econs 4; ss.
       + econs; ss; eauto using sim_rmap_add, sim_val_const.
