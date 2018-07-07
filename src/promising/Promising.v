@@ -119,6 +119,31 @@ Module Memory.
       { destruct n0; ss. }
       assert (ts = length mem) by lia. inv GET. eauto.
   Qed.
+
+  Lemma get_latest
+        loc mem:
+    exists ts val,
+      (forall ts', latest loc ts ts' mem) /\
+      read loc ts mem = Some val.
+  Proof.
+    induction mem using List.rev_ind.
+    { exists 0, Val.default. splits; ss.
+      ii. destruct ts; ss.
+    }
+    destruct (loc == x.(Msg.loc)).
+    { inversion e. subst. exists (S (length mem)), x.(Msg.val). splits.
+      - ii. apply nth_error_app_inv in MSG. des.
+        { lia. }
+        apply nth_error_singleton_inv in MSG0. des. subst.
+        replace ts with (length mem) in * by lia. lia.
+      - unfold read. ss. rewrite nth_error_app2, Nat.sub_diag; ss. condtac; ss.
+    }
+    des. exists ts, val. splits.
+    - ii. subst. apply nth_error_app_inv in MSG. des.
+      { eapply IHmem; eauto. }
+      apply nth_error_singleton_inv in MSG0. des. subst. congr.
+    - apply read_mon. ss.
+  Qed.
 End Memory.
 
 Module View.
@@ -651,6 +676,15 @@ Section Local.
     econs; ss; i; try by apply bot_spec.
     - rewrite Promises.lookup_bot in IN. ss.
     - destruct ts; ss. destruct ts; ss.
+  Qed.
+
+  Lemma internal_bot_inv
+        lc1 lc2
+        (LC: internal bot lc1 lc2):
+    lc2 = lc1.
+  Proof.
+    inv LC. destruct lc1. s. f_equal.
+    rewrite bot_join; ss. apply View.order.
   Qed.
 End Local.
 End Local.
