@@ -669,19 +669,17 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
           (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
           local.(Local.vrel).(View.ts);
   FWDBANK: forall loc,
-      match local.(Local.fwdbank) loc with
-      | Some fwd =>
-        exists eid,
-        <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\
-        <<TS: view_of_eid ex ob eid = Some fwd.(FwdItem.ts)>> /\
-        <<VIEW: sim_view
-                  ex ob
-                  (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))
-                  fwd.(FwdItem.view).(View.ts)>> /\
-        <<EX: fwd.(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>
-      | None =>
-        forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)
-      end;
+      (exists eid,
+          <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\
+          <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\
+          <<TS: view_of_eid ex ob eid = Some (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\
+          <<VIEW: sim_view
+                    ex ob
+                    (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))
+                    (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)>> /\
+          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/
+      ((local.(Local.fwdbank) loc) = FwdItem.init /\
+       forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid));
   EXBANK: opt_rel
             (fun aeb eb =>
                ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\

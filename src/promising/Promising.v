@@ -208,6 +208,8 @@ Section FwdItem.
   }.
   Hint Constructors t.
 
+  Definition init: t := mk bot bot false.
+
   Definition read_view (fwd:t) (tsx:Time.t) (ord:OrdR.t): View.t (A:=A) :=
     if andb (fwd.(ts) == tsx) (negb (andb fwd.(ex) (orb (arch == riscv) (OrdR.ge ord OrdR.acquire_pc))))
     then fwd.(view)
@@ -414,16 +416,16 @@ Section Local.
     vwm: View.t (A:=A);
     vcap: View.t (A:=A);
     vrel: View.t (A:=A);
-    fwdbank: Loc.t -> option (FwdItem.t (A:=A));
+    fwdbank: Loc.t -> (FwdItem.t (A:=A));
     exbank: option (Exbank.t (A:=A));
     promises: Promises.t;
   }.
   Hint Constructors t.
 
-  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => None) None bot.
+  Definition init: t := mk bot bot bot bot bot bot bot (fun _ => FwdItem.init) None bot.
 
   Definition init_with_promises (promises: Promises.t): Local.t :=
-    mk bot bot bot bot bot bot bot (fun _ => None) None promises.
+    mk bot bot bot bot bot bot bot (fun _ => FwdItem.init) None promises.
 
   Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | promise_intro
@@ -464,17 +466,15 @@ Section Local.
   Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       ts loc val view
-      view_ext1 view_ext2
+      view_ext1 view_msg view_ext2
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
       (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
       (LATEST: Memory.latest loc ts view_ext1.(View.ts) mem1)
       (MSG: Memory.read loc ts mem1 = Some val)
-      (VIEW_EXT2: view_ext2 = join view_ext1 (match lc1.(fwdbank) loc with
-                                              | None => View.mk ts bot
-                                              | Some fwd => fwd.(FwdItem.read_view) ts ord
-                                              end))
+      (VIEW_MSG: view_msg = (lc1.(fwdbank) loc).(FwdItem.read_view) ts ord)
+      (VIEW_EXT2: view_ext2 = join view_ext1 view_msg)
       (RES: res = ValA.mk _ val view_ext2)
       (LC2: lc2 =
             mk
@@ -538,7 +538,7 @@ Section Local.
               (join lc1.(vwm) (View.mk ts bot))
               (join lc1.(vcap) view_loc)
               (join lc1.(vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
-              (fun_add loc (Some (FwdItem.mk ts (join view_loc view_val) ex)) lc1.(fwdbank))
+              (fun_add loc (FwdItem.mk ts (join view_loc view_val) ex) lc1.(fwdbank))
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))
   .
@@ -633,10 +633,9 @@ Section Local.
       (VWM: lc.(vwm).(View.ts) <= List.length mem)
       (VCAP: lc.(vcap).(View.ts) <= List.length mem)
       (VREL: lc.(vrel).(View.ts) <= List.length mem)
-      (FWDBANK: forall loc fwd,
-          lc.(fwdbank) loc = Some fwd ->
-          fwd.(FwdItem.ts) <= lc.(coh) loc /\
-          fwd.(FwdItem.view).(View.ts) <= List.length mem)
+      (FWDBANK: forall loc,
+          (lc.(fwdbank) loc).(FwdItem.ts) <= lc.(coh) loc /\
+          (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= List.length mem)
       (EXBANK: forall eb, lc.(exbank) = Some eb -> exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
@@ -776,13 +775,9 @@ Section ExecUnit.
     assert (FWD:
               forall loc ord ts,
                 ts <= List.length mem1 ->
-                (match Local.fwdbank local1 loc with
-                 | Some fwd => FwdItem.read_view fwd ts ord
-                 | None => View.mk ts bot
-                 end).(View.ts) <= length mem1).
-    { inv LOCAL. i. destruct (Local.fwdbank local1 loc) eqn:FWD; ss.
-      exploit FWDBANK; eauto. i. des.
-      unfold FwdItem.read_view. condtac; ss.
+                (((Local.fwdbank local1 loc).(FwdItem.read_view) ts ord).(View.ts) <= length mem1)).
+    { inv LOCAL. i. exploit FWDBANK; eauto. i. des.
+      unfold FwdItem.read_view. condtac; ss. eauto.
     }
 
     inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
@@ -805,7 +800,7 @@ Section ExecUnit.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
         * i. exploit FWDBANK; eauto. i. des.
-          splits; ss. rewrite x, fun_add_spec. condtac; ss.
+          splits; eauto. rewrite x, fun_add_spec. condtac; ss.
           inversion e. subst. ss.
         * destruct ex0; ss. i. inv H1. eauto.
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
@@ -816,8 +811,8 @@ Section ExecUnit.
         rewrite TS. unfold ifc. condtac; [|by apply bot_spec]. eapply get_msg_wf. eauto.
       + econs; viewtac; rewrite <- ? TS0, <- ? TS1; eauto using get_msg_wf, expr_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
-        * i. revert H1. rewrite ? fun_add_spec. condtac; viewtac.
-          i. inv H1. s. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
+        * i. rewrite ? fun_add_spec. condtac; viewtac.
+          inversion e. subst. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
         * destruct ex0; ss.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
         * i. rewrite Promises.unset_o. rewrite fun_add_spec in TS2. condtac.
@@ -866,7 +861,7 @@ Section ExecUnit.
     - econs.
       all: try rewrite List.app_length; s; try lia.
       + i. rewrite COH. lia.
-      + i. exploit FWDBANK; eauto. i. des. lia.
+      + i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
       + i. exploit EXBANK; eauto. i. des.
         eexists. eapply Memory.read_mon. eauto.
       + i. revert IN. rewrite Promises.set_o. condtac.
@@ -1022,7 +1017,7 @@ Module Machine.
       + inv LOCAL. econs.
         all: try rewrite List.app_length; s; try lia.
         * i. rewrite COH. lia.
-        * i. exploit FWDBANK; eauto. i. des. lia.
+        * i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
         * i. exploit EXBANK; eauto. i. des.
           eexists. eapply Memory.read_mon. eauto.
         * i. exploit PROMISES; eauto. lia.
