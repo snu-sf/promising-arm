@@ -79,6 +79,7 @@ Proof.
             eapply EX0; eauto.
           - rewrite <- MSG. unfold Memory.get_msg. destruct ts; ss.
             rewrite nth_error_app1; [|lia]. ss.
+          - rewrite Promises.set_o. condtac; ss. inversion e0. subst. ss.
           - ss.
           - f_equal. apply Promises.set_unset.
             ii. subst. lia.
