@@ -527,6 +527,7 @@ Section Local.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_ext)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
+      (PROMISE: Promises.lookup ts lc1.(promises))
       (RES: res = ValA.mk _ 0 (View.mk (ifc (arch == riscv) ts) view_ext.(View.annot)))
       (LC2: lc2 =
             mk
@@ -634,7 +635,7 @@ Section Local.
       (VREL: lc.(vrel).(View.ts) <= List.length mem)
       (FWDBANK: forall loc fwd,
           lc.(fwdbank) loc = Some fwd ->
-          fwd.(FwdItem.ts) <= List.length mem /\
+          fwd.(FwdItem.ts) <= lc.(coh) loc /\
           fwd.(FwdItem.view).(View.ts) <= List.length mem)
       (EXBANK: forall eb, lc.(exbank) = Some eb -> exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
@@ -803,6 +804,9 @@ Section ExecUnit.
         all: try by apply FWD; eauto using read_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
+        * i. exploit FWDBANK; eauto. i. des.
+          splits; ss. rewrite x, fun_add_spec. condtac; ss.
+          inversion e. subst. ss.
         * destruct ex0; ss. i. inv H1. eauto.
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
           rewrite fun_add_spec. condtac; ss. inversion e. rewrite H2. ss.
@@ -812,7 +816,7 @@ Section ExecUnit.
         rewrite TS. unfold ifc. condtac; [|by apply bot_spec]. eapply get_msg_wf. eauto.
       + econs; viewtac; rewrite <- ? TS0, <- ? TS1; eauto using get_msg_wf, expr_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
-        * i. revert H1. rewrite fun_add_spec. condtac; viewtac.
+        * i. revert H1. rewrite ? fun_add_spec. condtac; viewtac.
           i. inv H1. s. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
         * destruct ex0; ss.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
