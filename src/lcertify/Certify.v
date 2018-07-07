@@ -543,7 +543,6 @@ Proof.
             - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
               destruct a, eb. inv REL. ss. subst.
               esplits; eauto. s. ii. subst.
-              eapply EX0; eauto. 
               assert (TS1': ts1 <= ts) by lia.
               replace ts2 with ts1 in *; cycle 1; ss.
               { inv TS'. rewrite TS3; ss. }
@@ -558,76 +557,16 @@ Proof.
         all: repeat rewrite fun_add_spec.
         all: repeat apply sim_view_join; ss.
         * condtac; ss.
-        * condtac; ss.
-          { splits; ss.
-            inv MEM. exploit (EQUIV ts0); ss.
-            unfold Memory.get_msg, Memory.read. destruct ts0; ss.
-            i. rewrite x1. ss.
-          }
-          { exploit FWDBANK; eauto.
-            rewrite <- H, fun_add_spec. condtac; ss.
-          }
-        * destruct ex0; ss.
-        * congr.
-        * revert FIND. rewrite Promises.unset_o. condtac; ss. eauto.      inv STEP.
-          assert (TS0: ts0 <= ts).
-          { inv WRITABLE. inv LOCAL. exploit PROMISES_TS; eauto. }
-          exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
-          { rewrite <- TS0. inv WRITABLE. etrans; [|by apply Time.lt_le_incl; eauto].
-            s. rewrite <- join_l. eauto.
-          }
-          intro ELOC. clear TS.
-          exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
-          { rewrite <- TS0. inv WRITABLE. etrans; [|by apply Time.lt_le_incl; eauto].
-            s. rewrite <- join_r, <- join_l. eauto.
-          }
-          intro EVAL. clear TS.
-          eexists (ExecUnit.mk _ _ _). esplits.
-      + econs 1. econs. econs; ss; cycle 1.
-        * econs 3; eauto. econs; eauto; cycle 1.
-          { rewrite <- MSG. apply MEM. ss. }
-          { inv LOCAL. rewrite PROMISES. eauto. }
-          { instantiate (1 := view_ext).
-            instantiate (1 := ord).
-            instantiate (1 := ex0).
-            inv WRITABLE. econs; eauto.
-            - symmetry. eapply sim_view_eq; cycle 1.
-              { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
-              s. repeat apply sim_view_join; ss.
-              all: try apply sim_view_ifc.
-              all: try by apply LOCAL.
-              inv LOCAL. inv EXBANK; ss. inv REL. ss.
-            - exploit sim_time_eq.
-              { inv LOCAL. eapply COH0. }
-              { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
-              i. congr.
-            - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
-              destruct a, eb. inv REL. ss. subst.
-              esplits; eauto. s. ii. subst.
-
-              assert (TS1': ts1 <= ts) by lia.
-              replace ts2 with ts1 in *; cycle 1; ss.
-              { inv TS. rewrite TS3; ss. }
-              eapply EX0; eauto. rewrite <- MSG0. inv MEM.
-              exploit (EQUIV (S ts3)).
-              { lia. }
-              unfold Memory.get_msg, Memory.read. ss.
-          }
-        * econs 4; ss.
-      + econs; ss; eauto using sim_rmap_add, sim_val_const.
-        inv LOCAL. econs; ss; i.
-        all: repeat rewrite fun_add_spec.
-        all: repeat apply sim_view_join; ss.
-        * condtac; ss.
-        * condtac; ss.
-          { splits; ss.
-            inv MEM. exploit (EQUIV ts0); ss.
-            unfold Memory.get_msg, Memory.read. destruct ts0; ss.
-            i. rewrite x1. ss.
-          }
-          { exploit FWDBANK; eauto.
-            rewrite <- H, fun_add_spec. condtac; ss.
-          }
+        * admit.
+          (* condtac; ss. *)
+          (* { splits; ss. *)
+          (*   inv MEM. exploit (EQUIV ts0); ss. *)
+          (*   unfold Memory.get_msg, Memory.read. destruct ts0; ss. *)
+          (*   i. rewrite x1. ss. *)
+          (* } *)
+          (* { exploit FWDBANK; eauto. *)
+          (*   rewrite <- H, fun_add_spec. condtac; ss. *)
+          (* } *)
         * destruct ex0; ss.
         * congr.
         * revert FIND. rewrite Promises.unset_o. condtac; ss. eauto.
