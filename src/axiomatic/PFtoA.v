@@ -22,40 +22,6 @@ Require Import PromisingArch.axiomatic.Axiomatic.
 Set Implicit Arguments.
 
 
-Definition mem_of_ex
-           (ex:Execution.t)
-           (ob:list eidT):
-  Memory.t :=
-  filter_map
-    (fun eid =>
-       match Execution.label eid ex with
-       | Some (Label.write ex ord loc val) => Some (Msg.mk loc val eid.(fst))
-       | _ => None
-       end)
-    ob.
-
-Lemma mem_of_ex_app ex ob1 ob2:
-  mem_of_ex ex (ob1 ++ ob2) = mem_of_ex ex ob1 ++ mem_of_ex ex ob2.
-Proof. apply filter_map_app. Qed.
-
-Lemma mem_of_ex_in_length
-      ex ob eid
-      (IN: List.In eid ob)
-      (EID: ex.(Execution.label_is) Label.is_write eid):
-  length (mem_of_ex ex ob) <> 0.
-Proof.
-  eapply filter_map_in_length; eauto.
-  inv EID. rewrite EID0. destruct l; ss.
-Qed.
-
-Inductive sim_mem (ex:Execution.t) (mem: Memory.t): Prop :=
-| sim_mem_intro
-    ob
-    (EIDS: Permutation ob (Execution.eids ex))
-    (MEM: mem = mem_of_ex ex ob)
-.
-Hint Constructors sim_mem.
-
 Inductive inverse A (rel:relation A) (codom:A -> Prop) (a:A): Prop :=
 | inverse_intro
     a'
@@ -90,179 +56,71 @@ Proof.
   - inv H. econs; eauto. econs; eauto.
 Qed.
 
-Definition view_of_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option Time.t :=
-  option_map
-    (fun n => length (mem_of_ex ex (List.firstn (S n) ob)))
-    (List_find_pos (fun eid' => eid' == eid) ob).
+Definition sim_view (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  forall eid (EID: eids eid), le (v eid) view.
 
-Lemma view_of_eid_inv
-      ex ob eid view
-      (VIEW: view_of_eid ex ob eid = Some view):
-  exists n,
-    <<N: List.nth_error ob n = Some eid>> /\
-    <<VIEW: view = length (mem_of_ex ex (List.firstn (S n) ob))>>.
-Proof.
-  unfold view_of_eid in *.
-  destruct ((List_find_pos (fun eid' : eidT => equiv_dec eid' eid) ob)) eqn:POS; inv VIEW.
-  exploit List_find_pos_inv; eauto. i. des. destruct (equiv_dec a eid); ss. inv e.
-  esplits; eauto.
-Qed.
-
-Lemma view_of_eid_ob_write_write
-      ex ob eid1 eid2 view loc
-      (VIEW1: view_of_eid ex ob eid1 = Some view)
-      (VIEW2: view_of_eid ex ob eid2 = Some view)
-      (WRITE1: Execution.label_is ex (Label.is_writing loc) eid1)
-      (WRITE2: Execution.label_is ex (Label.is_writing loc) eid2):
-  eid1 = eid2.
-Proof.
-  exploit view_of_eid_inv; try exact VIEW1; eauto. i. des.
-  exploit view_of_eid_inv; try exact VIEW2; eauto. i. des.
-  inv WRITE1. apply Label.is_writing_inv in LABEL. des. subst.
-  inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
-  destruct (Nat.compare_spec n n0).
-  - subst. congr.
-  - rewrite (@List_firstn_le (S n) (S n0)) in VIEW0; [|lia].
-    rewrite mem_of_ex_app, List.app_length in VIEW0.
-    apply plus_minus in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
-    exploit List_nth_error_skipn; eauto. i.
-    exploit @List_nth_error_firstn; [eauto| |i].
-    { instantiate (1 := (n0 - n)). lia. }
-    exploit List.nth_error_In; eauto. i.
-    exfalso. eapply mem_of_ex_in_length; eauto.
-  - symmetry in VIEW0.
-    rewrite (@List_firstn_le (S n0) (S n)) in VIEW0; [|lia].
-    rewrite mem_of_ex_app, List.app_length in VIEW0.
-    apply plus_minus in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
-    exploit List_nth_error_skipn; try exact N; eauto. i.
-    exploit @List_nth_error_firstn; [eauto| |i].
-    { instantiate (1 := (n - n0)). lia. }
-    exploit List.nth_error_In; eauto. i.
-    exfalso. eapply mem_of_ex_in_length; eauto.
-Qed.
-
-Lemma view_of_eid_ob
-      ex rel ob eid1 eid2 view1 view2
-      (LINEARIZED: linearized rel ob)
-      (OB: rel eid1 eid2)
-      (VIEW1: view_of_eid ex ob eid1 = Some view1)
-      (VIEW2: view_of_eid ex ob eid2 = Some view2):
-  le view1 view2.
-Proof.
-  exploit view_of_eid_inv; try exact VIEW1; eauto. i. des.
-  exploit view_of_eid_inv; try exact VIEW2; eauto. i. des.
-  subst. exploit LINEARIZED; try exact OB; eauto. i.
-  erewrite (@List_firstn_le (S n) (S n0)); [|lia].
-  rewrite mem_of_ex_app, List.app_length. unfold le. lia.
-Qed.
-
-Lemma view_of_eid_ob_write
-      ex rel ob eid1 eid2 view1 view2 loc
-      (LINEARIZED: linearized rel ob)
-      (OB: rel eid1 eid2)
-      (VIEW1: view_of_eid ex ob eid1 = Some view1)
-      (VIEW2: view_of_eid ex ob eid2 = Some view2)
-      (WRITE2: Execution.label_is ex (Label.is_writing loc) eid2):
-  view1 < view2.
-Proof.
-  exploit view_of_eid_inv; try exact VIEW1; eauto. i. des.
-  exploit view_of_eid_inv; try exact VIEW2; eauto. i. des.
-  subst. exploit LINEARIZED; try exact OB; eauto. i.
-  erewrite (@List_firstn_le (S n) (S n0)); [|lia].
-  rewrite mem_of_ex_app, List.app_length. apply Nat.lt_add_pos_r.
-  exploit List_nth_error_skipn; eauto. i.
-  exploit List_nth_error_firstn; [eauto| |i].
-  { instantiate (1 := (S n0 - S n)). lia. }
-  exploit List.nth_error_In; eauto. i.
-  apply neq_0_lt. ii. eapply mem_of_ex_in_length; eauto.
-  inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
-  econs; eauto.
-Qed.
-
-Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:Time.t): Prop :=
-| sim_view_bot
+Inductive sim_view_rev (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+| sim_view_rev_bot
     (VIEW: view = bot)
-| sim_view_event
-    eid v
+| sim_view_rev_event
+    eid
     (EID: eids eid)
-    (VIEW_OF_EID: view_of_eid ex ob eid = Some v)
-    (VIEW: le view v)
+    (VIEW: le view (v eid))
 .
-Hint Constructors sim_view.
+Hint Constructors sim_view_rev.
 
-Lemma sim_view_join ex ob pred v1 v2
-      (V1: sim_view ex ob pred v1)
-      (V2: sim_view ex ob pred v2):
-  sim_view ex ob pred (join v1 v2).
-Proof.
-  inv V1.
-  { rewrite join_comm, bot_join; [|exact Time.order]. ss. }
-  inv V2.
-  { rewrite bot_join; [|exact Time.order]. econs 2; eauto. }
+Definition sim_view_eq (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  sim_view v view eids /\ sim_view_rev v view eids.
 
-  generalize (Time.max_spec_le v1 v2). i. des.
-  - unfold join, Time.join. rewrite H0. econs 2; try exact VIEW_OF_EID0; eauto.
-  - unfold join, Time.join. rewrite H0. econs 2; try exact VIEW_OF_EID; eauto.
-Qed.
-
-Lemma sim_view_le ex ob pred1 pred2
-      (PRED: pred1 <1= pred2):
-  sim_view ex ob pred1 <1= sim_view ex ob pred2.
-Proof.
-  i. inv PR.
-  - econs 1. ss.
-  - econs 2; eauto.
-Qed.
-
-Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t (A:=unit))): Prop :=
+Inductive sim_val (tid:Id.t) (v:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat -> Prop)): Prop :=
 | sim_val_intro
-    (VAL: avala.(ValA.val) = vala.(ValA.val))
-    (VIEW: sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot).(View.ts))
+    (VAL: vala.(ValA.val) = avala.(ValA.val))
+    (VIEW: sim_view v vala.(ValA.annot).(View.ts) (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)))
 .
 Hint Constructors sim_val.
 
-Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t (A:=unit))): Prop :=
+Inductive sim_rmap (tid:Id.t) (v:eidT -> Time.t) (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
 | sim_rmap_intro
-    (RMAP: IdMap.Forall2 (fun reg => sim_val tid ex ob) armap rmap)
+    (RMAP: IdMap.Forall2 (fun reg => sim_val tid v) rmap armap)
 .
 Hint Constructors sim_rmap.
 
-Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t (A:=unit))): Prop :=
+Inductive sim_state (tid:Id.t) (v:eidT -> Time.t) (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
 | sim_state_intro
-    (STMTS: astate.(State.stmts) = state.(State.stmts))
-    (RMAP: sim_rmap tid ex ob astate.(State.rmap) state.(State.rmap))
+    (STMTS: state.(State.stmts) = astate.(State.stmts))
+    (RMAP: sim_rmap tid v state.(State.rmap) astate.(State.rmap))
 .
 Hint Constructors sim_state.
 
 Lemma sim_rmap_add
-      tid ex ob armap rmap reg avala vala
-      (SIM: sim_rmap tid ex ob armap rmap)
-      (VAL: sim_val tid ex ob avala vala):
-  sim_rmap tid ex ob (RMap.add reg avala armap) (RMap.add reg vala rmap).
+      tid v rmap armap reg vala avala
+      (SIM: sim_rmap tid v rmap armap)
+      (VAL: sim_val tid v vala avala):
+  sim_rmap tid v (RMap.add reg vala rmap) (RMap.add reg avala armap).
 Proof.
   econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
   inv SIM. condtac; eauto.
 Qed.
 
 Lemma sim_rmap_expr
-      tid ex ob armap rmap e
-      (SIM: sim_rmap tid ex ob armap rmap):
-  sim_val tid ex ob (sem_expr armap e) (sem_expr rmap e).
+      tid v rmap armap e
+      (SIM: sim_rmap tid v rmap armap):
+  sim_val tid v (sem_expr rmap e) (sem_expr armap e).
 Proof.
   inv SIM. induction e; s.
   - (* const *)
-    econs; ss. econs 1; ss.
+    econs; ss. ii. inv EID. inv H0.
   - (* reg *)
     specialize (RMAP reg). unfold RMap.find. inv RMAP; ss.
-    econs; ss. econs 1; ss.
+    econs; ss. ii. inv EID. inv H2.
   - (* op1 *)
     inv IHe. econs; ss. congr.
   - (* op2 *)
     inv IHe1. inv IHe2. econs; ss.
     + congr.
-    + apply sim_view_join; eapply sim_view_le; eauto.
-      * s. i. des. subst. esplits; eauto. left. ss.
-      * s. i. des. subst. esplits; eauto. right. ss.
+    + ii. des. inv EID0.
+      * etrans; [|eapply join_l]; eauto.
+      * etrans; [|eapply join_r]; eauto.
 Qed.
 
 Definition sim_local_coh ex loc :=
@@ -637,150 +495,149 @@ Proof.
   refl.
 Qed.
 
-Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t) (local:Local.t (A:=unit)): Prop := mk_sim_local {
+Inductive sim_local (tid:Id.t) (ex: Execution.t) (v: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
-          ex ob
-          (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))))
-          (local.(Local.coh) loc);
+          v
+          (local.(Local.coh) loc)
+          (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VRP: sim_view
-         ex ob
-         (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vrp).(View.ts);
+         v
+         local.(Local.vrp).(View.ts)
+         (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VWP: sim_view
-         ex ob
-         (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vwp).(View.ts);
+         v
+         local.(Local.vwp).(View.ts)
+         (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VRM: sim_view
-         ex ob
-         (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vrm).(View.ts);
+         v
+         local.(Local.vrm).(View.ts)
+         (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VWM: sim_view
-         ex ob
-         (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vwm).(View.ts);
-  VCAP:
-       sim_view
-         ex ob
-         (inverse (sim_local_vcap ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-         local.(Local.vcap).(View.ts);
+         v
+         local.(Local.vwm).(View.ts)
+         (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VCAP: sim_view
+          v
+          local.(Local.vcap).(View.ts)
+          (inverse (sim_local_vcap ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VREL: sim_view
-          ex ob
-          (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
-          local.(Local.vrel).(View.ts);
-  FWDBANK: forall loc,
-      (exists eid,
-          <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\
-          <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\
-          <<TS: view_of_eid ex ob eid = Some (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\
-          <<VIEW: sim_view
-                    ex ob
-                    (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))
-                    (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)>> /\
-          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/
-      ((local.(Local.fwdbank) loc) = FwdItem.init /\
-       forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid));
-  EXBANK: opt_rel
-            (fun aeb eb =>
-               ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\
-               (forall eid v, ex.(Execution.rf) eid (tid, aeb) -> view_of_eid ex ob eid = Some v -> le v eb.(Exbank.ts)) /\
-               sim_view
-                 ex ob
-                 (inverse ex.(Execution.rf) (eq (tid, aeb)))
-                 eb.(Exbank.ts) /\
-               sim_view
-                 ex ob
-                 (eq (tid, aeb))
-                 eb.(Exbank.view).(View.ts))
-            alocal.(ALocal.exbank) local.(Local.exbank);
-  PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
-      exists n,
-        <<N: (length alocal.(ALocal.labels)) <= n>> /\
-        <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
-        <<VIEW: view_of_eid ex ob (tid, n) = Some view>>;
+          v
+          local.(Local.vrel).(View.ts)
+          (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  (* FWDBANK: forall loc, *)
+  (*     (exists eid, *)
+  (*         <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\ *)
+  (*         <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\ *)
+  (*         <<TS: view_of_eid ex ob eid = Some (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\ *)
+  (*         <<VIEW: sim_view *)
+  (*                   ex ob *)
+  (*                   (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid)) *)
+  (*                   (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)>> /\ *)
+  (*         <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/ *)
+  (*     ((local.(Local.fwdbank) loc) = FwdItem.init /\ *)
+  (*      forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)); *)
+  (* EXBANK: opt_rel *)
+  (*           (fun aeb eb => *)
+  (*              ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\ *)
+  (*              (forall eid v, ex.(Execution.rf) eid (tid, aeb) -> view_of_eid ex ob eid = Some v -> le v eb.(Exbank.ts)) /\ *)
+  (*              sim_view *)
+  (*                ex ob *)
+  (*                (inverse ex.(Execution.rf) (eq (tid, aeb))) *)
+  (*                eb.(Exbank.ts) /\ *)
+  (*              sim_view *)
+  (*                ex ob *)
+  (*                (eq (tid, aeb)) *)
+  (*                eb.(Exbank.view).(View.ts)) *)
+  (*           alocal.(ALocal.exbank) local.(Local.exbank); *)
+  (* PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)), *)
+  (*     exists n, *)
+  (*       <<N: (length alocal.(ALocal.labels)) <= n>> /\ *)
+  (*       <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\ *)
+  (*       <<VIEW: view_of_eid ex ob (tid, n) = Some view>>; *)
 }.
 Hint Constructors sim_local.
 
-Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t (A:=unit)): Prop :=
-| sim_eu_intro
-    (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state))
-    (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local))
-    (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
-.
-Hint Constructors sim_eu.
+(* Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t (A:=unit)): Prop := *)
+(* | sim_eu_intro *)
+(*     (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state)) *)
+(*     (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local)) *)
+(*     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob) *)
+(* . *)
+(* Hint Constructors sim_eu. *)
 
-Lemma label_read_mem_of_ex
-      eid ex ob exm ord loc val
-      (OB: Permutation ob (Execution.eids ex))
-      (LABEL: Execution.label eid ex = Some (Label.read exm ord loc val)):
-  exists view,
-    <<VIEW: view_of_eid ex ob eid = Some view>>.
-Proof.
-  generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0.
-  specialize (LABEL0 eid). rewrite LABEL in LABEL0.
-  inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0.
-  symmetry in OB. exploit Permutation_in; eauto. intro IN.
-  exploit HahnList.Permutation_nodup; eauto. intro NODUP.
-  generalize (List_in_find_pos _ ob IN). i. des.
-  unfold view_of_eid. rewrite H. s. eauto.
-Qed.
+(* Lemma label_read_mem_of_ex *)
+(*       eid ex ob exm ord loc val *)
+(*       (OB: Permutation ob (Execution.eids ex)) *)
+(*       (LABEL: Execution.label eid ex = Some (Label.read exm ord loc val)): *)
+(*   exists view, *)
+(*     <<VIEW: view_of_eid ex ob eid = Some view>>. *)
+(* Proof. *)
+(*   generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0. *)
+(*   specialize (LABEL0 eid). rewrite LABEL in LABEL0. *)
+(*   inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0. *)
+(*   symmetry in OB. exploit Permutation_in; eauto. intro IN. *)
+(*   exploit HahnList.Permutation_nodup; eauto. intro NODUP. *)
+(*   generalize (List_in_find_pos _ ob IN). i. des. *)
+(*   unfold view_of_eid. rewrite H. s. eauto. *)
+(* Qed. *)
 
-Lemma label_write_mem_of_ex_msg
-      eid ex ob exm ord loc val
-      (OB: Permutation ob (Execution.eids ex))
-      (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)):
-  exists n,
-    <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
-    <<MSG: List.nth_error (mem_of_ex ex ob) n = Some (Msg.mk loc val eid.(fst))>>.
-Proof.
-  generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0.
-  specialize (LABEL0 eid). rewrite LABEL in LABEL0.
-  inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0.
-  symmetry in OB. exploit Permutation_in; eauto. intro IN.
-  exploit HahnList.Permutation_nodup; eauto. intro NODUP.
-  generalize (List_in_find_pos _ ob IN). i. des.
-  unfold view_of_eid. rewrite H.
-  exploit List_find_pos_inv; eauto. i. des.
-  destruct (equiv_dec a eid); [|done]. inversion e. subst.
-  esplits.
-  - unfold option_map. erewrite List_firstn_S; eauto.
-    rewrite mem_of_ex_app, List.app_length.
-    unfold mem_of_ex at 2. s. rewrite LABEL. s. rewrite Nat.add_1_r. ss.
-  - rewrite <- (List.firstn_skipn n ob) at 1.
-    rewrite mem_of_ex_app, List.nth_error_app2; [|lia].
-    erewrite Nat.sub_diag, List_skipn_cons; eauto. s.
-    unfold mem_of_ex. s. rewrite LABEL. ss.
-Qed.
+(* Lemma label_write_mem_of_ex_msg *)
+(*       eid ex ob exm ord loc val *)
+(*       (OB: Permutation ob (Execution.eids ex)) *)
+(*       (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)): *)
+(*   exists n, *)
+(*     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\ *)
+(*     <<MSG: List.nth_error (mem_of_ex ex ob) n = Some (Msg.mk loc val eid.(fst))>>. *)
+(* Proof. *)
+(*   generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0. *)
+(*   specialize (LABEL0 eid). rewrite LABEL in LABEL0. *)
+(*   inv LABEL0. clear H0. exploit H; [congr|]. clear H. intro IN0. *)
+(*   symmetry in OB. exploit Permutation_in; eauto. intro IN. *)
+(*   exploit HahnList.Permutation_nodup; eauto. intro NODUP. *)
+(*   generalize (List_in_find_pos _ ob IN). i. des. *)
+(*   unfold view_of_eid. rewrite H. *)
+(*   exploit List_find_pos_inv; eauto. i. des. *)
+(*   destruct (equiv_dec a eid); [|done]. inversion e. subst. *)
+(*   esplits. *)
+(*   - unfold option_map. erewrite List_firstn_S; eauto. *)
+(*     rewrite mem_of_ex_app, List.app_length. *)
+(*     unfold mem_of_ex at 2. s. rewrite LABEL. s. rewrite Nat.add_1_r. ss. *)
+(*   - rewrite <- (List.firstn_skipn n ob) at 1. *)
+(*     rewrite mem_of_ex_app, List.nth_error_app2; [|lia]. *)
+(*     erewrite Nat.sub_diag, List_skipn_cons; eauto. s. *)
+(*     unfold mem_of_ex. s. rewrite LABEL. ss. *)
+(* Qed. *)
 
-Lemma label_write_mem_of_ex
-      eid ex ob exm ord loc val
-      (OB: Permutation ob (Execution.eids ex))
-      (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)):
-  exists n,
-    <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
-    <<READ: Memory.read loc (S n) (mem_of_ex ex ob) = Some val>> /\
-    <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val eid.(fst))>>.
-Proof.
-  exploit label_write_mem_of_ex_msg; eauto. i. des.
-  esplits; eauto.
-  unfold Memory.read. s. rewrite MSG. s. condtac; [|congr]. ss.
-Qed.
+(* Lemma label_write_mem_of_ex *)
+(*       eid ex ob exm ord loc val *)
+(*       (OB: Permutation ob (Execution.eids ex)) *)
+(*       (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)): *)
+(*   exists n, *)
+(*     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\ *)
+(*     <<READ: Memory.read loc (S n) (mem_of_ex ex ob) = Some val>> /\ *)
+(*     <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val eid.(fst))>>. *)
+(* Proof. *)
+(*   exploit label_write_mem_of_ex_msg; eauto. i. des. *)
+(*   esplits; eauto. *)
+(*   unfold Memory.read. s. rewrite MSG. s. condtac; [|congr]. ss. *)
+(* Qed. *)
 
-Lemma in_mem_of_ex
-      ex ob view msg
-      (NODUP: List.NoDup ob)
-      (IN: List.nth_error (mem_of_ex ex ob) view = Some msg):
-  exists n ex1 ord1,
-    <<LABEL: Execution.label (msg.(Msg.tid), n) ex = Some (Label.write ex1 ord1 msg.(Msg.loc) msg.(Msg.val))>> /\
-    <<VIEW: view_of_eid ex ob (msg.(Msg.tid), n) = Some (S view)>>.
-Proof.
-  unfold mem_of_ex in IN. exploit nth_error_filter_map_inv; eauto. i. des.
-  destruct (Execution.label a ex) eqn:LABEL; ss. destruct t; inv FA. destruct a. ss.
-  esplits.
-  - eauto.
-  - unfold view_of_eid.
-    erewrite List_nth_error_find_pos; eauto. s. f_equal. ss.
-Qed.
+(* Lemma in_mem_of_ex *)
+(*       ex ob view msg *)
+(*       (NODUP: List.NoDup ob) *)
+(*       (IN: List.nth_error (mem_of_ex ex ob) view = Some msg): *)
+(*   exists n ex1 ord1, *)
+(*     <<LABEL: Execution.label (msg.(Msg.tid), n) ex = Some (Label.write ex1 ord1 msg.(Msg.loc) msg.(Msg.val))>> /\ *)
+(*     <<VIEW: view_of_eid ex ob (msg.(Msg.tid), n) = Some (S view)>>. *)
+(* Proof. *)
+(*   unfold mem_of_ex in IN. exploit nth_error_filter_map_inv; eauto. i. des. *)
+(*   destruct (Execution.label a ex) eqn:LABEL; ss. destruct t; inv FA. destruct a. ss. *)
+(*   esplits. *)
+(*   - eauto. *)
+(*   - unfold view_of_eid. *)
+(*     erewrite List_nth_error_find_pos; eauto. s. f_equal. ss. *)
+(* Qed. *)
 
 Definition promises_from_mem
            (tid:Id.t) (mem: Memory.t): Promises.t.
@@ -1116,6 +973,15 @@ Lemma w_property
 Proof.
 Admitted.
 
+Lemma w_bot
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists w wl',
+    wl = w :: wl' /\
+    forall eid ts (W: w eid = Some ts), Time.lt Time.bot ts.(snd).
+Proof.
+Admitted.
+
 Lemma r_property
       p mem tid tr atr wl rl cov vext
       (SIM: sim_trace p mem tid tr atr wl rl cov vext):
@@ -1235,7 +1101,7 @@ Lemma sim_traces_memory
 Proof.
 Admitted.
 
-Lemma sim_traces_rf1
+Lemma sim_traces_rf1_aux
       p mem trs atrs rs ws covs vexts ex m
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
@@ -1248,7 +1114,8 @@ Lemma sim_traces_rf1
               atrs PRE.(Valid.aeus)):
   forall eid1 ex1 ord1 loc val
      (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
-    (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default>>) \/
+    (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default >> /\
+     <<R: exists r rl, IdMap.find eid1.(fst) rs = Some (r::rl) /\ r eid1.(snd) = Some Time.bot>>) \/
     (exists eid2 ex2 ord2,
         <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
         <<RF: (rf_gen ws rs) eid2 eid1>>).
@@ -1262,8 +1129,9 @@ Proof.
   des. simplify.
   exploit r_property; eauto. i. des. simplify.
   exploit RPROP1; eauto. i. des.
-  - left. split; auto. ii. inv H. inv H1.
-    destruct x2 as [tid2 eid2]. ss. simplify.
+  - left. esplits; subst; eauto.
+    ii. inv H. inv H1.
+    destruct x0 as [tid2 eid2]. ss. simplify.
     rewrite R in x. inv x.
     generalize (SIM tid2). intro SIM1. inv SIM1; try congr.
     simplify.
@@ -1277,12 +1145,35 @@ Proof.
     exploit w_property; try exact REL0; eauto. i. des. simplify.
     exploit WPROP1; eauto. i. des; ss.
     + destruct b. ss. inv NOPROMISE.
-      exploit PROMISES0; eauto. i. rewrite x4 in x1.
+      exploit PROMISES; eauto. i. rewrite x4 in x1.
       rewrite Promises.lookup_bot in x1. ss.
     + generalize (ATR tid'). intro ATR2. inv ATR2; try congr.
       des. simplify. eexists (tid', eid). esplits; ss.
       * rewrite IdMap.map_spec. rewrite <- H8. ss. eauto.
       * econs; eauto.
+Qed.
+
+Lemma sim_traces_rf1
+      p mem trs atrs rs ws covs vexts ex m
+      (PRE: Valid.pre_ex p ex)
+      (NOPROMISE: Machine.no_promise m)
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (TR: IdMap.Forall2
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun tid atr aeu => exists l, atr = aeu :: l)
+              atrs PRE.(Valid.aeus)):
+  forall eid1 ex1 ord1 loc val
+     (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
+    (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default >>) \/
+    (exists eid2 ex2 ord2,
+        <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
+        <<RF: (rf_gen ws rs) eid2 eid1>>).
+Proof.
+  ii. exploit sim_traces_rf1_aux; eauto. i. des.
+  - left. esplits; eauto.
+  - right. esplits; eauto.
 Qed.
 
 Lemma sim_traces_rf2
@@ -1342,31 +1233,34 @@ Definition lastn A (n: nat) (l: list A) :=
 Lemma sim_trace_vext_cov
       p mem tid tr atr wl rl cov vext
       (SIM: sim_trace p mem tid tr atr wl rl cov vext):
-  exists w wl' aeu atr',
-    wl = w :: wl' /\
+  exists aeu atr' w wl' r rl',
     atr = aeu :: atr' /\
-    forall eid ts (W: w eid = Some ts),
-      (exists ex ord loc val,
-          List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)) /\
-      cov eid = ts.(snd) /\
-      vext eid = ts.(snd).
+    wl = w :: wl' /\
+    rl = r :: rl' /\
+    (forall eid ts (W: w eid = Some ts),
+        (exists ex ord loc val,
+            List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)) /\
+        cov eid = ts.(snd) /\
+        vext eid = ts.(snd)) /\
+    (forall eid ts (R: r eid = Some ts),
+        (exists ex ord loc val,
+            List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)) /\
+        cov eid = ts).
 Proof.
-  induction SIM.
-  - esplits; eauto. i. ss.
-  - esplits; eauto. i. des. inv IHSIM. inv IHSIM0.
-    inv EVENT.
-    + exploit IHSIM1; eauto. i. des.
+  induction SIM; esplits; eauto; i; ss.
+  - des. inv IHSIM. inv IHSIM0. inv EVENT.
+    + exploit IHSIM2; eauto. i. des.
       destruct aeu2. destruct local.
       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
     + des_ifs; eauto.
       * exfalso.
         rewrite Nat.eqb_eq in Heq. subst.
-        exploit IHSIM1; eauto. i. des.
+        exploit IHSIM2; eauto. i. des.
         unfold ALocal.next_eid in *.
         assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None)
           by (ii; congr).
         rewrite List.nth_error_Some in H. lia.
-      * exploit IHSIM1; eauto. i. des.
+      * exploit IHSIM2; eauto. i. des.
         destruct aeu2. destruct local.
         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
         { rewrite List.nth_error_app1; eauto.
@@ -1384,47 +1278,81 @@ Proof.
             rewrite <- Minus.minus_n_n. ss. lia.
           - inv EVENT. inv FAILURE. }
         { inv STEP. ss. }
-      * exploit IHSIM1; eauto. i. des.
+      * exploit IHSIM2; eauto. i. des.
         destruct aeu2. destruct local.
         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
         { rewrite List.nth_error_app1; eauto.
           eapply List.nth_error_Some. ii. congr. }
-      * exploit IHSIM1; eauto. i. des.
+      * exploit IHSIM2; eauto. i. des.
         destruct aeu2. destruct local.
         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
         { rewrite List.nth_error_app1; eauto.
           eapply List.nth_error_Some. ii. congr. }
-      * exploit IHSIM1; eauto. i. des.
+      * exploit IHSIM2; eauto. i. des.
         destruct aeu2. destruct local.
         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
         { rewrite List.nth_error_app1; eauto.
           eapply List.nth_error_Some. ii. congr. }
-    + exploit IHSIM1; eauto. i. des.
+    + exploit IHSIM2; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+      { rewrite List.nth_error_app1; eauto.
+        eapply List.nth_error_Some. ii. congr. }
+  - des. inv IHSIM. inv IHSIM1. inv EVENT.
+    + exploit IHSIM3; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+    + des_ifs; eauto.
+      * destruct eu1. destruct eu2.
+        destruct aeu. destruct aeu2. ss.
+        inv STATE. inv STEP. inv STATE; ss.
+        rewrite Nat.eqb_eq in Heq. subst.
+        inv LOCAL; ss.
+        inv STEP. ss. splits; eauto.
+        inv EVENT. inv ALOCAL_STEP; ss.
+        esplits. unfold ALocal.next_eid.
+        rewrite List.nth_error_app2.
+        rewrite <- Minus.minus_n_n. ss. lia.
+      * exploit IHSIM3; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + des_ifs; eauto.
+      * exfalso.
+        rewrite Nat.eqb_eq in Heq. subst.
+        exploit IHSIM3; eauto. i. des.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None)
+          by (ii; congr).
+        rewrite List.nth_error_Some in H. lia.
+      * exploit IHSIM3; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM3; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM3; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + exploit IHSIM3; eauto. i. des.
       destruct aeu2. destruct local.
       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
       { rewrite List.nth_error_app1; eauto.
         eapply List.nth_error_Some. ii. congr. }
 Qed.
 
-Lemma sim_traces_valid_co
+Lemma sim_traces_cov_co
       p mem trs atrs ws rs covs vexts
-      m ex
+      ex
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
-      (NOPROMISE: Machine.no_promise m)
-      (PRE: Valid.pre_ex p ex)
-      (CO: ex.(Execution.co) = co_gen ws)
-      (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (CO1: Valid.co1 ex)
-      (CO2: Valid.co2 ex)
-      (RF1: Valid.rf1 ex)
-      (RF2: Valid.rf2 ex)
-      (RF_WF: Valid.rf_wf ex)
-      (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
-             trs m.(Machine.tpool))
-      (ATR: IdMap.Forall2
-              (fun _ atr aeu => exists l, atr = aeu :: l)
-              atrs (Valid.aeus PRE)):
+      (CO: ex.(Execution.co) = co_gen ws):
   <<CO:
     forall eid1 eid2
       (CO: ex.(Execution.co) eid1 eid2),
@@ -1436,13 +1364,105 @@ Proof.
   generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
   exploit sim_trace_vext_cov; try exact REL6. i. des.
   exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
-  exploit x2; eauto. i. des.
-  exploit x5; eauto. i. des.
+  exploit x3; eauto. i. des.
+  exploit x8; eauto. i. des.
   unfold v_gen. ss. rewrite <- H4. rewrite <- H10.
-  rewrite x0. rewrite x4. auto.
+  rewrite x0. rewrite x5. auto.
 Qed.
 
-Lemma sim_traces_valid_thread
+Lemma sim_traces_cov_rf
+      p mem trs atrs ws rs covs vexts
+      ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (RF: ex.(Execution.rf) = rf_gen ws rs):
+  <<RF:
+    forall eid1 eid2
+      (RF: ex.(Execution.rf) eid1 eid2),
+      Time.eq ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
+Proof.
+  ii. rewrite RF in *. inv RF0.
+  destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+  generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
+  generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
+  exploit sim_trace_vext_cov; try exact REL6. i. des.
+  exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
+  exploit x3; eauto. i. des.
+  exploit x9; eauto. i. des.
+  unfold v_gen. ss. rewrite <- H4. rewrite <- H10.
+  rewrite x0. rewrite x5. refl.
+Qed.
+
+Lemma sim_traces_cov_fr
+      p mem trs atrs ws rs covs vexts
+      ex m
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (PRE: Valid.pre_ex p ex)
+      (NOPROMISE: Machine.no_promise m)
+      (TR: IdMap.Forall2
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun tid atr aeu => exists l, atr = aeu :: l)
+              atrs PRE.(Valid.aeus)):
+  <<FR:
+    forall eid1 eid2
+      (FR: ex.(Execution.fr) eid1 eid2),
+      Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
+Proof.
+  ii. inv FR.
+  - inv H. des.
+    exploit sim_traces_cov_co; eauto. i.
+    exploit sim_traces_cov_rf; eauto. i.
+    rewrite <- x2. auto.
+  - inv H. inv H1. inv H. inv H1. destruct l; ss.
+    exploit sim_traces_rf1_aux; eauto. i. des.
+    + inv H2. destruct l; ss. destruct PRE.
+      unfold Execution.label in EID0.
+      rewrite LABELS in EID0. rewrite IdMap.map_spec in EID0.
+      destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2]. ss.
+      destruct (IdMap.find tid2 aeus) eqn:FIND2; ss.
+      generalize (ATR tid2). intro ATR2. inv ATR2; try congr. des. simplify.
+      generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
+      exploit w_property; try exact REL6. i. des. simplify.
+      exploit WPROP2; eauto. i. des.
+      exploit w_bot; eauto. i. des. simplify.
+      exploit x1; eauto. i. ss.
+      generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify.
+      exploit sim_trace_vext_cov; try exact REL6. i. des.
+      exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
+      exploit x6; eauto. i. des.
+      exploit x12; eauto. i. des.
+      unfold v_gen. ss. rewrite <- H12. rewrite <- H7.
+      rewrite x9. rewrite x4. auto.
+    + exfalso.
+      rewrite RF in *. eapply H3. unfold codom_rel.
+      eexists. eauto.
+Qed.
+
+Lemma sim_traces_cov_po_loc
+      p mem trs atrs ws rs covs vexts
+      ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (ATR: IdMap.Forall2
+              (fun tid atr aeu => exists l, atr = aeu :: l)
+              atrs PRE.(Valid.aeus)):
+    <<PO_LOC_WRITE:
+      forall eid1 eid2
+        (PO_LOC: ex.(Execution.po_loc) eid1 eid2)
+        (EID2: ex.(Execution.label_is) Label.is_write eid2),
+        Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>> /\
+    <<PO_LOC_READ:
+      forall eid1 eid2
+        (PO_LOC: ex.(Execution.po_loc) eid1 eid2)
+        (EID2: ex.(Execution.label_is) Label.is_read eid2),
+        Time.le ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
+Proof.
+Admitted.
+
+Lemma sim_traces_vext_valid
       p mem trs atrs ws rs covs vexts
       m ex
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
@@ -1465,76 +1485,70 @@ Lemma sim_traces_valid_thread
     (FINDA: IdMap.find tid atrs = Some atr)
     n aeu atr'
     (LASTN: lastn (S n) atr = aeu :: atr'),
-    <<PO_LOC_WRITE:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (PO_LOC: ex.(Execution.po_loc) eid1 (tid, eid2))
-        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
-    <<PO_LOC_READ:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (PO_LOC: ex.(Execution.po_loc) eid1 (tid, eid2))
-        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
-    <<RF:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (RF: ex.(Execution.rf) eid1 (tid, eid2)),
-        Time.eq ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
     <<RFE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (RFE: ex.(Execution.rfe) eid1 (tid, eid2)),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<FR:
       forall eid1 eid2
         (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (FR: ex.(Execution.fr) (tid, eid1) eid2),
-        Time.lt ((v_gen covs) (tid, eid1)) ((v_gen covs) eid2)>> /\
+        Time.lt ((v_gen vexts) (tid, eid1)) ((v_gen vexts) eid2)>> /\
     <<AOB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
         (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<AOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(Execution.aob) eid1 (tid, eid2))
         (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<BOB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (BOB: ex.(Execution.bob) eid1 (tid, eid2))
         (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<BOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (BOB: ex.(Execution.bob) eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<DOB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
         (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>> /\
+        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<DOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (DOB: ex.(Execution.dob) eid1 (tid, eid2))
         (EID1: ex.(Execution.label_is) Label.is_access eid1)
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) (tid, eid2))>>.
+        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>>.
 Proof.
+  i. induction n.
+  - admit.
+  - admit.
 Admitted.
+
+Ltac des_union :=
+  repeat
+    (try match goal with
+         | [H: Execution.internal _ _ _ |- _] => inv H
+         | [H: Execution.ob _ _ _ |- _] => inv H
+         | [H: (_ ∪ _) _ _ |- _] => inv H
+         end).
 
 Lemma sim_traces_valid
       p mem trs atrs ws rs covs vexts
