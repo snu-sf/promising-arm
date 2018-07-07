@@ -123,25 +123,31 @@ Module Memory.
   Lemma get_latest
         loc mem:
     exists ts val,
-      (forall ts', latest loc ts ts' mem) /\
+      (forall ts' val (READ: read loc ts' mem = Some val), ts' <= ts) /\
       read loc ts mem = Some val.
   Proof.
     induction mem using List.rev_ind.
-    { exists 0, Val.default. splits; ss.
-      ii. destruct ts; ss.
-    }
+    { exists 0, Val.default. splits; ss. i. destruct ts'; ss. destruct ts'; ss. }
     destruct (loc == x.(Msg.loc)).
     { inversion e. subst. exists (S (length mem)), x.(Msg.val). splits.
-      - ii. apply nth_error_app_inv in MSG. des.
-        { lia. }
-        apply nth_error_singleton_inv in MSG0. des. subst.
-        replace ts with (length mem) in * by lia. lia.
+      - i. unfold read in READ. destruct ts'; [lia|]. ss.
+        destruct (nth_error (mem ++ [x]) ts') eqn:NTH; ss.
+        apply nth_error_app_inv in NTH. des; [lia|].
+        apply nth_error_singleton_inv in NTH0. des. subst.
+        replace ts' with (length mem) by lia. ss.
       - unfold read. ss. rewrite nth_error_app2, Nat.sub_diag; ss. condtac; ss.
     }
     des. exists ts, val. splits.
-    - ii. subst. apply nth_error_app_inv in MSG. des.
-      { eapply IHmem; eauto. }
-      apply nth_error_singleton_inv in MSG0. des. subst. congr.
+    - ii. eapply IHmem. rewrite <- READ.
+      destruct (read loc ts' mem) eqn:READ'.
+      { erewrite read_mon; eauto. }
+      unfold read in *. destruct ts'; ss.
+      destruct (nth_error (mem ++ [x]) ts') eqn:NTH; ss.
+      apply nth_error_app_inv in NTH. des; ss.
+      { rewrite NTH0 in READ'. ss. }
+      apply nth_error_singleton_inv in NTH0. des. subst.
+      replace ts' with (length mem) in * by lia.
+      revert READ. condtac; ss. inversion e. subst. congr.
     - apply read_mon. ss.
   Qed.
 End Memory.
@@ -652,6 +658,7 @@ Section Local.
   Inductive wf (tid:Id.t) (mem:Memory.t) (lc:t): Prop :=
   | wf_intro
       (COH: forall loc, lc.(coh) loc <= List.length mem)
+      (COH_READ: forall loc, exists val, Memory.read loc (lc.(coh) loc) mem = Some val)
       (VRP: lc.(vrp).(View.ts) <= List.length mem)
       (VWP: lc.(vwp).(View.ts) <= List.length mem)
       (VRM: lc.(vrm).(View.ts) <= List.length mem)
@@ -674,6 +681,7 @@ Section Local.
   Lemma init_wf tid: wf tid Memory.empty init.
   Proof.
     econs; ss; i; try by apply bot_spec.
+    - esplits. ss.
     - rewrite Promises.lookup_bot in IN. ss.
     - destruct ts; ss. destruct ts; ss.
   Qed.
@@ -833,6 +841,7 @@ Section ExecUnit.
         all: try by apply FWD; eauto using read_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
+        * i. rewrite fun_add_spec. condtac; eauto. inversion e. subst. eauto.
         * i. exploit FWDBANK; eauto. i. des.
           splits; eauto. rewrite x, fun_add_spec. condtac; ss.
           inversion e. subst. ss.
@@ -845,6 +854,9 @@ Section ExecUnit.
         rewrite TS. unfold ifc. condtac; [|by apply bot_spec]. eapply get_msg_wf. eauto.
       + econs; viewtac; rewrite <- ? TS0, <- ? TS1; eauto using get_msg_wf, expr_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
+        * i. rewrite fun_add_spec. condtac; ss. inversion e. subst.
+          revert MSG. unfold Memory.get_msg, Memory.read. destruct ts; ss. i.
+          rewrite MSG. s. rewrite X. eauto.
         * i. rewrite ? fun_add_spec. condtac; viewtac.
           inversion e. subst. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
         * destruct ex0; ss.
@@ -895,6 +907,7 @@ Section ExecUnit.
     - econs.
       all: try rewrite List.app_length; s; try lia.
       + i. rewrite COH. lia.
+      + i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
       + i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
       + i. exploit EXBANK; eauto. i. des.
         eexists. eapply Memory.read_mon. eauto.
@@ -1051,6 +1064,7 @@ Module Machine.
       + inv LOCAL. econs.
         all: try rewrite List.app_length; s; try lia.
         * i. rewrite COH. lia.
+        * i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
         * i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
         * i. exploit EXBANK; eauto. i. des.
           eexists. eapply Memory.read_mon. eauto.
