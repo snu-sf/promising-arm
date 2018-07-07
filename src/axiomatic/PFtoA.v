@@ -56,56 +56,56 @@ Proof.
   - inv H. econs; eauto. econs; eauto.
 Qed.
 
-Definition sim_view (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
-  forall eid (EID: eids eid), le (v eid) view.
+Definition sim_view (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  forall eid (EID: eids eid), le (vext eid) view.
 
-Inductive sim_view_rev (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+Inductive sim_view_rev (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
 | sim_view_rev_bot
     (VIEW: view = bot)
 | sim_view_rev_event
     eid
     (EID: eids eid)
-    (VIEW: le view (v eid))
+    (VIEW: le view (vext eid))
 .
 Hint Constructors sim_view_rev.
 
-Definition sim_view_eq (v: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
-  sim_view v view eids /\ sim_view_rev v view eids.
+Definition sim_view_eq (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  sim_view vext view eids /\ sim_view_rev vext view eids.
 
-Inductive sim_val (tid:Id.t) (v:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat -> Prop)): Prop :=
+Inductive sim_val (tid:Id.t) (vext:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat -> Prop)): Prop :=
 | sim_val_intro
     (VAL: vala.(ValA.val) = avala.(ValA.val))
-    (VIEW: sim_view v vala.(ValA.annot).(View.ts) (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)))
+    (VIEW: sim_view vext vala.(ValA.annot).(View.ts) (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)))
 .
 Hint Constructors sim_val.
 
-Inductive sim_rmap (tid:Id.t) (v:eidT -> Time.t) (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
+Inductive sim_rmap (tid:Id.t) (vext:eidT -> Time.t) (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
 | sim_rmap_intro
-    (RMAP: IdMap.Forall2 (fun reg => sim_val tid v) rmap armap)
+    (RMAP: IdMap.Forall2 (fun reg => sim_val tid vext) rmap armap)
 .
 Hint Constructors sim_rmap.
 
-Inductive sim_state (tid:Id.t) (v:eidT -> Time.t) (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
+Inductive sim_state (tid:Id.t) (vext:eidT -> Time.t) (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
 | sim_state_intro
     (STMTS: state.(State.stmts) = astate.(State.stmts))
-    (RMAP: sim_rmap tid v state.(State.rmap) astate.(State.rmap))
+    (RMAP: sim_rmap tid vext state.(State.rmap) astate.(State.rmap))
 .
 Hint Constructors sim_state.
 
 Lemma sim_rmap_add
-      tid v rmap armap reg vala avala
-      (SIM: sim_rmap tid v rmap armap)
-      (VAL: sim_val tid v vala avala):
-  sim_rmap tid v (RMap.add reg vala rmap) (RMap.add reg avala armap).
+      tid vext rmap armap reg vala avala
+      (SIM: sim_rmap tid vext rmap armap)
+      (VAL: sim_val tid vext vala avala):
+  sim_rmap tid vext (RMap.add reg vala rmap) (RMap.add reg avala armap).
 Proof.
   econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
   inv SIM. condtac; eauto.
 Qed.
 
 Lemma sim_rmap_expr
-      tid v rmap armap e
-      (SIM: sim_rmap tid v rmap armap):
-  sim_val tid v (sem_expr rmap e) (sem_expr armap e).
+      tid vext rmap armap e
+      (SIM: sim_rmap tid vext rmap armap):
+  sim_val tid vext (sem_expr rmap e) (sem_expr armap e).
 Proof.
   inv SIM. induction e; s.
   - (* const *)
@@ -495,76 +495,74 @@ Proof.
   refl.
 Qed.
 
-Inductive sim_local (tid:Id.t) (ex: Execution.t) (v: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
+Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
-          v
+          vext
           (local.(Local.coh) loc)
           (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VRP: sim_view
-         v
+         vext
          local.(Local.vrp).(View.ts)
          (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VWP: sim_view
-         v
+         vext
          local.(Local.vwp).(View.ts)
          (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VRM: sim_view
-         v
+         vext
          local.(Local.vrm).(View.ts)
          (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VWM: sim_view
-         v
+         vext
          local.(Local.vwm).(View.ts)
          (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VCAP: sim_view
-          v
+          vext
           local.(Local.vcap).(View.ts)
           (inverse (sim_local_vcap ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VREL: sim_view
-          v
+          vext
           local.(Local.vrel).(View.ts)
           (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
-  (* FWDBANK: forall loc, *)
-  (*     (exists eid, *)
-  (*         <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\ *)
-  (*         <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\ *)
-  (*         <<TS: view_of_eid ex ob eid = Some (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\ *)
-  (*         <<VIEW: sim_view *)
-  (*                   ex ob *)
-  (*                   (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid)) *)
-  (*                   (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)>> /\ *)
-  (*         <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/ *)
-  (*     ((local.(Local.fwdbank) loc) = FwdItem.init /\ *)
-  (*      forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid)); *)
-  (* EXBANK: opt_rel *)
-  (*           (fun aeb eb => *)
-  (*              ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\ *)
-  (*              (forall eid v, ex.(Execution.rf) eid (tid, aeb) -> view_of_eid ex ob eid = Some v -> le v eb.(Exbank.ts)) /\ *)
-  (*              sim_view *)
-  (*                ex ob *)
-  (*                (inverse ex.(Execution.rf) (eq (tid, aeb))) *)
-  (*                eb.(Exbank.ts) /\ *)
-  (*              sim_view *)
-  (*                ex ob *)
-  (*                (eq (tid, aeb)) *)
-  (*                eb.(Exbank.view).(View.ts)) *)
-  (*           alocal.(ALocal.exbank) local.(Local.exbank); *)
-  (* PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)), *)
-  (*     exists n, *)
-  (*       <<N: (length alocal.(ALocal.labels)) <= n>> /\ *)
-  (*       <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\ *)
-  (*       <<VIEW: view_of_eid ex ob (tid, n) = Some view>>; *)
+  FWDBANK: forall loc,
+      (exists eid,
+          <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\
+          <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\
+          <<TS: vext eid = (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\
+          <<VIEW: sim_view
+                    vext
+                    (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)
+                    (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))>> /\
+          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/
+      ((local.(Local.fwdbank) loc) = FwdItem.init /\
+       forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid));
+  EXBANK: opt_rel
+            (fun aeb eb =>
+               ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\
+               sim_view_eq
+                 vext
+                 eb.(Exbank.ts)
+                 (inverse ex.(Execution.rf) (eq (tid, aeb))) /\
+               sim_view
+                 vext
+                 eb.(Exbank.view).(View.ts)
+                 (eq (tid, aeb)))
+            alocal.(ALocal.exbank) local.(Local.exbank);
+  PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
+      exists n,
+        <<N: (length alocal.(ALocal.labels)) <= n>> /\
+        <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
+        <<VIEW: vext (tid, n) = view>>;
 }.
 Hint Constructors sim_local.
 
-(* Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t (A:=unit)): Prop := *)
-(* | sim_eu_intro *)
-(*     (STATE: sim_state tid ex ob aeu.(AExecUnit.state) eu.(ExecUnit.state)) *)
-(*     (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local)) *)
-(*     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob) *)
-(* . *)
-(* Hint Constructors sim_eu. *)
+Inductive sim_eu (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t) (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
+| sim_eu_intro
+    (STATE: sim_state tid vext eu.(ExecUnit.state) aeu.(AExecUnit.state))
+    (LOCAL: sim_local tid ex vext eu.(ExecUnit.local) aeu.(AExecUnit.local))
+.
+Hint Constructors sim_eu.
 
 (* Lemma label_read_mem_of_ex *)
 (*       eid ex ob exm ord loc val *)
@@ -1145,7 +1143,7 @@ Proof.
     exploit w_property; try exact REL0; eauto. i. des. simplify.
     exploit WPROP1; eauto. i. des; ss.
     + destruct b. ss. inv NOPROMISE.
-      exploit PROMISES; eauto. i. rewrite x4 in x1.
+      exploit PROMISES0; eauto. i. rewrite x4 in x1.
       rewrite Promises.lookup_bot in x1. ss.
     + generalize (ATR tid'). intro ATR2. inv ATR2; try congr.
       des. simplify. eexists (tid', eid). esplits; ss.

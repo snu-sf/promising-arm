@@ -122,6 +122,7 @@ Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank
 | sim_exbank_intro
     (LOC: eb1.(Exbank.loc) = eb2.(Exbank.loc))
     (TS: sim_time ts eb1.(Exbank.ts) eb2.(Exbank.ts))
+    (TS': sim_time ts eb2.(Exbank.ts) eb1.(Exbank.ts))
     (EBVIEW: sim_view ts eb1.(Exbank.view) eb2.(Exbank.view))
 .
 
@@ -618,7 +619,15 @@ Proof.
         all: repeat rewrite fun_add_spec.
         all: repeat apply sim_view_join; ss.
         * condtac; ss.
-        * condtac; ss. econs. s. splits; ss.
+        * condtac; ss.
+          { splits; ss.
+            inv MEM. exploit (EQUIV ts0); ss.
+            unfold Memory.get_msg, Memory.read. destruct ts0; ss.
+            i. rewrite x1. ss.
+          }
+          { exploit FWDBANK; eauto.
+            rewrite <- H, fun_add_spec. condtac; ss.
+          }
         * destruct ex0; ss.
         * congr.
         * revert FIND. rewrite Promises.unset_o. condtac; ss. eauto.
@@ -647,12 +656,12 @@ Proof.
         * econs 1; eauto. econs; eauto.
         * econs 6; ss.
       + exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
-        { rewrite <- VCAP. apply join_r. }
+        { rewrite <- VCAP. s. rewrite <- join_r. refl. }
         intro ELOC. econs; ss.
         { econs; ss. rewrite ELOC. ss. }
         econs; ss; try by apply LOCAL.
         apply sim_view_join; try by apply LOCAL.
-        rewrite x. ss.
+        rewrite ELOC. econs. ss.
     - (* dowhile *)
       apply internal_bot_inv in LC. subst.
       eexists (ExecUnit.mk _ _ _). esplits.
@@ -663,8 +672,6 @@ Proof.
         rewrite bot_join; [|by apply View.order]. apply LOCAL.
   }
 Admitted.
-      
-
 
 Lemma sim_certify
       tid eu1 eu2
