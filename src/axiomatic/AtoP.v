@@ -109,17 +109,17 @@ Proof.
 Qed.
 
 Lemma view_of_eid_ob_write_write
-      ex ob eid1 eid2 view loc
+      ex ob eid1 eid2 view
       (VIEW1: view_of_eid ex ob eid1 = Some view)
       (VIEW2: view_of_eid ex ob eid2 = Some view)
-      (WRITE1: Execution.label_is ex (Label.is_writing loc) eid1)
-      (WRITE2: Execution.label_is ex (Label.is_writing loc) eid2):
+      (WRITE1: Execution.label_is ex (Label.is_write) eid1)
+      (WRITE2: Execution.label_is ex (Label.is_write) eid2):
   eid1 = eid2.
 Proof.
   exploit view_of_eid_inv; try exact VIEW1; eauto. i. des.
   exploit view_of_eid_inv; try exact VIEW2; eauto. i. des.
-  inv WRITE1. apply Label.is_writing_inv in LABEL. des. subst.
-  inv WRITE2. apply Label.is_writing_inv in LABEL. des. subst.
+  inv WRITE1. destruct l; try done.
+  inv WRITE2. destruct l; try done.
   destruct (Nat.compare_spec n n0).
   - subst. congr.
   - rewrite (@List_firstn_le (S n) (S n0)) in VIEW0; [|lia].
@@ -693,11 +693,12 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
                  (eq (tid, aeb))
                  eb.(Exbank.view).(View.ts))
             alocal.(ALocal.exbank) local.(Local.exbank);
-  PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
-      exists n,
-        <<N: (length alocal.(ALocal.labels)) <= n>> /\
-        <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
-        <<VIEW: view_of_eid ex ob (tid, n) = Some view>>;
+  PROMISES: forall view,
+      Promises.lookup view local.(Local.promises) <->
+      (exists n,
+          <<N: (length alocal.(ALocal.labels)) <= n>> /\
+          <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
+          <<VIEW: view_of_eid ex ob (tid, n) = Some view>>);
 }.
 Hint Constructors sim_local.
 
@@ -899,7 +900,7 @@ Proof.
       esplits; eauto.
       { i. inv H. }
       econs 2; try exact VIEW0; eauto; ss.
-      generalize (SIM_LOCAL.(FWDBANK) (ValA.val (sem_expr armap1 eloc))). i. des.      
+      generalize (SIM_LOCAL.(FWDBANK) (ValA.val (sem_expr armap1 eloc))). i. des.
       - (* fwdbank = Some *)
         destruct (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) eqn:FWD.
         ss. unfold FwdItem.read_view. s. condtac.
@@ -908,8 +909,8 @@ Proof.
           destruct (equiv_dec ts (S n)); ss. inv e.
           assert (eid2 = eid).
           { eapply view_of_eid_ob_write_write; eauto.
-            - econs; eauto. apply Label.write_is_writing.
-            - apply WRITE.
+            inv WRITE. inv WRITE0. apply Label.is_writing_inv in LABEL1. des. subst.
+            econs; eauto.
           }
           subst. inv VIEW2.
           { rewrite VIEW3. apply bot_spec. }
@@ -1171,11 +1172,12 @@ Proof.
           rewrite VIEW1 in H0. inv H0. refl.
         }
         { econs 2; eauto. refl. }
-      * (* sim_local promises *)
-        i. exploit SIM_LOCAL.(PROMISES); eauto. i. des.
-        esplits; cycle 1; eauto.
-        rewrite List.app_length, Nat.add_1_r. inv N; [|lia].
-        inv WRITE. destruct l; ss. congr.
+      * i. rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
+        { inv N.
+          - inv WRITE. destruct l; ss. congr.
+          - esplits; cycle 1; eauto. lia.
+        }
+        { esplits; cycle 1; eauto. lia. }
   - (* write *)
     exploit LABEL.
     { rewrite List.nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
@@ -1190,7 +1192,7 @@ Proof.
       econs; try refl.
       all: cycle 1.
       { rewrite <- VAL, <- VAL0. eauto. }
-      { admit. (* promise.. *) }
+      { rewrite SIM_LOCAL.(PROMISES). esplits; eauto. }
       econs; try refl.
       * (* internal *)
         rewrite <- VAL.
@@ -1280,7 +1282,7 @@ Proof.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
           - right. right. rewrite X. s. apply RMW. econs; ss. right. econs; ss.
           - econs; eauto. apply Label.write_is_writing.
-        }          
+        }
         { apply bot_spec. }
       * (* exclusive *)
         i. specialize (EX0 H). des. inv EX1. des.
@@ -1428,10 +1430,19 @@ Proof.
             + inv H. rewrite LABEL_LEN in EID. inv EID. ss.
         }
       * destruct ex1; ss. apply SIM_LOCAL.(EXBANK).
-      * i. revert VIEW2. rewrite Promises.unset_o. condtac; ss. i.
-        exploit SIM_LOCAL.(PROMISES); eauto. i. des.
-        esplits; cycle 1; eauto.
-        rewrite List.app_length, Nat.add_1_r. inv N; [|lia]. congr.
+      * i. rewrite Promises.unset_o. condtac.
+        { econs; ss. i. des. inversion e. subst.
+          rewrite List.app_length in *. ss.
+          assert ((tid, length (ALocal.labels alocal1)) = (tid, n0)).
+          { eapply view_of_eid_ob_write_write; eauto. }
+          inv H. lia.
+        }
+        rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
+        { inv N.
+          - inv WRITE. destruct l; ss. congr.
+          - esplits; cycle 1; eauto. lia.
+        }
+        { esplits; cycle 1; eauto. lia. }
   - (* write_failure *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs. econs; ss.
@@ -1493,10 +1504,12 @@ Proof.
           - inv H3. ss. subst. eapply H0. econs; eauto. econs; eauto.
         }
       * apply SIM_LOCAL.
-      * i. exploit SIM_LOCAL.(PROMISES); eauto. i. des.
-        esplits; cycle 1; eauto.
-        rewrite List.app_length, Nat.add_1_r. inv N; [|lia].
-        inv WRITE. destruct l; ss. congr.
+      * i. rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
+        { inv N.
+          - inv WRITE. destruct l; ss. congr.
+          - esplits; cycle 1; eauto. lia.
+        }
+        { esplits; cycle 1; eauto. lia. }
     + (* dmb *)
       esplits.
       { econs. econs; ss.
@@ -1566,10 +1579,12 @@ Proof.
           - inv H3. ss. subst. eapply H0. econs; eauto. econs; eauto.
         }
       * apply SIM_LOCAL.
-      * i. exploit SIM_LOCAL.(PROMISES); eauto. i. des.
-        esplits; cycle 1; eauto.
-        rewrite List.app_length, Nat.add_1_r. inv N; [|lia].
-        inv WRITE. destruct l; ss. congr.
+      * i. rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
+        { inv N.
+          - inv WRITE. destruct l; ss. congr.
+          - esplits; cycle 1; eauto. lia.
+        }
+        { esplits; cycle 1; eauto. lia. }
   - (* if *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs. econs; ss.
@@ -1592,7 +1607,7 @@ Proof.
     + econs; ss.
       inv SIM_LOCAL; econs; eauto. s.
       apply sim_view_join; ss. econs. ss.
-Admitted.
+Qed.
 
 Lemma sim_eu_rtc_step
       p ex ob tid aeu1 eu1 aeu2
@@ -1683,26 +1698,31 @@ Proof.
     end; ss.
 Qed.
 
-Lemma promises_from_mem_inv
-      ts tid mem
-      (LOOKUP: Promises.lookup (S ts) (promises_from_mem tid mem)):
+Lemma promises_from_mem_spec
+      ts tid mem:
+  Promises.lookup (S ts) (promises_from_mem tid mem) <->
   exists loc val, List.nth_error mem ts = Some (Msg.mk loc val tid).
 Proof.
-  revert LOOKUP. induction mem using List.rev_ind.
-  { rewrite promises_from_mem_nil, Promises.lookup_bot. ss. }
-  rewrite promises_from_mem_snoc. condtac.
-  { rewrite Promises.set_o. condtac.
-    - inversion e. inversion e0. subst.
-      rewrite List.nth_error_app2; [|lia].
-      rewrite Nat.sub_diag. ss.
-      destruct x. esplits; eauto.
-    - i. exploit IHmem; eauto.  i. des.
-      rewrite List.nth_error_app1; eauto.
-      apply List.nth_error_Some. congr.
+  induction mem using List.rev_ind.
+  { econs.
+    - rewrite promises_from_mem_nil, Promises.lookup_bot. ss.
+    - i. des. destruct ts; ss.
   }
-  i. exploit IHmem; eauto.  i. des.
-  rewrite List.nth_error_app1; eauto.
-  apply List.nth_error_Some. congr.
+  rewrite promises_from_mem_snoc. econs.
+  - condtac.
+    + inversion e. subst. rewrite Promises.set_o. condtac.
+      * inversion e0. subst. i.
+        rewrite List.nth_error_app2, Nat.sub_diag; [|lia]. ss.
+        destruct x. ss. eauto.
+      * intro Y. apply IHmem in Y. des.
+        esplits; eauto. apply nth_error_app_mon. eauto.
+    + intro Y. apply IHmem in Y. des.
+      esplits; eauto. apply nth_error_app_mon. eauto.
+  - i. des. apply nth_error_app_inv in H. des.
+    { condtac; eauto. rewrite Promises.set_o. condtac; eauto. }
+    apply nth_error_singleton_inv in H0. des. subst.
+    replace ts with (length mem) in * by lia.
+    s. condtac; ss; [|congr]. rewrite Promises.set_o. condtac; [|congr]. ss.
 Qed.
 
 Definition init_with_promises (p:program) (mem:Memory.t): Machine.t :=
@@ -1876,20 +1896,26 @@ Proof.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
     - econs; eauto; ss.
       + right. splits; ss. ii. inv H. inv REL1. inv H. inv H1. ss. lia.
-      + i. destruct view; ss. exploit promises_from_mem_inv; eauto. i. des.
-        exploit in_mem_of_ex; swap 1 2; eauto.
-        { eapply Permutation_NoDup; [by symmetry; eauto|].
-          eapply Execution.eids_spec; eauto.
+      + econs; i.
+        { destruct view; ss. apply promises_from_mem_spec in H. des.
+          exploit in_mem_of_ex; swap 1 2; eauto.
+          { eapply Permutation_NoDup; [by symmetry; eauto|].
+            eapply Execution.eids_spec; eauto.
+          }
+          s. i. des. esplits; cycle 1; eauto. lia.
         }
-        s. i. des. esplits; cycle 1; eauto. lia.
+        { des. inv WRITE. destruct l; ss. exploit label_write_mem_of_ex; eauto. i. des.
+          rewrite VIEW in VIEW0. inv VIEW0.
+          unfold Memory.get_msg in MSG. ss. apply promises_from_mem_spec. eauto.
+        }
   }
   { apply AExecUnit.wf_init. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
   - intro X. exploit X; eauto. i. inv STATE. congr.
-  - apply Promises.ext. i. destruct (Promises.lookup i (Local.promises local2)) eqn:L; ss; cycle 1.
-    { rewrite Promises.lookup_bot. ss. }
-    exploit LOCAL.(PROMISES); eauto. i. des.
+  - apply Promises.ext. i. rewrite Promises.lookup_bot.
+    destruct (Promises.lookup i (Local.promises local2)) eqn:L; ss; cycle 1.
+    apply LOCAL.(PROMISES) in L. des.
     exploit view_of_eid_inv; eauto. i. des. subst.
     inv WRITE. unfold Execution.label in EID. ss.
     rewrite EX.(Valid.LABELS), IdMap.map_spec, <- AEU in EID. ss.
