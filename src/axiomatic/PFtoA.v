@@ -1573,6 +1573,13 @@ Lemma sim_traces_sim_eu
     (AEU: lastn (S n) atr = aeu :: atr'),
     sim_eu tid ex (v_gen vexts) eu aeu.
 Proof.
+  i. generalize (SIM tid). intro X. inv X; simplify.
+  revert eu aeu tr' atr' EU AEU. induction n.
+  { i. admit. (* lastn *) }
+  (* Lemma lastn_S A *)
+  (* n (l:list A): *)
+  (*   lastn (S n) l =  :: lastn n l. *)
+  admit.
 Admitted.
 
 Lemma sim_traces_vext_valid_aux
