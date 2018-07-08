@@ -1873,7 +1873,7 @@ Lemma sim_traces_sim_eu
         (OB: ex.(ob') eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<AOB_READ:
+    <<OB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(ob') eid1 (tid, eid2))
@@ -1940,12 +1940,12 @@ Proof.
   rewrite EU, AEU, WL, RL, COVL, VEXTL. intro SIM2.
   exploit sim_traces_ex; try exact EU; eauto. i. des.
   exploit sim_traces_ex; try exact EU'; eauto. i. des.
-  clear IHn. (* clear as many as possible *)
-  splits.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
+  clear IHn. (* clear as much as possible *)
+  splits; cycle 1.
+  { admit. }
+  { admit. }
+  { admit. }
+  admit.
 Admitted.
 
 Lemma sim_traces_vext_valid
