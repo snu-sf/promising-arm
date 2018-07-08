@@ -898,12 +898,16 @@ Qed.
 
 Lemma sim_traces_memory
       p mem trs atrs rs ws covs vexts
+      m
       ts loc val tid
+      (STEP: Machine.pf_exec p m)
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (TR: IdMap.Forall2
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
       (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)):
   exists eu, IdMap.find tid trs = Some eu.
 Proof.
-  (* TODO: wrong.  eu should come from promising execution. *)
 Admitted.
 
 Lemma promising_pf_sim_traces
@@ -1003,9 +1007,10 @@ Lemma r_property
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\
     <<RPROP2:
       forall eid ts (GET: r eid = Some ts),
-      exists ex ord loc val,
+      exists ex ord loc val tid',
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
-        Memory.read loc ts mem = Some val>>.
+        ((ts = Time.bot /\ val = Val.default) \/
+         Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>>.
 Proof.
 Admitted.
 
@@ -1113,12 +1118,13 @@ Proof.
 Qed.
 
 Lemma sim_traces_rf1_aux
-      p mem trs atrs rs ws covs vexts ex m
+      p trs atrs rs ws covs vexts ex m
+      (ETEP: Machine.pf_exec p m)
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -1165,12 +1171,13 @@ Proof.
 Qed.
 
 Lemma sim_traces_rf1
-      p mem trs atrs rs ws covs vexts ex m
+      p trs atrs rs ws covs vexts ex m
+      (ETEP: Machine.pf_exec p m)
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -1207,15 +1214,15 @@ Proof.
   exploit r_property; try exact REL6; eauto. i. des. inv x2.
   exploit WPROP3; eauto. i. des.
   exploit RPROP2; eauto. i. des.
-  admit.
-  (* rewrite x2 in x0. inv x0. *)
-  (* generalize (ATR tid1). intro ATR1. inv ATR1; try congr. *)
-  (* generalize (ATR tid2). intro ATR2. inv ATR2; try congr. *)
-  (* des. simplify. destruct PRE, ex. unfold Execution.label. ss. *)
-  (* clear WPROP1 WPROP2 WPROP3 WPROP4 RPROP1 RPROP2. *)
-  (* rewrite LABELS. repeat rewrite IdMap.map_spec. *)
-  (* rewrite <- H8. rewrite <- H13. ss. esplits; eauto. *)
-Admitted.
+  - rewrite x3 in x1. inv x1.
+  - rewrite x3 in x1. inv x1.
+    generalize (ATR tid1). intro ATR1. inv ATR1; try congr.
+    generalize (ATR tid2). intro ATR2. inv ATR2; try congr.
+    des. simplify. destruct PRE, ex. unfold Execution.label. ss.
+    clear WPROP1 WPROP2 WPROP3 WPROP4 RPROP1 RPROP2.
+    rewrite LABELS. repeat rewrite IdMap.map_spec.
+    rewrite <- H8. rewrite <- H13. ss. esplits; eauto.
+Qed.
 
 Lemma sim_traces_rf_wf
       p mem trs atrs rs ws covs vexts
@@ -1415,15 +1422,16 @@ Proof.
 Qed.
 
 Lemma sim_traces_cov_fr
-      p mem trs atrs ws rs covs vexts
+      p trs atrs ws rs covs vexts
       ex m
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -1449,20 +1457,19 @@ Proof.
       generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
       exploit w_property; try exact REL6. i. des. simplify.
       exploit WPROP2; eauto. i. des.
-      admit.
-      (* exploit w_bot; eauto. i. des. simplify. *)
-      (* exploit x1; eauto. i. ss. *)
-      (* generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify. *)
-      (* exploit sim_trace_vext_cov; try exact REL6. i. des. *)
-      (* exploit sim_trace_vext_cov; try exact REL0. i. des. simplify. *)
-      (* exploit x6; eauto. i. des. *)
-      (* exploit x12; eauto. i. des. *)
-      (* unfold v_gen. ss. rewrite <- H12. rewrite <- H7. *)
-      (* rewrite x9. rewrite x4. auto. *)
+      exploit WPROP3; eauto. i. des.
+      clear ex2 ord1 val0 x2 x3.
+      generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify.
+      exploit sim_trace_vext_cov; try exact REL6. i. des.
+      exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
+      exploit x5; eauto. i. des.
+      exploit x11; eauto. i. des.
+      unfold v_gen. ss. rewrite <- H12. rewrite <- H7.
+      rewrite x8. rewrite x3. auto.
     + exfalso.
       rewrite RF in *. eapply H3. unfold codom_rel.
       eexists. eauto.
-Admitted.
+Qed.
 
 Lemma sim_traces_cov_po_loc
       p mem trs atrs ws rs covs vexts
@@ -1472,18 +1479,14 @@ Lemma sim_traces_cov_po_loc
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
               atrs PRE.(Valid.aeus)):
-    <<PO_LOC_WRITE:
-      forall eid1 eid2
-        (PO_LOC: ex.(Execution.po_loc) eid1 eid2)
-        (EID2: ex.(Execution.label_is) Label.is_write eid2),
-        Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>> /\
-    <<PO_LOC_READ:
-      forall eid1 eid2
-        (PO_LOC: ex.(Execution.po_loc) eid1 eid2)
-        (EID2: ex.(Execution.label_is) Label.is_read eid2),
-        Time.le ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
+  forall eid1 eid2 (PO_LOC: ex.(Execution.po_loc) eid1 eid2),
+     <<PO_LOC_WRITE:
+       ex.(Execution.label_is) Label.is_write eid2 ->
+       Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>> /\
+     <<PO_LOC_READ:
+       ex.(Execution.label_is) Label.is_read eid2 ->
+       Time.le ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
 Proof.
-  (* generalize eid1, eid2, po *)
 Admitted.
 
 Lemma sim_traces_vext_co
@@ -1737,7 +1740,8 @@ Proof.
     exploit RFE0; eauto.
     exploit r_property; try exact REL6. i. des.
     simplify. exploit RPROP2; eauto. i. des.
-    eapply List.nth_error_Some; eauto. ii. congr.
+    + eapply List.nth_error_Some; eauto. ii. congr.
+    + eapply List.nth_error_Some; eauto. ii. congr.
   - admit.
   - admit.
   - admit.
@@ -1757,10 +1761,10 @@ Ltac des_union :=
          end).
 
 Lemma sim_traces_valid
-      p mem trs atrs ws rs covs vexts
+      p trs atrs ws rs covs vexts
       m ex
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
-      (NOPROMISE: Machine.no_promise m)
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
@@ -1770,7 +1774,7 @@ Lemma sim_traces_valid
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -1789,7 +1793,7 @@ Lemma sim_traces_valid
       (Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
   <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>>.
 Proof.
-  splits.
+  generalize STEP. intro X. inv X. splits.
   - ii. exploit Valid.internal_rw; eauto. i. des.
     inv EID2. destruct l; ss.
     + right. des_union.
@@ -1823,12 +1827,11 @@ Proof.
         destruct eid2 as [tid2 eid2]. ss.
         generalize (SIM tid2). intro SIM2. inv SIM2; try congr.
         exploit r_property; eauto. i. des. simplify.
-        exploit RPROP2; eauto. i. des.
         generalize (ATR tid2). intro ATR2. inv ATR2; try congr. des.
-        simplify.
-        unfold Execution.label in *. destruct PRE.
+        simplify. unfold Execution.label in *. destruct PRE.
         rewrite LABELS in *. rewrite IdMap.map_spec in *. ss.
-        rewrite <- H7 in *. ss. congr.
+        rewrite <- H7 in *. ss.
+        exploit RPROP2; eauto. i. des; try congr.
       * exploit FR; eauto.
       * exploit sim_traces_vext_co; eauto.
       * exploit DOB_WRITE; eauto.
@@ -1903,10 +1906,10 @@ Proof.
   remember (@Valid.mk_pre_ex p ex' aeus AEUS LABELS ADDR DATA CTRL RMW) as PRE'.
   replace aeus with PRE'.(Valid.aeus) in ATR; [|subst; ss].
   exists ex'. exists PRE'. exists (v_gen covs). exists (v_gen vexts).
-  inversion STEP.
+  generalize STEP. intro X. inversion X.
   generalize (sim_traces_co1 PRE' SIM ATR). intro CO1.
   generalize (sim_traces_co2 PRE' SIM ATR). intro CO2.
-  generalize (sim_traces_rf1 PRE' NOPROMISE SIM TR ATR). intro RF1.
+  generalize (sim_traces_rf1 STEP PRE' NOPROMISE SIM TR ATR). intro RF1.
   generalize (sim_traces_rf2 PRE' SIM ATR). intro RF2.
   generalize (sim_traces_rf_wf SIM). intro RF_WF.
   replace (co_gen ws) with (ex'.(Execution.co)) in CO1, CO2;[|subst; ss].
