@@ -1471,106 +1471,106 @@ Lemma sim_trace_vext_cov
             List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)) /\
         cov eid = ts).
 Proof.
-  (* induction SIM; esplits; eauto; i; ss. *)
-  (* - des. inv IHSIM. inv IHSIM0. inv EVENT. *)
-  (*   + exploit IHSIM2; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. *)
-  (*     inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*   + des_ifs; eauto. *)
-  (*     * exfalso. *)
-  (*       rewrite Nat.eqb_eq in Heq. subst. *)
-  (*       exploit IHSIM2; eauto. i. des. *)
-  (*       unfold ALocal.next_eid in *. *)
-  (*       assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None) *)
-  (*         by (ii; congr). *)
-  (*       rewrite List.nth_error_Some in H. lia. *)
-  (*     * exploit IHSIM2; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + des_ifs; eauto. *)
-  (*     * destruct eu1. destruct eu2. *)
-  (*       destruct aeu. destruct aeu2. ss. *)
-  (*       inv STATE. inv STEP. inv STATE; ss. *)
-  (*       rewrite Nat.eqb_eq in Heq. subst. *)
-  (*       inv LOCAL; ss. *)
-  (*       { inv STEP. ss. splits; eauto. *)
-  (*         inv EVENT. inv ALOCAL_STEP; ss. *)
-  (*         - esplits. unfold ALocal.next_eid. *)
-  (*           rewrite List.nth_error_app2. *)
-  (*           rewrite <- Minus.minus_n_n. ss. lia. *)
-  (*         - inv EVENT. inv FAILURE. } *)
-  (*       { inv STEP. ss. } *)
-  (*     * exploit IHSIM2; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*     * exploit IHSIM2; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*     * exploit IHSIM2; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + exploit IHSIM2; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. *)
-  (*     inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*     { rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. } *)
-  (* - des. inv IHSIM. inv IHSIM1. inv EVENT. *)
-  (*   + exploit IHSIM3; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. *)
-  (*     inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*   + des_ifs; eauto. *)
-  (*     * destruct eu1. destruct eu2. *)
-  (*       destruct aeu. destruct aeu2. ss. *)
-  (*       inv STATE. inv STEP. inv STATE; ss. *)
-  (*       rewrite Nat.eqb_eq in Heq. subst. *)
-  (*       inv LOCAL; ss. *)
-  (*       inv STEP. ss. splits; eauto. *)
-  (*       inv EVENT. inv ALOCAL_STEP; ss. *)
-  (*       esplits. unfold ALocal.next_eid. *)
-  (*       rewrite List.nth_error_app2. *)
-  (*       rewrite <- Minus.minus_n_n. ss. lia. *)
-  (*     * exploit IHSIM3; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + des_ifs; eauto. *)
-  (*     * exfalso. *)
-  (*       rewrite Nat.eqb_eq in Heq. subst. *)
-  (*       exploit IHSIM3; eauto. i. des. *)
-  (*       unfold ALocal.next_eid in *. *)
-  (*       assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None) *)
-  (*         by (ii; congr). *)
-  (*       rewrite List.nth_error_Some in H. lia. *)
-  (*     * exploit IHSIM3; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*     * exploit IHSIM3; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*     * exploit IHSIM3; eauto. i. des. *)
-  (*       destruct aeu2. destruct local. *)
-  (*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*       { rewrite List.nth_error_app1; eauto. *)
-  (*         eapply List.nth_error_Some. ii. congr. } *)
-  (*   + exploit IHSIM3; eauto. i. des. *)
-  (*     destruct aeu2. destruct local. *)
-  (*     inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-  (*     { rewrite List.nth_error_app1; eauto. *)
-  (*       eapply List.nth_error_Some. ii. congr. } *)
-Admitted.
+  induction SIM; esplits; eauto; i; ss.
+  - des. simplify. inv EVENT.
+    + exploit IHSIM4; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+    + des_ifs; eauto.
+      * exfalso.
+        rewrite Nat.eqb_eq in Heq. subst.
+        exploit IHSIM4; eauto. i. des.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None)
+          by (ii; congr).
+        rewrite List.nth_error_Some in H. lia.
+      * exploit IHSIM4; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + des_ifs; eauto.
+      * destruct eu1. destruct eu2.
+        destruct aeu. destruct aeu2. ss.
+        inv STATE. inv STEP. inv STATE; ss.
+        rewrite Nat.eqb_eq in Heq. subst.
+        inv LOCAL; ss.
+        { inv STEP. ss. splits; eauto.
+          inv EVENT. inv ALOCAL_STEP; ss.
+          - esplits. unfold ALocal.next_eid.
+            rewrite List.nth_error_app2.
+            rewrite <- Minus.minus_n_n. ss. lia.
+          - inv EVENT. inv FAILURE. }
+        { inv STEP. ss. }
+      * exploit IHSIM4; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM4; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM4; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + exploit IHSIM4; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+      { rewrite List.nth_error_app1; eauto.
+        eapply List.nth_error_Some. ii. congr. }
+  - des. simplify. inv EVENT.
+    + exploit IHSIM5; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+    + des_ifs; eauto.
+      * destruct eu1. destruct eu2.
+        destruct aeu. destruct aeu2. ss.
+        inv STATE. inv STEP. inv STATE; ss.
+        rewrite Nat.eqb_eq in Heq. subst.
+        inv LOCAL; ss.
+        inv STEP. ss. splits; eauto.
+        inv EVENT. inv ALOCAL_STEP; ss.
+        esplits. unfold ALocal.next_eid.
+        rewrite List.nth_error_app2.
+        rewrite <- Minus.minus_n_n. ss. lia.
+      * exploit IHSIM5; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + des_ifs; eauto.
+      * exfalso.
+        rewrite Nat.eqb_eq in Heq. subst.
+        exploit IHSIM5; eauto. i. des.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None)
+          by (ii; congr).
+        rewrite List.nth_error_Some in H. lia.
+      * exploit IHSIM5; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM5; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+      * exploit IHSIM5; eauto. i. des.
+        destruct aeu2. destruct local.
+        inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+        { rewrite List.nth_error_app1; eauto.
+          eapply List.nth_error_Some. ii. congr. }
+    + exploit IHSIM5; eauto. i. des.
+      destruct aeu2. destruct local.
+      inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto.
+      { rewrite List.nth_error_app1; eauto.
+        eapply List.nth_error_Some. ii. congr. }
+Qed.
 
 Lemma sim_traces_cov_co
       p mem trs atrs ws rs covs vexts
