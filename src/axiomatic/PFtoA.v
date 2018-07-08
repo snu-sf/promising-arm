@@ -903,21 +903,35 @@ Lemma sim_traces_memory
       (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)):
   exists eu, IdMap.find tid trs = Some eu.
 Proof.
+  (* TODO: wrong.  eu should come from promising execution. *)
 Admitted.
 
 Lemma promising_pf_sim_traces
       p m
       (STEP: Machine.pf_exec p m):
-  exists mem trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
-    <<SIM: sim_traces p mem trs atrs ws rs covs vexts>> /\
+  exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
+    <<SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts>> /\
     <<TR: IdMap.Forall2
-            (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+            (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
             trs m.(Machine.tpool)>> /\
     <<ATR: IdMap.Forall2
              (fun tid atr aeu => exists l, atr = aeu :: l)
              atrs PRE.(Valid.aeus)>>.
 Proof.
 Admitted.
+
+Ltac simplify :=
+  repeat
+    (try match goal with
+         | [H1: _ = IdMap.find ?id ?m, H2: _ = IdMap.find ?id ?m |- _] =>
+           rewrite <- H1 in H2; inv H2
+         | [H1: IdMap.find ?id ?m = _, H2: IdMap.find ?id ?m = _ |- _] =>
+           rewrite H1 in H2; inv H2
+         | [H1: IdMap.find ?id ?m = _, H2: _ = IdMap.find ?id ?m |- _] =>
+           rewrite H1 in H2; inv H2
+         | [H: Some _ = Some _ |- _] => inv H
+         | [H: _::_ = _::_ |- _] => inv H
+         end).
 
 Lemma w_property
       p mem tid tr atr wl rl cov vext
@@ -930,7 +944,7 @@ Lemma w_property
       forall ts loc val
          (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)),
         ((Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = true /\
-          forall eid, w eid = None) \/
+          forall eid, w eid <> Some (loc, ts)) \/
          (Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = false /\
           exists eid ex ord,
             w eid = Some (loc, ts) /\
@@ -943,6 +957,7 @@ Lemma w_property
         Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\
     <<WPROP3:
       forall eid loc ts (GET: w eid = Some (loc, ts)),
+        Time.lt Time.bot ts /\
       exists ex ord val,
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val) /\
         Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\
@@ -950,15 +965,26 @@ Lemma w_property
       forall eid1 loc1 eid2 loc2 ts (W1: w eid1 = Some (loc1, ts)) (W2: w eid2 = Some (loc2, ts)),
         eid1 = eid2>>.
 Proof.
-Admitted.
-
-Lemma w_bot
-      p mem tid tr atr wl rl cov vext
-      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
-  exists w wl',
-    wl = w :: wl' /\
-    forall eid ts (W: w eid = Some ts), Time.lt Time.bot ts.(snd).
-Proof.
+  induction SIM.
+  { esplits; ss.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+      left. splits; ss. admit.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+      destruct eid; ss.
+  }
+  des. simplify. esplits; eauto.
+  - inv STEP. inv EVENT; inv LOCAL; ss.
+    + inv LC. rewrite LC2 in *. s. 
+      inv ALOCAL_STEP; ss. rewrite ALOCAL in *. s.
+      eauto.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma r_property
@@ -977,9 +1003,9 @@ Lemma r_property
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\
     <<RPROP2:
       forall eid ts (GET: r eid = Some ts),
-      exists ex ord loc val tid',
+      exists ex ord loc val,
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
-        Memory.get_msg ts mem = Some (Msg.mk loc val tid')>>.
+        Memory.read loc ts mem = Some val>>.
 Proof.
 Admitted.
 
@@ -1010,19 +1036,6 @@ Definition v_gen (vs: IdMap.t (nat -> Time.t)) (eid: eidT): Time.t :=
   | None => Time.bot
   end
 .
-
-Ltac simplify :=
-  repeat
-    (try match goal with
-         | [H1: _ = IdMap.find ?id ?m, H2: _ = IdMap.find ?id ?m |- _] =>
-           rewrite <- H1 in H2; inv H2
-         | [H1: IdMap.find ?id ?m = _, H2: IdMap.find ?id ?m = _ |- _] =>
-           rewrite H1 in H2; inv H2
-         | [H1: IdMap.find ?id ?m = _, H2: _ = IdMap.find ?id ?m |- _] =>
-           rewrite H1 in H2; inv H2
-         | [H: Some _ = Some _ |- _] => inv H
-         | [H: _::_ = _::_ |- _] => inv H
-         end).
 
 Lemma sim_traces_co1
       p mem trs atrs rs ws covs vexts ex
@@ -1194,14 +1207,15 @@ Proof.
   exploit r_property; try exact REL6; eauto. i. des. inv x2.
   exploit WPROP3; eauto. i. des.
   exploit RPROP2; eauto. i. des.
-  rewrite x2 in x0. inv x0.
-  generalize (ATR tid1). intro ATR1. inv ATR1; try congr.
-  generalize (ATR tid2). intro ATR2. inv ATR2; try congr.
-  des. simplify. destruct PRE, ex. unfold Execution.label. ss.
-  clear WPROP1 WPROP2 WPROP3 WPROP4 RPROP1 RPROP2.
-  rewrite LABELS. repeat rewrite IdMap.map_spec.
-  rewrite <- H8. rewrite <- H13. ss. esplits; eauto.
-Qed.
+  admit.
+  (* rewrite x2 in x0. inv x0. *)
+  (* generalize (ATR tid1). intro ATR1. inv ATR1; try congr. *)
+  (* generalize (ATR tid2). intro ATR2. inv ATR2; try congr. *)
+  (* des. simplify. destruct PRE, ex. unfold Execution.label. ss. *)
+  (* clear WPROP1 WPROP2 WPROP3 WPROP4 RPROP1 RPROP2. *)
+  (* rewrite LABELS. repeat rewrite IdMap.map_spec. *)
+  (* rewrite <- H8. rewrite <- H13. ss. esplits; eauto. *)
+Admitted.
 
 Lemma sim_traces_rf_wf
       p mem trs atrs rs ws covs vexts
@@ -1435,19 +1449,20 @@ Proof.
       generalize (SIM tid2). intro SIM2. inv SIM2; try congr. simplify.
       exploit w_property; try exact REL6. i. des. simplify.
       exploit WPROP2; eauto. i. des.
-      exploit w_bot; eauto. i. des. simplify.
-      exploit x1; eauto. i. ss.
-      generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify.
-      exploit sim_trace_vext_cov; try exact REL6. i. des.
-      exploit sim_trace_vext_cov; try exact REL0. i. des. simplify.
-      exploit x6; eauto. i. des.
-      exploit x12; eauto. i. des.
-      unfold v_gen. ss. rewrite <- H12. rewrite <- H7.
-      rewrite x9. rewrite x4. auto.
+      admit.
+      (* exploit w_bot; eauto. i. des. simplify. *)
+      (* exploit x1; eauto. i. ss. *)
+      (* generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify. *)
+      (* exploit sim_trace_vext_cov; try exact REL6. i. des. *)
+      (* exploit sim_trace_vext_cov; try exact REL0. i. des. simplify. *)
+      (* exploit x6; eauto. i. des. *)
+      (* exploit x12; eauto. i. des. *)
+      (* unfold v_gen. ss. rewrite <- H12. rewrite <- H7. *)
+      (* rewrite x9. rewrite x4. auto. *)
     + exfalso.
       rewrite RF in *. eapply H3. unfold codom_rel.
       eexists. eauto.
-Qed.
+Admitted.
 
 Lemma sim_traces_cov_po_loc
       p mem trs atrs ws rs covs vexts
@@ -1468,6 +1483,7 @@ Lemma sim_traces_cov_po_loc
         (EID2: ex.(Execution.label_is) Label.is_read eid2),
         Time.le ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
 Proof.
+  (* generalize eid1, eid2, po *)
 Admitted.
 
 Lemma sim_traces_vext_co
