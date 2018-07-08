@@ -912,19 +912,50 @@ Proof.
   induction SIM; ss. des. splits; congr.
 Qed.
 
+(* TODO: move *)
+  Lemma step_get_msg_tpool
+        p m ts msg
+        (STEPS: rtc (Machine.step ExecUnit.step) (Machine.init p) m)
+        (MSG: Memory.get_msg ts m.(Machine.mem) = Some msg):
+    exists sl, IdMap.find msg.(Msg.tid) m.(Machine.tpool) = Some sl.
+  Proof.
+    apply clos_rt_rt1n_iff in STEPS.
+    apply clos_rt_rtn1_iff in STEPS.
+    revert ts msg MSG. induction STEPS; ss.
+    { destruct ts; ss. destruct ts; ss. }
+    destruct y as [tpool1 mem1].
+    destruct z as [tpool2 mem2].
+    ss. inv H. ss. i. inv STEP.
+    - rewrite IdMap.add_spec. condtac; eauto.
+      inv STEP0. inv STEP. ss. subst. eauto.
+    - rewrite IdMap.add_spec. condtac; eauto.
+      inv STEP0. ss. subst. inv LOCAL. inv MEM2.
+      apply Memory.get_msg_snoc_inv in MSG. des; eauto. subst.
+      ss. congr.
+  Qed.
+
 Lemma sim_traces_memory
-      p mem trs atrs rs ws covs vexts
+      p trs atrs rs ws covs vexts
       m
       ts loc val tid
       (STEP: Machine.pf_exec p m)
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
-      (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)):
+      (GET: Memory.get_msg ts m.(Machine.mem) = Some (Msg.mk loc val tid)):
   exists eu, IdMap.find tid trs = Some eu.
 Proof.
-Admitted.
+  generalize (SIM tid). intro X. inv X; eauto.
+  generalize (TR tid). rewrite <- H0. intro X. inv X.
+  inv STEP. hexploit state_exec_rtc_state_step; [by eauto|]. i. des.
+  exploit step_get_msg_tpool.
+  - etrans.
+    + eapply Machine.rtc_step_mon; [|by eauto]. right. ss.
+    + eapply Machine.rtc_step_mon; [|by eauto]. left. ss.
+  - inv EQUIV. rewrite <- MEM. eauto.
+  - s. i. des. inv EQUIV. generalize (TPOOL tid). congr.
+Qed.
 
 (* TODO: move *)
   Lemma rtc_promise_step_spec
