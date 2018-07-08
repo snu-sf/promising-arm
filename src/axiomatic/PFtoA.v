@@ -1209,23 +1209,48 @@ Proof.
   induction SIM.
   { esplits; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
-      left. splits; ss. admit.
+      left. splits; ss. admit. (* promises_from_mem *)
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       destruct eid; ss.
   }
-  des. simplify. esplits; eauto.
-  - inv STEP. inv EVENT; inv LOCAL; ss.
-    + inv LC. rewrite LC2 in *. s. 
-      inv ALOCAL_STEP; ss. rewrite ALOCAL in *. s.
-      eauto.
-    + admit.
-    + admit.
-    + admit.
-    + admit.
-    + admit.
-  - admit.
-  - admit.
-  - admit.
+  des. simplify.
+  destruct eu as [st1 lc1 mem1].
+  destruct eu2 as [st2 lc2 mem2].
+  destruct aeu2 as [ast2 alc2].
+  ss. inv STEP. inv EVENT; inv LOCAL; inv EVENT; ss.
+  - (* internal *)
+    inv LC. s. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto.
+  - (* read *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    + i. exploit WPROP2; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit WPROP3; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+  - (* write *)
+    admit.
+  - (* write failure *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto.
+  - (* isb *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    + i. exploit WPROP2; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit WPROP3; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+  - (* dmb *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    + i. exploit WPROP2; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit WPROP3; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
 Admitted.
 
 Lemma r_property
@@ -1240,15 +1265,52 @@ Lemma r_property
          (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)),
       exists ts tid',
         r eid = Some ts /\
-        ((ts = Time.bot /\ val = Val.default) \/
+        __guard__ ((ts = Time.bot /\ val = Val.default) \/
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\
     <<RPROP2:
       forall eid ts (GET: r eid = Some ts),
       exists ex ord loc val tid',
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
-        ((ts = Time.bot /\ val = Val.default) \/
+        __guard__ ((ts = Time.bot /\ val = Val.default) \/
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>>.
 Proof.
+  induction SIM.
+  { esplits; ss.
+    rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+    destruct eid; ss.
+  }
+  des. simplify.
+  destruct eu as [st1 lc1 mem1].
+  destruct eu2 as [st2 lc2 mem2].
+  destruct aeu2 as [ast2 alc2].
+  ss. inv STEP. inv EVENT; inv LOCAL; inv EVENT; ss.
+  - (* internal *)
+    inv LC. s. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto.
+  - (* read *)
+    admit.
+  - (* write *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit RPROP1; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit RPROP2; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+  - (* write failure *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto.
+  - (* isb *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit RPROP1; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit RPROP2; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+  - (* dmb *)
+    inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss.
+    + i. exploit RPROP1; eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    + i. exploit RPROP2; eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
 Admitted.
 
 Inductive co_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (eid1 eid2: eidT): Prop :=
@@ -1382,7 +1444,7 @@ Proof.
   generalize (SIM tid1). intro SIM1. inv SIM1; try congr.
   des. simplify.
   exploit r_property; eauto. i. des. simplify.
-  exploit RPROP1; eauto. i. des.
+  exploit RPROP1; eauto. i. des. unguardH x0. des.
   - left. esplits; subst; eauto.
     ii. inv H. inv H1.
     destruct x0 as [tid2 eid2]. ss. simplify.
@@ -1450,7 +1512,7 @@ Proof.
   exploit w_property; try exact REL0; eauto. i. des. inv x2.
   exploit r_property; try exact REL6; eauto. i. des. inv x2.
   exploit WPROP3; eauto. i. des.
-  exploit RPROP2; eauto. i. des.
+  exploit RPROP2; eauto. i. des. unguardH x3. des.
   - rewrite x3 in x1. inv x1.
   - rewrite x3 in x1. inv x1.
     generalize (ATR tid1). intro ATR1. inv ATR1; try congr.
