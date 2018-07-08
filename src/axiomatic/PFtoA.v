@@ -1760,6 +1760,25 @@ Proof.
       eexists. eauto.
 Qed.
 
+Lemma sim_traces_cov_po_loc_aux
+      p mem tid tr atr wl rl cov vext aeu atr' covf cov'
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext)
+      (AEU: atr = aeu :: atr')
+      (COV: cov = covf :: cov'):
+  forall iid1 iid2 label1 label2
+    (PO: iid1 < iid2)
+    (LABEL1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid1 = Some label1)
+    (LABEL2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid2 = Some label2)
+    (REL: Execution.label_loc label1 label2),
+     <<PO_LOC_WRITE:
+       Label.is_write label2 ->
+       Time.lt (covf iid1) (covf iid2)>> /\
+     <<PO_LOC_READ:
+       Label.is_read label2 ->
+       Time.le (covf iid1) (covf iid2)>>.
+Proof.
+Admitted.
+
 Lemma sim_traces_cov_po_loc
       p mem trs atrs ws rs covs vexts
       ex
@@ -1776,7 +1795,20 @@ Lemma sim_traces_cov_po_loc
        ex.(Execution.label_is) Label.is_read eid2 ->
        Time.le ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
 Proof.
-Admitted.
+  i. destruct eid1 as [tid1 iid1], eid2 as [tid2 iid2]. inv PO_LOC. inv H. ss. subst.
+  inv H0. unfold Execution.label in *. ss. rewrite PRE.(Valid.LABELS), IdMap.map_spec in *.
+  generalize (ATR tid2). intro X. inv X; ss; rewrite <- H in *; ss.
+  des. subst. generalize (SIM tid2). i. inv H1; simplify.
+  exploit sim_trace_last; eauto. i. des. subst. simplify.
+  exploit sim_traces_cov_po_loc_aux; eauto. i. des.
+  unfold v_gen. s. rewrite <- H7. splits; i.
+  - inv H1. unfold Execution.label in *. ss.
+    rewrite PRE.(Valid.LABELS), IdMap.map_spec, <- H in *. inv EID.
+    rewrite EID2 in H2. inv H2. eauto.
+  - inv H1. unfold Execution.label in *. ss.
+    rewrite PRE.(Valid.LABELS), IdMap.map_spec, <- H in *. inv EID.
+    rewrite EID2 in H2. inv H2. eauto.
+Qed.
 
 Lemma sim_traces_vext_co
       p mem trs atrs ws rs covs vexts
