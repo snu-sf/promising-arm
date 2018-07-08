@@ -909,7 +909,8 @@ Lemma sim_trace_length
   <<LENGTH_COVL: List.length covl = List.length tr>> /\
   <<LENGTH_VEXTL: List.length vextl = List.length tr>>.
 Proof.
-Admitted.
+  induction SIM; ss. des. splits; congr.
+Qed.
 
 Lemma sim_traces_memory
       p mem trs atrs rs ws covs vexts
@@ -1708,14 +1709,11 @@ Qed.
 Definition lastn A (n: nat) (l: list A) :=
   List.rev (List.firstn n (List.rev l)).
 
-Lemma lastn_all A (l: list A):
-  lastn (S (List.length l)) l = l.
+Lemma lastn_snoc A n (l:list A) x:
+  lastn (S n) (l ++ [x]) = (lastn n l) ++ [x].
 Proof.
-  unfold lastn.
-  rewrite <- List.rev_length.
-  rewrite List.firstn_all2.
-  - rewrite List.rev_involutive. refl.
-  - omega.
+  revert n. induction l using List.rev_ind; ss.
+  unfold lastn. s. rewrite List.rev_app_distr. ss.
 Qed.
 
 Lemma lastn_one A
@@ -1723,13 +1721,36 @@ Lemma lastn_one A
       (LENGTH: List.length l >= 1):
   exists a, lastn 1 l = [a].
 Proof.
-Admitted.
+  destruct l using List.rev_ind; ss; [lia|]. rewrite lastn_snoc. s. eauto.
+Qed.
+
+Lemma lastn_all A n (l: list A)
+      (N: n >= length l):
+  lastn n l = l.
+Proof.
+  revert n N. induction l using List.rev_ind; ss.
+  { destruct n; ss. }
+  i. rewrite List.app_length in N. ss. destruct n; [lia|].
+  rewrite lastn_snoc, IHl; ss. lia.
+Qed.
+
+Lemma lastn_length A n (l: list A):
+  length (lastn n l) = min n (length l).
+Proof.
+  revert n. induction l using List.rev_ind; ss.
+  { destruct n; ss. }
+  i. destruct n; ss. rewrite lastn_snoc, ? List.app_length, IHl. s.
+  rewrite (Nat.add_comm (length l)). s. lia.
+Qed.
 
 Lemma lastn_S A n (l: list A)
       (LENGTH: List.length l > 0):
   exists a l', lastn (S n) l = a :: l'.
 Proof.
-Admitted.
+  generalize (lastn_length (S n) l). i.
+  destruct (lastn (S n) l) eqn:LASTN; eauto.
+  destruct l; ss. lia.
+Qed.
 
 Lemma lastn_S1 A
       (l: list A) n a l'
@@ -1737,15 +1758,11 @@ Lemma lastn_S1 A
       (LASTN: lastn (S n) l = a :: l'):
   lastn n l = l'.
 Proof.
-Admitted.
-
-Lemma lastn_S2 A
-      (l: list A) n l'
-      (N: n >= List.length l)
-      (LASTN: lastn (S n) l = l'):
-  lastn n l = l'.
-Proof.
-Admitted.
+  rewrite <- List.rev_length in N. apply List.nth_error_Some in N.
+  destruct (List.nth_error (List.rev l) n) eqn:NTH; ss.
+  revert LASTN. unfold lastn. erewrite List_firstn_S; eauto.
+  rewrite List.rev_app_distr. s. i. inv LASTN. ss.
+Qed.
 
 Lemma sim_trace_lastn
       p mem tid tr atr wl rl covl vextl
@@ -1903,9 +1920,9 @@ Proof.
   i. rename c into wl, d into rl, e into covl, f into vextl.
   destruct (Nat.le_gt_cases (List.length tr) (S n)).
   { exploit sim_trace_length; eauto. i. des.
-    exploit lastn_S2; try exact EU; eauto. i.
-    exploit lastn_S2; try exact AEU; eauto.
-    rewrite LENGTH_ATR. auto. }
+    rewrite lastn_all in EU; [|lia]. subst.
+    rewrite lastn_all in AEU; [|lia]. subst.
+    eapply IHn; apply lastn_all; lia. }
   exploit sim_trace_length; eauto. i. des.
   exploit (lastn_S (S n) wl); try rewrite LENGTH_WL; try lia. intro WL. des.
   exploit (lastn_S (S n) rl); try rewrite LENGTH_RL; try lia. intro RL. des.
