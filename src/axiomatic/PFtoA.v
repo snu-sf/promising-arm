@@ -683,13 +683,13 @@ Proof.
     - eapply IH.(WPROP4).
     - admit. (* rprop1 *)
     - admit. (* rprop2 *)
-    - i. exploit IH.(WCV); eauto. s. i. des. condtac.
-      + apply Nat.eqb_eq in X. subst. esplits; eauto.
-        * eapply nth_error_app_mon. eauto.
-        * rewrite fun_add_spec. condtac; [|congr].
-          admit.
-        * admit.
-      + esplits; eauto. eapply nth_error_app_mon. eauto.
+    - i. exploit IH.(WCV); eauto. s. i. des. des_ifs.
+      { exfalso. apply Nat.eqb_eq in Heq. subst.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels alc1) (length (ALocal.labels alc1)) <> None) by (ii; congr).
+        apply List.nth_error_Some in H. lia.
+      }
+      esplits; eauto. eapply nth_error_app_mon. eauto.
     - admit. (* rcv *)
     - admit. (* po *)
   }
