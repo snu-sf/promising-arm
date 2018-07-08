@@ -651,7 +651,169 @@ Lemma sim_trace_sim_th
       (VEXT: vextl = vext :: vextl'):
   sim_th p mem tid eu aeu w r cov vext.
 Proof.
+  revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT. induction SIM.
+  { i. simplify. ss. econs; ss.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+      left. splits; ss. admit. (* promises_from_mem *)
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+      destruct eid; ss.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
+      destruct eid; ss.
+    - i. destruct iid1; ss.
+  }
+  i. simplify.
+  destruct eu1 as [st1 lc1 mem1].
+  destruct eu as [st2 lc2 mem2].
+  destruct aeu1 as [ast1 alc1].
+  destruct aeu as [ast2 alc2].
+  ss. exploit IHSIM; eauto. i. des. rename x into IH.
+  inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
+  { (* internal *)
+    inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
+  }
+  { (* read *)
+    inv LOCAL; ss. inv STEP. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
+    - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    - i. exploit IH.(WPROP2); eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    - i. exploit IH.(WPROP3); eauto. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    - eapply IH.(WPROP4).
+    - admit. (* rprop1 *)
+    - admit. (* rprop2 *)
+    - i. exploit IH.(WCV); eauto. s. i. des. condtac.
+      + apply Nat.eqb_eq in X. subst. esplits; eauto.
+        * eapply nth_error_app_mon. eauto.
+        * rewrite fun_add_spec. condtac; [|congr].
+          admit.
+        * admit.
+      + esplits; eauto. eapply nth_error_app_mon. eauto.
+    - admit. (* rcv *)
+    - admit. (* po *)
+  }
+  { (* write *)
+    destruct res1; ss. subst. econs; ss.
+    - admit. (* wprop1 *)
+    - admit. (* wprop2 *)
+    - admit. (* wprop3 *)
+    - admit. (* wprop4 *)
+    - i. exploit IH.(RPROP1); eauto.
+      apply nth_error_app_inv in GET. des; eauto.
+      apply nth_error_singleton_inv in GET0. des. congr.
+    - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
+      eapply nth_error_app_mon. eauto.
+    - admit. (* wcv *)
+    - i. exploit IH.(RCV); eauto. s. i. des. esplits; eauto.
+      + eapply nth_error_app_mon. eauto.
+      + condtac; ss. apply Nat.eqb_eq in X. subst.
+        admit. (* List.nth_error *)
+    - admit. (* po *)
+  }
+  { (* write failure *)
+    subst. destruct res1; ss. subst.
+    inv LOCAL; ss; inv STEP; ss. inv EVENT. econs; ss; try by apply IH.
+  }
+  { (* barrier *)
+    inv LOCAL; ss.
+    { (* isb *)
+      inv STEP. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
+      - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(WPROP2); eauto.
+        apply nth_error_app_inv in GET. des; eauto.
+        apply nth_error_singleton_inv in GET0. des. congr.
+      - i. exploit IH.(WPROP3); eauto. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - eapply IH.(WPROP4).
+      - i. exploit IH.(RPROP1); eauto.
+        apply nth_error_app_inv in GET. des; eauto.
+        apply nth_error_singleton_inv in GET0. des. congr.
+      - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(WCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(RCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. apply nth_error_app_inv in LABEL1. des; cycle 1.
+        { apply nth_error_singleton_inv in LABEL0. des. subst. inv REL. inv X. }
+        apply nth_error_app_inv in LABEL2. des; cycle 1.
+        { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
+        eapply IH.(PO); eauto.
+    }
+    { (* isb *)
+      inv STEP. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
+      - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(WPROP2); eauto.
+        apply nth_error_app_inv in GET. des; eauto.
+        apply nth_error_singleton_inv in GET0. des. congr.
+      - i. exploit IH.(WPROP3); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - eapply IH.(WPROP4).
+      - i. exploit IH.(RPROP1); eauto.
+        apply nth_error_app_inv in GET. des; eauto.
+        apply nth_error_singleton_inv in GET0. des. congr.
+      - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(WCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. exploit IH.(RCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+      - i. apply nth_error_app_inv in LABEL1. des; cycle 1.
+        { apply nth_error_singleton_inv in LABEL0. des. subst. inv REL. inv X. }
+        apply nth_error_app_inv in LABEL2. des; cycle 1.
+        { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
+        eapply IH.(PO); eauto.
+    }
+ }
 Admitted.
+
+(*     { i. etrans; eauto. inv STEP. s. rewrite fun_add_spec. condtac; ss. inversion e. subst. ss. } *)
+(*     i. unfold ALocal.next_eid in *. *)
+(*     apply nth_error_app_inv in LABEL1. *)
+(*     apply nth_error_app_inv in LABEL2. *)
+(*     des. *)
+(*     + repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
+(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
+(*       eapply LABEL; eauto. *)
+(*     + lia. *)
+(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
+(*       repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
+(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
+(*       splits; ss. exploit sim_trace_vext_cov; eauto. i. des. simplify. ss. *)
+      
+      
+(*       admit. *)
+(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
+(*       repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
+(*   - (* write *) *)
+(*     inv ASTATE_STEP; ss; eauto. *)
+(*     destruct res1; ss. destruct val; ss. unfold ALocal.next_eid in *. *)
+(*     apply nth_error_app_inv in LABEL1. *)
+(*     apply nth_error_app_inv in LABEL2. *)
+(*     des. *)
+(*     + repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
+(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
+(*       eauto. *)
+(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
+(*       repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
+(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
+(*       admit. *)
+(*     + lia. *)
+(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
+(*       repeat condtac; ss. *)
+(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
+(*   - (* isb *) *)
+(*     destruct res1; ss. destruct val; ss. eauto. *)
+(*   - (* write *) *)
+(* Admitted. *)
 
 
 (* Lemma sim_trace_vext_cov *)
