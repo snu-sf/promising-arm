@@ -1418,7 +1418,7 @@ Qed.
 
 Lemma sim_traces_rf1_aux
       p trs atrs rs ws covs vexts ex m
-      (ETEP: Machine.pf_exec p m)
+      (STEP: Machine.pf_exec p m)
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
       (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
@@ -1988,32 +1988,37 @@ Lemma sim_traces_sim_eu
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  forall tid tr atr n eu tr' aeu atr'
+  forall tid tr atr covl vextl
+    n eu tr' aeu atr' cov covl' vext vextl'
     (FIND_TR: IdMap.find tid trs = Some tr)
     (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_COVL: IdMap.find tid covs = Some covl)
+    (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
     (EU: lastn (S n) tr = eu :: tr')
-    (AEU: lastn (S n) atr = aeu :: atr'),
+    (AEU: lastn (S n) atr = aeu :: atr')
+    (COV: lastn (S n) covl = cov :: covl')
+    (VEXT: lastn (S n) vextl = vext :: vextl'),
     <<SIM_EU: sim_eu tid ex (v_gen vexts) eu aeu>> /\
     <<OB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (OB: ex.(ob') eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
+        Time.lt ((v_gen vexts) eid1) (vext eid2)>> /\
     <<OB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (AOB: ex.(ob') eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
+        Time.le ((v_gen vexts) eid1) (vext eid2)>> /\
     <<FR:
       forall eid1 eid2
         (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
         (FR: ex.(Execution.fr) (tid, eid1) eid2),
-        Time.lt ((v_gen vexts) (tid, eid1)) ((v_gen vexts) eid2)>>.
+        Time.lt (vext eid1) ((v_gen vexts) eid2)>>.
 Proof.
   i. generalize (SIM tid). intro X. inv X; simplify.
-  revert eu aeu tr' atr' EU AEU. induction n.
+  revert eu aeu tr' atr' cov covl' vext vextl' EU AEU COV VEXT. induction n.
   { i.
     exploit (lastn_one tr).
     { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
@@ -2021,29 +2026,37 @@ Proof.
     exploit (lastn_one atr).
     { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
     i. des.
+    (* exploit (lastn_one covl). *)
+    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
+    (* i. des. *)
+    (* exploit (lastn_one vextl). *)
+    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
+    (* i. des. *)
     rewrite EU in x0. symmetry in x0. inv x0.
     rewrite AEU in x1. symmetry in x1. inv x1.
-    exploit sim_trace_lastn; eauto. rewrite EU. rewrite AEU. i. des.
+    (* rewrite COV in x2. symmetry in x2. inv x2. *)
+    (* rewrite VEXT in x3. symmetry in x3. inv x3. *)
+    exploit sim_trace_lastn; eauto. rewrite AEU. i.
     inv x0. ss. splits; i; try lia.
     admit.
   }
-  i. rename c into wl, d into rl, e into covl, f into vextl.
+  i. rename c into wl, d into rl.
   destruct (Nat.le_gt_cases (List.length tr) (S n)).
   { exploit sim_trace_length; eauto. i. des.
     rewrite lastn_all in EU; [|lia]. subst.
     rewrite lastn_all in AEU; [|lia]. subst.
+    rewrite lastn_all in COV; [|lia]. subst.
+    rewrite lastn_all in VEXT; [|lia]. subst.
     eapply IHn; apply lastn_all; lia. }
   exploit sim_trace_length; eauto. i. des.
-  exploit (lastn_S (S n) wl); try rewrite LENGTH_WL; try lia. intro WL. des.
-  exploit (lastn_S (S n) rl); try rewrite LENGTH_RL; try lia. intro RL. des.
-  exploit (lastn_S (S n) covl); try rewrite LENGTH_COVL; try lia. intro COVL. des.
-  exploit (lastn_S (S n) vextl); try rewrite LENGTH_VEXTL; try lia. intro VEXTL. des.
+  exploit (lastn_S (S n) wl); try rewrite LENGTH_WL; try lia. intro W. des.
+  exploit (lastn_S (S n) rl); try rewrite LENGTH_RL; try lia. intro R. des.
   exploit lastn_S1; try exact EU; eauto. intro EU'.
   exploit lastn_S1; try exact AEU; try rewrite LENGTH_ATR; eauto. intro AEU'.
-  exploit lastn_S1; try exact WL; try rewrite LENGTH_WL; eauto. intro WL'.
-  exploit lastn_S1; try exact RL; try rewrite LENGTH_RL; eauto. intro RL'.
-  exploit lastn_S1; try exact COVL; try rewrite LENGTH_COVL; eauto. intro COVL'.
-  exploit lastn_S1; try exact VEXTL; try rewrite LENGTH_VEXTL; eauto. intro VEXTL'.
+  exploit lastn_S1; try exact WL; try rewrite LENGTH_WL; eauto. intro W'.
+  exploit lastn_S1; try exact RL; try rewrite LENGTH_RL; eauto. intro R'.
+  exploit lastn_S1; try exact COV; try rewrite LENGTH_COVL; eauto. intro COV'.
+  exploit lastn_S1; try exact VEXT; try rewrite LENGTH_VEXTL; eauto. intro VEXT'.
   exploit (lastn_S n tr); try lia. i. des.
   exploit (lastn_S n atr); try lia. i. des.
   exploit (lastn_S n wl); try lia. i. des.
@@ -2052,26 +2065,42 @@ Proof.
   exploit (lastn_S n vextl); try lia. i. des.
   rewrite EU' in x0. rewrite x0 in *. clear x0 tr'.
   rewrite AEU' in x1. rewrite x1 in *. clear x1 atr'.
-  rewrite WL' in x2. rewrite x2 in *. clear x2 l'.
-  rewrite RL' in x3. rewrite x3 in *. clear x3 l'0.
-  rewrite COVL' in x4. rewrite x4 in *. clear x4 l'1.
-  rewrite VEXTL' in x5. rewrite x5 in *. clear x5 l'2.
-  rename a3 into eu1, l'3 into tr'.
-  rename a4 into aeu1, l'4 into atr'.
-  rename a into w, a5 into w1, l'5 into wl'.
-  rename a0 into r, a6 into r1, l'6 into rl'.
-  rename a1 into cov, a7 into cov1, l'7 into covl'.
-  rename a2 into vext, a8 into vext1, l'8 into vextl'.
+  rewrite W' in x2. rewrite x2 in *. clear x2 l'.
+  rewrite R' in x3. rewrite x3 in *. clear x3 l'0.
+  rewrite COV' in x4. rewrite x4 in *. clear x4 covl'.
+  rewrite VEXT' in x5. rewrite x5 in *. clear x5 vextl'.
+  rename a1 into eu1, l'1 into tr'.
+  rename a2 into aeu1, l'2 into atr'.
+  rename a into w, a3 into w1, l'3 into wl'.
+  rename a0 into r, a4 into r1, l'4 into rl'.
+  rename a5 into cov1, l'5 into covl'.
+  rename a6 into vext1, l'6 into vextl'.
   exploit IHn; eauto. i. des.
-  exploit sim_trace_lastn; eauto.
-  rewrite EU, AEU, WL, RL, COVL, VEXTL. intro SIM2.
-  exploit sim_traces_ex; try exact EU; eauto. i. des.
-  exploit sim_traces_ex; try exact EU'; eauto. i. des.
+  exploit sim_trace_lastn; try exact REL6; eauto.
+  rewrite EU', AEU', W', R', COV', VEXT'. intro SIM1.
+  exploit sim_trace_lastn; try exact REL6; eauto.
+  rewrite EU, AEU, W, R, COV, VEXT. intro SIM2.
+  exploit sim_traces_ex; try exact AEU'; eauto. i. des.
+  exploit sim_traces_ex; try exact AEU; eauto. i. des.
   clear IHn. (* clear as much as possible *)
   splits; cycle 1.
   { admit. }
   { admit. }
-  { admit. }
+  { i. inv FR0.
+    - admit.
+    - (* inv H0. inv H6. inv H0. inv H6. *)
+      (* exploit LABELS0; eauto. intro LABEL1. destruct l; ss. *)
+      (* rewrite VEXT0; eauto. *)
+      (* exploit r_property; try exact SIM2. i. des. simplify. *)
+      (* exploit RPROP1; eauto. i. des. *)
+      (* + inv SIM2. inv EVENT; ss. *)
+      (* generalize (ATR tid). intro ATR1. inv ATR1; try congr. des. simplify. *)
+      (* destruct PRE. unfold Execution.label in EID. ss. *)
+      (* rewrite LABELS1 in EID. rewrite IdMap.map_spec in EID. *)
+      (* rewrite <- H9 in EID. ss. simplify. *)
+      (* exploit w_property; try exact REL6. i. des. *)
+      admit.
+  }
   admit.
 Admitted.
 
