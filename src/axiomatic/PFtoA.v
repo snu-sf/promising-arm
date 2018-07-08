@@ -1556,25 +1556,30 @@ Proof.
 Admitted.
 
 Lemma sim_trace_lastn
-      p mem tid tr atr wl rl cov vext
+      p mem tid tr atr wl rl covl vextl
       n
-      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
-  exists cov' vext',
-    sim_trace p mem tid (lastn (S n) tr) (lastn (S n) atr) (lastn (S n) wl) (lastn (S n) rl) cov' vext'.
+      (SIM: sim_trace p mem tid tr atr wl rl covl vextl):
+  sim_trace p mem tid
+            (lastn (S n) tr) (lastn (S n) atr) (lastn (S n) wl)
+            (lastn (S n) rl) (lastn (S n) covl) (lastn (S n) vextl).
 Proof.
 Admitted.
 
 Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
       ex
-      tid n atr aeu atr'
+      tid n atr aeu atr' covl cov covl' vextl vext vextl'
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
       (PRE: Valid.pre_ex p ex)
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE))
       (FIND_ATR: IdMap.find tid atrs = Some atr)
-      (AEU: lastn (S n) atr = aeu :: atr'):
+      (FIND_COVL: IdMap.find tid covs = Some covl)
+      (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+      (AEU: lastn (S n) atr = aeu :: atr')
+      (COV: lastn (S n) covl = cov :: covl')
+      (VEXT: lastn (S n) vextl = vext :: vextl'):
   <<LABELS:
     forall eid label
       (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
@@ -1599,7 +1604,15 @@ Lemma sim_traces_ex
     forall eid1 eid2
       (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
       (ADDR: ex.(Execution.rmw) (tid, eid1) (tid, eid2)),
-      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2>>.
+      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2>> /\
+  <<COV:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen covs) (tid, eid) = cov eid>> /\
+  <<VEXT:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen vexts) (tid, eid) = vext eid>>.
 Proof.
 Admitted.
 
@@ -1695,7 +1708,7 @@ Proof.
     inv x0. ss. splits; i; try lia.
     admit.
   }
-  i. rename c into wl, d into rl, e into cov, f into vext.
+  i. rename c into wl, d into rl, e into covl, f into vextl.
   destruct (Nat.le_gt_cases (List.length tr) (S n)).
   { exploit sim_trace_length; eauto. i. des.
     exploit lastn_S2; try exact EU; eauto. i.
@@ -1704,25 +1717,43 @@ Proof.
   exploit sim_trace_length; eauto. i. des.
   exploit (lastn_S (S n) wl); try rewrite LENGTH_WL; try lia. intro WL. des.
   exploit (lastn_S (S n) rl); try rewrite LENGTH_RL; try lia. intro RL. des.
+  exploit (lastn_S (S n) covl); try rewrite LENGTH_COVL; try lia. intro COVL. des.
+  exploit (lastn_S (S n) vextl); try rewrite LENGTH_VEXTL; try lia. intro VEXTL. des.
   exploit lastn_S1; try exact EU; eauto. intro EU'.
   exploit lastn_S1; try exact AEU; try rewrite LENGTH_ATR; eauto. intro AEU'.
   exploit lastn_S1; try exact WL; try rewrite LENGTH_WL; eauto. intro WL'.
   exploit lastn_S1; try exact RL; try rewrite LENGTH_RL; eauto. intro RL'.
+  exploit lastn_S1; try exact COVL; try rewrite LENGTH_COVL; eauto. intro COVL'.
+  exploit lastn_S1; try exact VEXTL; try rewrite LENGTH_VEXTL; eauto. intro VEXTL'.
   exploit (lastn_S n tr); try lia. i. des.
   exploit (lastn_S n atr); try lia. i. des.
   exploit (lastn_S n wl); try lia. i. des.
   exploit (lastn_S n rl); try lia. i. des.
+  exploit (lastn_S n covl); try lia. i. des.
+  exploit (lastn_S n vextl); try lia. i. des.
   rewrite EU' in x0. rewrite x0 in *. clear x0 tr'.
   rewrite AEU' in x1. rewrite x1 in *. clear x1 atr'.
   rewrite WL' in x2. rewrite x2 in *. clear x2 l'.
   rewrite RL' in x3. rewrite x3 in *. clear x3 l'0.
-  rename a1 into eu1, l'1 into tr'.
-  rename a2 into aeu1, l'2 into atr'.
-  rename a into w, a3 into w1, l'3 into wl'.
-  rename a0 into r, a4 into r1, l'4 into rl'.
+  rewrite COVL' in x4. rewrite x4 in *. clear x4 l'1.
+  rewrite VEXTL' in x5. rewrite x5 in *. clear x5 l'2.
+  rename a3 into eu1, l'3 into tr'.
+  rename a4 into aeu1, l'4 into atr'.
+  rename a into w, a5 into w1, l'5 into wl'.
+  rename a0 into r, a6 into r1, l'6 into rl'.
+  rename a1 into cov, a7 into cov1, l'7 into covl'.
+  rename a2 into vext, a8 into vext1, l'8 into vextl'.
   exploit IHn; eauto. i. des.
   exploit sim_trace_lastn; eauto.
-  rewrite EU, AEU, WL, RL. intro SIM2. des.
+  rewrite EU, AEU, WL, RL, COVL, VEXTL. intro SIM2.
+  exploit sim_traces_ex; try exact EU; eauto. i. des.
+  exploit sim_traces_ex; try exact EU'; eauto. i. des.
+  clear IHn. (* clear as many as possible *)
+  splits.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma sim_traces_vext_valid
