@@ -1716,6 +1716,16 @@ Proof.
   unfold lastn. s. rewrite List.rev_app_distr. ss.
 Qed.
 
+Lemma lastn_cons A n a (l:list A)
+      (N: n <= length l):
+  lastn n (a::l) = lastn n l.
+Proof.
+  revert n N. induction l using List.rev_ind; ss.
+  { i. destruct n; ss. unfold lastn. s. destruct n; lia. }
+  i. destruct n; ss. rewrite List.app_comm_cons, ? lastn_snoc. f_equal.
+  eapply IHl. rewrite List.app_length in N. ss. lia.
+Qed.
+
 Lemma lastn_one A
       (l: list A)
       (LENGTH: List.length l >= 1):
@@ -1772,7 +1782,14 @@ Lemma sim_trace_lastn
             (lastn (S n) tr) (lastn (S n) atr) (lastn (S n) wl)
             (lastn (S n) rl) (lastn (S n) covl) (lastn (S n) vextl).
 Proof.
-Admitted.
+  revert n atr wl rl covl vextl SIM. induction tr; i; [by inv SIM|].
+  exploit sim_trace_length; eauto. s. i. des.
+  destruct (le_lt_dec (length tr) n).
+  { rewrite ? lastn_all in *; ss; try lia. }
+  exploit sim_trace_last; eauto. i. des. simplify. ss.
+  rewrite ? lastn_cons; try lia. eapply IHtr.
+  inv SIM; ss. lia.
+Qed.
 
 Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
