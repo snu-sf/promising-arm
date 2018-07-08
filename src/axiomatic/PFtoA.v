@@ -1057,8 +1057,8 @@ Proof.
     eexists (IdMap.map (fun x => [x]) (IdMap.mapi (fun _ _ => _) p)).
     eexists (IdMap.mapi (fun _ _ => [fun _ => None]) p).
     eexists (IdMap.mapi (fun _ _ => [fun _ => None]) p).
-    eexists (IdMap.mapi (fun _ _ => bot) p).
-    eexists (IdMap.mapi (fun _ _ => bot) p).
+    eexists (IdMap.mapi (fun _ _ => [bot]) p).
+    eexists (IdMap.mapi (fun _ _ => [bot]) p).
     eexists (Execution.mk (IdMap.mapi (fun _ _ => _) p) bot bot bot bot bot bot).
     eexists (@Valid.mk_pre_ex _ _ (IdMap.mapi (fun tid stmts => AExecUnit.mk (State.init stmts) ALocal.init) p)  _ _ _ _ _ _).
     hexploit rtc_promise_step_spec; eauto. s. intro X.
@@ -1096,12 +1096,12 @@ Proof.
   s. splits; cycle 1.
   - i. rewrite ? IdMap.add_spec. condtac; eauto.
   - ii. rewrite ? IdMap.add_spec. condtac; eauto.
-  - s. ii. rewrite ? IdMap.add_spec. condtac; eauto. inversion e1. subst. clear e1 X. econs.
+  - s. ii. rewrite ? IdMap.add_spec. condtac; eauto. inversion e0. subst. clear e0 X. econs.
     econs 2; eauto. econs; eauto.
 Grab Existential Variables.
 all: ss.
 1: { ii. generalize (PRE.(Valid.AEUS) id). intro X.
-     rewrite IdMap.add_spec. condtac; ss. inversion e1. subst. clear e1 X0.
+     rewrite IdMap.add_spec. condtac; ss. inversion e0. subst. clear e0 X0.
      generalize (ATR tid). rewrite <- H. intro Y. inv Y. des. inv REL.
      rewrite <- H6 in X. inv X. econs. etrans; eauto.
 }
