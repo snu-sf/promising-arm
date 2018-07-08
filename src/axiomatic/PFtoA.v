@@ -649,9 +649,11 @@ Lemma sim_trace_sim_th
       (WL: wl = w :: wl')
       (COV: covl = cov :: covl')
       (VEXT: vextl = vext :: vextl'):
+      (* (MEM: mem = eu.(ExecUnit.mem)): TODO: enable it *)
   sim_th p mem tid eu aeu w r cov vext.
 Proof.
   revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT. induction SIM.
+  (* revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT MEM. induction SIM. *)
   { i. simplify. ss. econs; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       left. splits; ss. admit. (* promises_from_mem *)
@@ -666,13 +668,15 @@ Proof.
   destruct eu as [st2 lc2 mem2].
   destruct aeu1 as [ast1 alc1].
   destruct aeu as [ast2 alc2].
-  ss. exploit IHSIM; eauto. i. des. rename x into IH.
+  ss. exploit IHSIM; eauto.
+  (* { admit. (* mem is preserved *) } *)
+  i. des. rename x into IH.
   inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
   { (* internal *)
     inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
   }
   { (* read *)
-    inv LOCAL; ss. inv STEP. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
+    inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WPROP2); eauto.
@@ -681,8 +685,25 @@ Proof.
     - i. exploit IH.(WPROP3); eauto. i. des. esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - eapply IH.(WPROP4).
-    - admit. (* rprop1 *)
-    - admit. (* rprop2 *)
+    - i. apply nth_error_app_inv in GET. des.
+      + exploit IH.(RPROP1); eauto. i. des. esplits; eauto.
+        des_ifs. apply Nat.eqb_eq in Heq. subst. unfold ALocal.next_eid in *. lia.
+      + apply nth_error_singleton_inv in GET0. des.
+        replace eid with (length (ALocal.labels alc1)) in * by lia.
+        des_ifs; cycle 1.
+        { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
+        rewrite fun_add_spec. condtac; [|congr].
+        admit. (* rprop1 *)
+    - i. des_ifs.
+      + apply Nat.eqb_eq in Heq. subst. esplits; eauto.
+        * rewrite List.nth_error_app2, Nat.sub_diag; [|refl].
+          admit. (* rprop2 *)
+        * rewrite fun_add_spec. des_ifs; [|congr]. eauto.
+          destruct ts; [left|right]; eauto.
+          revert MSG. unfold Memory.read, Memory.get_msg. ss.
+          admit. (* rprop2 *)
+      + exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WCV); eauto. s. i. des. des_ifs.
       { exfalso. apply Nat.eqb_eq in Heq. subst.
         unfold ALocal.next_eid in *.
@@ -690,12 +711,26 @@ Proof.
         apply List.nth_error_Some in H. lia.
       }
       esplits; eauto. eapply nth_error_app_mon. eauto.
-    - admit. (* rcv *)
+    - i. des_ifs.
+      + apply Nat.eqb_eq in Heq. subst. esplits; eauto.
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
+      + exploit IH.(RCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
     - admit. (* po *)
   }
   { (* write *)
-    destruct res1; ss. subst. econs; ss.
-    - admit. (* wprop1 *)
+    inv LOCAL; inv EVENT; [|by inv STEP]. inv STEP. econs; ss.
+    - i. exploit IH.(WPROP1); eauto. s. i. rewrite Promises.unset_o. des_ifs.
+      { inv e. right. esplits; ss.
+        admit.
+        admit.
+      }
+      des; [left|right]; splits; ss.
+      + i. des_ifs; eauto. apply Nat.eqb_eq in Heq. subst. ii. inv H.
+        rewrite fun_add_spec in c. des_ifs; [|congr]. congr.
+      + esplits; eauto.
+        * des_ifs; eauto. apply Nat.eqb_eq in Heq. subst. admit. (* wprop1 *)
+        * eapply nth_error_app_mon. eauto.
     - admit. (* wprop2 *)
     - admit. (* wprop3 *)
     - admit. (* wprop4 *)
@@ -704,11 +739,18 @@ Proof.
       apply nth_error_singleton_inv in GET0. des. congr.
     - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
       eapply nth_error_app_mon. eauto.
-    - admit. (* wcv *)
+    - i. des_ifs.
+      + rewrite Nat.eqb_eq in Heq. subst. esplits; eauto.
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
+      + exploit IH.(WCV); eauto. s. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
     - i. exploit IH.(RCV); eauto. s. i. des. esplits; eauto.
       + eapply nth_error_app_mon. eauto.
-      + condtac; ss. apply Nat.eqb_eq in X. subst.
-        admit. (* List.nth_error *)
+      + des_ifs.
+        exfalso. apply Nat.eqb_eq in Heq. subst.
+        unfold ALocal.next_eid in *.
+        assert (H: List.nth_error (ALocal.labels alc1) (length (ALocal.labels alc1)) <> None) by (ii; congr).
+        apply List.nth_error_Some in H. lia.
     - admit. (* po *)
   }
   { (* write failure *)
@@ -769,172 +811,6 @@ Proof.
     }
  }
 Admitted.
-
-(*     { i. etrans; eauto. inv STEP. s. rewrite fun_add_spec. condtac; ss. inversion e. subst. ss. } *)
-(*     i. unfold ALocal.next_eid in *. *)
-(*     apply nth_error_app_inv in LABEL1. *)
-(*     apply nth_error_app_inv in LABEL2. *)
-(*     des. *)
-(*     + repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
-(*       eapply LABEL; eauto. *)
-(*     + lia. *)
-(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
-(*       splits; ss. exploit sim_trace_vext_cov; eauto. i. des. simplify. ss. *)
-      
-      
-(*       admit. *)
-(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
-(*   - (* write *) *)
-(*     inv ASTATE_STEP; ss; eauto. *)
-(*     destruct res1; ss. destruct val; ss. unfold ALocal.next_eid in *. *)
-(*     apply nth_error_app_inv in LABEL1. *)
-(*     apply nth_error_app_inv in LABEL2. *)
-(*     des. *)
-(*     + repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
-(*       eauto. *)
-(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
-(*       admit. *)
-(*     + lia. *)
-(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
-(*   - (* isb *) *)
-(*     destruct res1; ss. destruct val; ss. eauto. *)
-(*   - (* write *) *)
-(* Admitted. *)
-
-
-(* Lemma sim_trace_vext_cov *)
-(*       p mem tid tr atr wl rl covl vextl *)
-(*       (SIM: sim_trace p mem tid tr atr wl rl covl vextl): *)
-(*   exists aeu atr' w wl' r rl' cov covl' vext vextl', *)
-(*     atr = aeu :: atr' /\ *)
-(*     wl = w :: wl' /\ *)
-(*     rl = r :: rl' /\ *)
-(*     covl = cov :: covl' /\ *)
-(*     vextl = vext :: vextl' /\ *)
-(*     (forall eid ts (W: w eid = Some ts), *)
-(*         (exists ex ord loc val, *)
-(*             List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)) /\ *)
-(*         cov eid = ts.(snd) /\ *)
-(*         vext eid = ts.(snd)) /\ *)
-(*     (forall eid ts (R: r eid = Some ts), *)
-(*         (exists ex ord loc val, *)
-(*             List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)) /\ *)
-(*         cov eid = ts.(snd)). *)
-(* Proof. *)
-(*   induction SIM; esplits; eauto; i; ss. *)
-(*   - des. simplify. inv EVENT. *)
-(*     + exploit IHSIM4; eauto. i. des. *)
-(*       destruct aeu2. destruct local. *)
-(*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*     + des_ifs; eauto. *)
-(*       * exfalso. *)
-(*         rewrite Nat.eqb_eq in Heq. subst. *)
-(*         exploit IHSIM4; eauto. i. des. *)
-(*         unfold ALocal.next_eid in *. *)
-(*         assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None) *)
-(*           by (ii; congr). *)
-(*         rewrite List.nth_error_Some in H. lia. *)
-(*       * exploit IHSIM4; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*     + des_ifs; eauto. *)
-(*       * destruct eu1. destruct eu2. *)
-(*         destruct aeu. destruct aeu2. ss. *)
-(*         inv STATE. inv STEP. inv STATE; ss. *)
-(*         rewrite Nat.eqb_eq in Heq. subst. *)
-(*         inv LOCAL; ss. *)
-(*         { inv STEP. ss. splits; eauto. *)
-(*           inv EVENT. inv ALOCAL_STEP; ss. *)
-(*           - esplits. unfold ALocal.next_eid. *)
-(*             rewrite List.nth_error_app2. *)
-(*             rewrite <- Minus.minus_n_n. ss. lia. *)
-(*           - inv EVENT. inv FAILURE. } *)
-(*         { inv STEP. ss. } *)
-(*       * exploit IHSIM4; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*       * exploit IHSIM4; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*       * exploit IHSIM4; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*     + exploit IHSIM4; eauto. i. des. *)
-(*       destruct aeu2. destruct local. *)
-(*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*       { rewrite List.nth_error_app1; eauto. *)
-(*         eapply List.nth_error_Some. ii. congr. } *)
-(*   - des. simplify. inv EVENT. *)
-(*     + exploit IHSIM5; eauto. i. des. *)
-(*       destruct aeu2. destruct local. *)
-(*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*     + des_ifs; eauto. *)
-(*       * destruct eu1. destruct eu2. *)
-(*         destruct aeu. destruct aeu2. ss. *)
-(*         inv STATE. inv STEP. inv STATE; ss. *)
-(*         rewrite Nat.eqb_eq in Heq. subst. *)
-(*         inv LOCAL; ss. *)
-(*         inv STEP. ss. splits; eauto. *)
-(*         inv EVENT. inv ALOCAL_STEP; ss. *)
-(*         esplits. unfold ALocal.next_eid. *)
-(*         rewrite List.nth_error_app2. *)
-(*         rewrite <- Minus.minus_n_n. ss. lia. *)
-(*       * exploit IHSIM5; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*     + des_ifs; eauto. *)
-(*       * exfalso. *)
-(*         rewrite Nat.eqb_eq in Heq. subst. *)
-(*         exploit IHSIM5; eauto. i. des. *)
-(*         unfold ALocal.next_eid in *. *)
-(*         assert (H: List.nth_error (ALocal.labels (AExecUnit.local aeu)) (length (ALocal.labels (AExecUnit.local aeu))) <> None) *)
-(*           by (ii; congr). *)
-(*         rewrite List.nth_error_Some in H. lia. *)
-(*       * exploit IHSIM5; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*       * exploit IHSIM5; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*       * exploit IHSIM5; eauto. i. des. *)
-(*         destruct aeu2. destruct local. *)
-(*         inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*         { rewrite List.nth_error_app1; eauto. *)
-(*           eapply List.nth_error_Some. ii. congr. } *)
-(*     + exploit IHSIM5; eauto. i. des. *)
-(*       destruct aeu2. destruct local. *)
-(*       inv ALOCAL_STEP; ss; inv ALOCAL; esplits; eauto. *)
-(*       { rewrite List.nth_error_app1; eauto. *)
-(*         eapply List.nth_error_Some. ii. congr. } *)
-(* Qed. *)
 
 (* Lemma sim_trace_cov_po_loc *)
 (*       p mem tid tr atr wl rl cov vext r rl' w wl' eu tr' aeu atr' covf cov' *)
@@ -1024,145 +900,6 @@ Admitted.
 (*       inv REL. inv Y. *)
 (*     } *)
 (*     eauto. *)
-(* Admitted. *)
-
-(* Lemma w_property *)
-(*       p mem tid tr atr wl rl covl vextl *)
-(*       (SIM: sim_trace p mem tid tr atr wl rl covl vextl): *)
-(*   exists eu tr' aeu atr' w wl', *)
-(*     tr = eu :: tr' /\ *)
-(*     atr = aeu :: atr' /\ *)
-(*     wl = w :: wl' /\ *)
-(*     <<WPROP1: *)
-(*       forall ts loc val *)
-(*          (GET: Memory.get_msg ts mem = Some (Msg.mk loc val tid)), *)
-(*         ((Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = true /\ *)
-(*           forall eid, w eid <> Some (loc, ts)) \/ *)
-(*          (Promises.lookup ts eu.(ExecUnit.local).(Local.promises) = false /\ *)
-(*           exists eid ex ord, *)
-(*             w eid = Some (loc, ts) /\ *)
-(*             List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)))>> /\ *)
-(*     <<WPROP2: *)
-(*       forall eid ex ord loc val *)
-(*         (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val)), *)
-(*       exists ts, *)
-(*         w eid = Some (loc, ts) /\ *)
-(*         Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\ *)
-(*     <<WPROP3: *)
-(*       forall eid loc ts (GET: w eid = Some (loc, ts)), *)
-(*         Time.lt Time.bot ts /\ *)
-(*       exists ex ord val, *)
-(*         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val) /\ *)
-(*         Memory.get_msg ts mem = Some (Msg.mk loc val tid)>> /\ *)
-(*     <<WPROP4: *)
-(*       forall eid1 loc1 eid2 loc2 ts (W1: w eid1 = Some (loc1, ts)) (W2: w eid2 = Some (loc2, ts)), *)
-(*         eid1 = eid2>>. *)
-(* Proof. *)
-(*   induction SIM. *)
-(*   { esplits; ss. *)
-(*     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i. *)
-(*       left. splits; ss. admit. (* promises_from_mem *) *)
-(*     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i. *)
-(*       destruct eid; ss. *)
-(*   } *)
-(*   des. simplify. *)
-(*   destruct eu as [st1 lc1 mem1]. *)
-(*   destruct eu2 as [st2 lc2 mem2]. *)
-(*   destruct aeu2 as [ast2 alc2]. *)
-(*   ss. inv STEP. inv EVENT; inv LOCAL; inv EVENT; ss. *)
-(*   - (* internal *) *)
-(*     inv LC. s. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto. *)
-(*   - (* read *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*     + i. exploit WPROP2; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit WPROP3; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*   - (* write *) *)
-(*     admit. *)
-(*   - (* write failure *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto. *)
-(*   - (* isb *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*     + i. exploit WPROP2; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit WPROP3; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*   - (* dmb *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit WPROP1; eauto. i. des; [left|right]; esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*     + i. exploit WPROP2; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit WPROP3; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(* Admitted. *)
-
-(* Lemma r_property *)
-(*       p mem tid tr atr wl rl covl vextl *)
-(*       (SIM: sim_trace p mem tid tr atr wl rl covl vextl): *)
-(*   exists eu tr' aeu atr' r rl', *)
-(*     tr = eu :: tr' /\ *)
-(*     atr = aeu :: atr' /\ *)
-(*     rl = r :: rl' /\ *)
-(*     <<RPROP1: *)
-(*       forall eid ex ord loc val *)
-(*          (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)), *)
-(*       exists ts tid', *)
-(*         r eid = Some (loc, ts) /\ *)
-(*         __guard__ ((ts = Time.bot /\ val = Val.default) \/ *)
-(*          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\ *)
-(*     <<RPROP2: *)
-(*       forall eid loc ts (GET: r eid = Some (loc, ts)), *)
-(*       exists ex ord val tid', *)
-(*         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\ *)
-(*         __guard__ ((ts = Time.bot /\ val = Val.default) \/ *)
-(*          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>>. *)
-(* Proof. *)
-(*   induction SIM. *)
-(*   { esplits; ss. *)
-(*     rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i. *)
-(*     destruct eid; ss. *)
-(*   } *)
-(*   des. simplify. *)
-(*   destruct eu as [st1 lc1 mem1]. *)
-(*   destruct eu2 as [st2 lc2 mem2]. *)
-(*   destruct aeu2 as [ast2 alc2]. *)
-(*   ss. inv STEP. inv EVENT; inv LOCAL; inv EVENT; ss. *)
-(*   - (* internal *) *)
-(*     inv LC. s. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto. *)
-(*   - (* read *) *)
-(*     admit. *)
-(*   - (* write *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit RPROP1; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit RPROP2; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*   - (* write failure *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; eauto. *)
-(*   - (* isb *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit RPROP1; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit RPROP2; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
-(*   - (* dmb *) *)
-(*     inv STEP; ss. inv ALOCAL_STEP; inv EVENT; ss. esplits; ss. all: ss. *)
-(*     + i. exploit RPROP1; eauto. *)
-(*       apply nth_error_app_inv in GET. des; eauto. *)
-(*       apply nth_error_singleton_inv in GET0. des. congr. *)
-(*     + i. exploit RPROP2; eauto. i. des. esplits; eauto. *)
-(*       eapply nth_error_app_mon. eauto. *)
 (* Admitted. *)
 
 Lemma sim_traces_co1
