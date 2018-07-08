@@ -896,6 +896,15 @@ Proof.
   inv SIM; esplits; eauto.
 Qed.
 
+Lemma sim_trace_length
+      p mem tid tr atr wl rl cov vext
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  <<LENGTH_ATR: List.length atr = List.length tr>> /\
+  <<LENGTH_WL: List.length wl = List.length tr>> /\
+  <<LENGTH_RL: List.length rl = List.length tr>>.
+Proof.
+Admitted.
+
 Lemma sim_traces_memory
       p mem trs atrs rs ws covs vexts
       m
@@ -1246,19 +1255,6 @@ Proof.
     congr.
 Qed.
 
-Definition lastn A (n: nat) (l: list A) :=
-  List.rev (List.firstn n (List.rev l)).
-
-Lemma lastn_all A (l: list A):
-  lastn (S (List.length l)) l = l.
-Proof.
-  unfold lastn.
-  rewrite <- List.rev_length.
-  rewrite List.firstn_all2.
-  - rewrite List.rev_involutive. refl.
-  - omega.
-Qed.
-
 Lemma sim_trace_vext_cov
       p mem tid tr atr wl rl cov vext
       (SIM: sim_trace p mem tid tr atr wl rl cov vext):
@@ -1511,7 +1507,58 @@ Proof.
   rewrite x1. rewrite x6. auto.
 Qed.
 
-Lemma asdf
+Definition lastn A (n: nat) (l: list A) :=
+  List.rev (List.firstn n (List.rev l)).
+
+Lemma lastn_all A (l: list A):
+  lastn (S (List.length l)) l = l.
+Proof.
+  unfold lastn.
+  rewrite <- List.rev_length.
+  rewrite List.firstn_all2.
+  - rewrite List.rev_involutive. refl.
+  - omega.
+Qed.
+
+Lemma lastn_one A
+      (l: list A)
+      (LENGTH: List.length l >= 1):
+  exists a, lastn 1 l = [a].
+Proof.
+Admitted.
+
+Lemma lastn_S A n (l: list A)
+      (LENGTH: List.length l > 0):
+  exists a l', lastn (S n) l = a :: l'.
+Proof.
+Admitted.
+
+Lemma lastn_S1 A
+      (l: list A) n a l'
+      (N: n < List.length l)
+      (LASTN: lastn (S n) l = a :: l'):
+  lastn n l = l'.
+Proof.
+Admitted.
+
+Lemma lastn_S2 A
+      (l: list A) n l'
+      (N: n >= List.length l)
+      (LASTN: lastn (S n) l = l'):
+  lastn n l = l'.
+Proof.
+Admitted.
+
+Lemma sim_trace_lastn
+      p mem tid tr atr wl rl cov vext
+      n
+      (SIM: sim_trace p mem tid tr atr wl rl cov vext):
+  exists cov' vext',
+    sim_trace p mem tid (lastn (S n) tr) (lastn (S n) atr) (lastn (S n) wl) (lastn (S n) rl) cov' vext'.
+Proof.
+Admitted.
+
+Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
       ex
       tid n atr aeu atr'
@@ -1550,6 +1597,40 @@ Lemma asdf
 Proof.
 Admitted.
 
+Definition ob' (ex: Execution.t): relation eidT :=
+  ex.(Execution.rfe) ∪ ex.(Execution.dob) ∪ ex.(Execution.aob) ∪ ex.(Execution.bob).
+
+Ltac des_union :=
+  repeat
+    (try match goal with
+         | [H: Execution.internal _ _ _ |- _] => inv H
+         | [H: Execution.ob _ _ _ |- _] => inv H
+         | [H: Execution.obs _ _ _ |- _] => inv H
+         | [H: (_ ∪ _) _ _ |- _] => inv H
+         end).
+
+Lemma ob_ob'
+      ex eid1 eid2:
+  ex.(Execution.ob) eid1 eid2 <->
+  (ex.(Execution.fr) ∪ ex.(Execution.co) ∪ ex.(ob')) eid1 eid2.
+Proof.
+  split; i.
+  - des_union.
+    + right. left. left. left. auto.
+    + left. left. auto.
+    + left. right. auto.
+    + right. left. left. right. auto.
+    + right. left. right. auto.
+    + right. right. auto.
+  - unfold ob' in *. des_union.
+    + left. left. left. left. right. auto.
+    + left. left. left. right. auto.
+    + left. left. left. left. left. auto.
+    + left. left. right. auto.
+    + left. right. auto.
+    + right. auto.
+Qed.
+
 Lemma sim_traces_sim_eu
       p mem trs atrs ws rs covs vexts
       m ex
@@ -1574,95 +1655,68 @@ Lemma sim_traces_sim_eu
     (FIND_ATR: IdMap.find tid atrs = Some atr)
     (EU: lastn (S n) tr = eu :: tr')
     (AEU: lastn (S n) atr = aeu :: atr'),
-    sim_eu tid ex (v_gen vexts) eu aeu.
-Proof.
-  i. generalize (SIM tid). intro X. inv X; simplify.
-  revert eu aeu tr' atr' EU AEU. induction n.
-  { i. admit. (* lastn *) }
-  (* Lemma lastn_S A *)
-  (* n (l:list A): *)
-  (*   lastn (S n) l =  :: lastn n l. *)
-  admit.
-Admitted.
-
-Lemma sim_traces_vext_valid_aux
-      p mem trs atrs ws rs covs vexts
-      m ex
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
-      (NOPROMISE: Machine.no_promise m)
-      (PRE: Valid.pre_ex p ex)
-      (CO: ex.(Execution.co) = co_gen ws)
-      (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (CO1: Valid.co1 ex)
-      (CO2: Valid.co2 ex)
-      (RF1: Valid.rf1 ex)
-      (RF2: Valid.rf2 ex)
-      (RF_WF: Valid.rf_wf ex)
-      (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
-             trs m.(Machine.tpool))
-      (ATR: IdMap.Forall2
-              (fun _ atr aeu => exists l, atr = aeu :: l)
-              atrs (Valid.aeus PRE)):
-  forall tid atr
-    (FINDA: IdMap.find tid atrs = Some atr)
-    n aeu atr'
-    (LASTN: lastn (S n) atr = aeu :: atr'),
-    <<RFE:
+    <<SIM_EU: sim_eu tid ex (v_gen vexts) eu aeu>> /\
+    <<OB_WRITE:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (RFE: ex.(Execution.rfe) eid1 (tid, eid2)),
-        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<FR:
-      forall eid1 eid2
-        (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (FR: ex.(Execution.fr) (tid, eid1) eid2),
-        Time.lt ((v_gen vexts) (tid, eid1)) ((v_gen vexts) eid2)>> /\
-    <<AOB_WRITE:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (AOB: ex.(Execution.aob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) Label.is_access eid1)
+        (OB: ex.(ob') eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
         Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
     <<AOB_READ:
       forall eid1 eid2
         (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (AOB: ex.(Execution.aob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) Label.is_access eid1)
+        (AOB: ex.(ob') eid1 (tid, eid2))
         (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
         Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<BOB_WRITE:
+    <<FR:
       forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (BOB: ex.(Execution.bob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) Label.is_access eid1)
-        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<BOB_READ:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (BOB: ex.(Execution.bob) eid1 (tid, eid2))
-        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<DOB_WRITE:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (DOB: ex.(Execution.dob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) Label.is_access eid1)
-        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>> /\
-    <<DOB_READ:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (DOB: ex.(Execution.dob) eid1 (tid, eid2))
-        (EID1: ex.(Execution.label_is) Label.is_access eid1)
-        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen vexts) eid1) ((v_gen vexts) (tid, eid2))>>.
+        (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+        (FR: ex.(Execution.fr) (tid, eid1) eid2),
+        Time.lt ((v_gen vexts) (tid, eid1)) ((v_gen vexts) eid2)>>.
 Proof.
-  i. induction n.
-  - admit.
-  - admit.
+  i. generalize (SIM tid). intro X. inv X; simplify.
+  revert eu aeu tr' atr' EU AEU. induction n.
+  { i.
+    exploit (lastn_one tr).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    exploit (lastn_one atr).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    rewrite EU in x0. symmetry in x0. inv x0.
+    rewrite AEU in x1. symmetry in x1. inv x1.
+    exploit sim_trace_lastn; eauto. rewrite EU. rewrite AEU. i. des.
+    inv x0. ss. splits; i; try lia.
+    admit.
+  }
+  i. rename c into wl, d into rl, e into cov, f into vext.
+  destruct (Nat.le_gt_cases (List.length tr) (S n)).
+  { exploit sim_trace_length; eauto. i. des.
+    exploit lastn_S2; try exact EU; eauto. i.
+    exploit lastn_S2; try exact AEU; eauto.
+    rewrite LENGTH_ATR. auto. }
+  exploit sim_trace_length; eauto. i. des.
+  exploit (lastn_S (S n) wl); try rewrite LENGTH_WL; try lia. intro WL. des.
+  exploit (lastn_S (S n) rl); try rewrite LENGTH_RL; try lia. intro RL. des.
+  exploit lastn_S1; try exact EU; eauto. intro EU'.
+  exploit lastn_S1; try exact AEU; try rewrite LENGTH_ATR; eauto. intro AEU'.
+  exploit lastn_S1; try exact WL; try rewrite LENGTH_WL; eauto. intro WL'.
+  exploit lastn_S1; try exact RL; try rewrite LENGTH_RL; eauto. intro RL'.
+  exploit (lastn_S n tr); try lia. i. des.
+  exploit (lastn_S n atr); try lia. i. des.
+  exploit (lastn_S n wl); try lia. i. des.
+  exploit (lastn_S n rl); try lia. i. des.
+  rewrite EU' in x0. rewrite x0 in *. clear x0 tr'.
+  rewrite AEU' in x1. rewrite x1 in *. clear x1 atr'.
+  rewrite WL' in x2. rewrite x2 in *. clear x2 l'.
+  rewrite RL' in x3. rewrite x3 in *. clear x3 l'0.
+  rename a1 into eu1, l'1 into tr'.
+  rename a2 into aeu1, l'2 into atr'.
+  rename a into w, a3 into w1, l'3 into wl'.
+  rename a0 into r, a4 into r1, l'4 into rl'.
+  exploit IHn; eauto. i. des.
+  exploit sim_trace_lastn; eauto.
+  rewrite EU, AEU, WL, RL. intro SIM2. des.
 Admitted.
 
 Lemma sim_traces_vext_valid
@@ -1684,81 +1738,22 @@ Lemma sim_traces_vext_valid
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  <<RFE:
-    forall eid1 eid2
-      (RFE: ex.(Execution.rfe) eid1 eid2),
-      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
   <<FR:
     forall eid1 eid2
       (FR: ex.(Execution.fr) eid1 eid2),
       Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<AOB_WRITE:
+  <<OB_WRITE:
     forall eid1 eid2
-      (AOB: ex.(Execution.aob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_access eid1)
+      (OB: ex.(ob') eid1 eid2)
       (EID2: ex.(Execution.label_is) Label.is_write eid2),
       Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<AOB_READ:
+  <<OB_READ:
     forall eid1 eid2
-      (AOB: ex.(Execution.aob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_access eid1)
-      (EID2: ex.(Execution.label_is) Label.is_read eid2),
-      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<BOB_WRITE:
-    forall eid1 eid2
-      (BOB: ex.(Execution.bob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_access eid1)
-      (EID2: ex.(Execution.label_is) Label.is_write eid2),
-      Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<BOB_READ:
-    forall eid1 eid2
-      (BOB: ex.(Execution.bob) eid1 eid2)
-      (EID2: ex.(Execution.label_is) Label.is_read eid2),
-      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<DOB_WRITE:
-    forall eid1 eid2
-      (DOB: ex.(Execution.dob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_access eid1)
-      (EID2: ex.(Execution.label_is) Label.is_write eid2),
-      Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
-  <<DOB_READ:
-    forall eid1 eid2
-      (DOB: ex.(Execution.dob) eid1 eid2)
-      (EID1: ex.(Execution.label_is) Label.is_access eid1)
+      (OB: ex.(ob') eid1 eid2)
       (EID2: ex.(Execution.label_is) Label.is_read eid2),
       Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>>.
 Proof.
-  splits.
-  - i. destruct eid2 as [tid2 eid2].
-    generalize RFE. intro X. inv X.
-    rewrite RF in H. inv H. ss.
-    generalize (SIM tid2). intro SIM2. inv SIM2; try congr.
-    exploit sim_trace_last; eauto. i. des. simplify.
-    exploit sim_traces_vext_valid_aux; eauto.
-    { rewrite lastn_all. refl. }
-    i. des.
-    exploit RFE0; eauto.
-    exploit r_property; try exact REL6. i. des.
-    simplify. exploit RPROP2; eauto. i. des.
-    + eapply List.nth_error_Some; eauto. ii. congr.
-    + eapply List.nth_error_Some; eauto. ii. congr.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
 Admitted.
-
-Ltac des_union :=
-  repeat
-    (try match goal with
-         | [H: Execution.internal _ _ _ |- _] => inv H
-         | [H: Execution.ob _ _ _ |- _] => inv H
-         | [H: Execution.obs _ _ _ |- _] => inv H
-         | [H: (_ ∪ _) _ _ |- _] => inv H
-         end).
 
 Lemma sim_traces_valid
       p trs atrs ws rs covs vexts
@@ -1813,30 +1808,16 @@ Proof.
       * exploit RF2; eauto. i. des. congr.
   - exploit sim_traces_vext_valid; eauto. i. des.
     inv LABEL2. destruct l; ss.
-    + right. des_union.
-      * exploit RFE; eauto.
+    + right. rewrite ob_ob' in OB. des_union.
       * exploit FR; eauto. i.
         split; eauto using Nat.lt_le_incl.
       * exploit sim_traces_vext_co; eauto. i.
         split; eauto using Nat.lt_le_incl.
-      * exploit DOB_READ; eauto.
-      * exploit AOB_READ; eauto.
-      * exploit BOB_READ; eauto.
-    + left. des_union.
-      * inv H. rewrite RF in *. inv H0.
-        destruct eid2 as [tid2 eid2]. ss.
-        generalize (SIM tid2). intro SIM2. inv SIM2; try congr.
-        exploit r_property; eauto. i. des. simplify.
-        generalize (ATR tid2). intro ATR2. inv ATR2; try congr. des.
-        simplify. unfold Execution.label in *. destruct PRE.
-        rewrite LABELS in *. rewrite IdMap.map_spec in *. ss.
-        rewrite <- H7 in *. ss.
-        exploit RPROP2; eauto. i. des; try congr.
+      * exploit OB_READ; eauto.
+    + left. rewrite ob_ob' in OB. des_union.
       * exploit FR; eauto.
       * exploit sim_traces_vext_co; eauto.
-      * exploit DOB_WRITE; eauto.
-      * exploit AOB_WRITE; eauto.
-      * exploit BOB_WRITE; eauto.
+      * exploit OB_WRITE; eauto.
   - admit.
 Admitted.
 
