@@ -668,7 +668,9 @@ Section Local.
       (FWDBANK: forall loc,
           (lc.(fwdbank) loc).(FwdItem.ts) <= lc.(coh) loc /\
           (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= List.length mem)
-      (EXBANK: forall eb, lc.(exbank) = Some eb -> exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
+      (EXBANK: forall eb, lc.(exbank) = Some eb ->
+                     eb.(Exbank.ts) <= lc.(coh) eb.(Exbank.loc) /\
+                     exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
                    (MSG: Memory.get_msg ts mem = Some msg)
@@ -845,7 +847,12 @@ Section ExecUnit.
         * i. exploit FWDBANK; eauto. i. des.
           splits; eauto. rewrite x, fun_add_spec. condtac; ss.
           inversion e. subst. ss.
-        * destruct ex0; ss. i. inv H1. eauto.
+        * destruct ex0.
+          { i. inv H1. ss. splits; eauto. rewrite fun_add_spec. condtac; ss. congr. }
+          { i. exploit EXBANK; eauto. i. des. splits; eauto.
+            rewrite fun_add_spec. condtac; ss. inversion e. rewrite H3 in *.
+            etrans; eauto.
+          }
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
           rewrite fun_add_spec. condtac; ss. inversion e. rewrite H2. ss.
     - inv RES. inv VIEW. inv VVAL. inv VIEW. inv VLOC. inv VIEW.
@@ -859,7 +866,8 @@ Section ExecUnit.
           rewrite MSG. s. rewrite X. eauto.
         * i. rewrite ? fun_add_spec. condtac; viewtac.
           inversion e. subst. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
-        * destruct ex0; ss.
+        * destruct ex0; ss. i. exploit EXBANK; eauto. i. des. rewrite fun_add_spec. splits; eauto.
+          condtac; ss. inversion e. rewrite H3 in *. etrans; eauto. clear -COH0. lia.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
         * i. rewrite Promises.unset_o. rewrite fun_add_spec in TS2. condtac.
           { inversion e. subst. rewrite MSG in MSG0. destruct msg. inv MSG0. ss.
@@ -909,8 +917,8 @@ Section ExecUnit.
       + i. rewrite COH. lia.
       + i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
       + i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
-      + i. exploit EXBANK; eauto. i. des.
-        eexists. eapply Memory.read_mon. eauto.
+      + i. exploit EXBANK; eauto. i. des. esplits; eauto.
+        eapply Memory.read_mon. eauto.
       + i. revert IN. rewrite Promises.set_o. condtac.
         * inversion e. i. inv IN. lia.
         * i. exploit PROMISES; eauto. lia.
@@ -1066,8 +1074,8 @@ Module Machine.
         * i. rewrite COH. lia.
         * i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
         * i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
-        * i. exploit EXBANK; eauto. i. des.
-          eexists. eapply Memory.read_mon. eauto.
+        * i. exploit EXBANK; eauto. i. des. esplits; eauto.
+          eapply Memory.read_mon. eauto.
         * i. exploit PROMISES; eauto. lia.
         * i. apply Memory.get_msg_snoc_inv in MSG. des.
           { eapply PROMISES0; eauto. }
