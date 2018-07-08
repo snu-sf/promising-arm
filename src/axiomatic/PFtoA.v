@@ -1492,6 +1492,73 @@ Proof.
   rewrite x1. rewrite x6. auto.
 Qed.
 
+Lemma asdf
+      p mem trs atrs ws rs covs vexts
+      ex
+      tid n atr aeu atr'
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE))
+      (FIND_ATR: IdMap.find tid atrs = Some atr)
+      (AEU: lastn (S n) atr = aeu :: atr'):
+  <<LABELS:
+    forall eid label
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (LABEL: Execution.label (tid, eid) ex = Some label),
+      List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some label>> /\
+  <<ADDR:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.addr) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2>> /\
+  <<DATA:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (DATA: ex.(Execution.data) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.data) eid1 eid2>> /\
+  <<CTRL:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (CTRL: ex.(Execution.ctrl) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2>> /\
+  <<RMW:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.rmw) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2>>.
+Proof.
+Admitted.
+
+Lemma sim_traces_sim_eu
+      p mem trs atrs ws rs covs vexts
+      m ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (NOPROMISE: Machine.no_promise m)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid tr atr n eu tr' aeu atr'
+    (FIND_TR: IdMap.find tid trs = Some tr)
+    (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (EU: lastn (S n) tr = eu :: tr')
+    (AEU: lastn (S n) atr = aeu :: atr'),
+    sim_eu tid ex (v_gen vexts) eu aeu.
+Proof.
+Admitted.
+
 Lemma sim_traces_vext_valid_aux
       p mem trs atrs ws rs covs vexts
       m ex
