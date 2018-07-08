@@ -17,6 +17,7 @@ Require Import PromisingArch.lib.Order.
 Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
 Require Import PromisingArch.promising.Promising.
+Require Import PromisingArch.promising.StateExecFacts.
 Require Import PromisingArch.axiomatic.Axiomatic.
 
 Set Implicit Arguments.
@@ -818,6 +819,7 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
     b1 b2:
     sim_event (Event.barrier b1) (Event.barrier b2)
 .
+Hint Constructors sim_event.
 
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
   forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t)
@@ -919,19 +921,27 @@ Lemma sim_traces_memory
 Proof.
 Admitted.
 
-Lemma promising_pf_sim_traces
-      p m
-      (STEP: Machine.pf_exec p m):
-  exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
-    <<SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts>> /\
-    <<TR: IdMap.Forall2
-            (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
-            trs m.(Machine.tpool)>> /\
-    <<ATR: IdMap.Forall2
-             (fun tid atr aeu => exists l, atr = aeu :: l)
-             atrs PRE.(Valid.aeus)>>.
-Proof.
-Admitted.
+(* TODO: move *)
+  Lemma rtc_promise_step_spec
+        p m
+        (STEP: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m):
+    IdMap.Equal m.(Machine.tpool) (init_with_promises p m.(Machine.mem)).(Machine.tpool).
+  Proof.
+    apply clos_rt_rt1n_iff in STEP.
+    apply clos_rt_rtn1_iff in STEP.
+    induction STEP.
+    { s. ii. rewrite IdMap.map_spec, IdMap.mapi_spec.
+      destruct (IdMap.find y p); ss. f_equal. f_equal.
+      rewrite promises_from_mem_nil. ss.
+    }
+    destruct y as [tpool2 mem2].
+    destruct z as [tpool3 mem3].
+    ss. inv H. inv STEP0. inv LOCAL. ss. subst. inv MEM2.
+    ii. generalize (IHSTEP y). rewrite IdMap.add_spec, ? IdMap.mapi_spec.
+    rewrite promises_from_mem_snoc. s.
+    repeat condtac; try congr.
+    inversion e. subst. rewrite FIND. destruct (IdMap.find tid p); ss. i. inv H. ss.
+  Qed.
 
 Ltac simplify :=
   repeat
@@ -945,6 +955,188 @@ Ltac simplify :=
          | [H: Some _ = Some _ |- _] => inv H
          | [H: _::_ = _::_ |- _] => inv H
          end).
+
+
+Lemma promising_pf_sim_step
+      tid e (eu1 eu2:ExecUnit.t (A:=unit)) aeu1
+      (EU: sim_state_weak eu1.(ExecUnit.state) aeu1.(AExecUnit.state))
+      (STEP: ExecUnit.state_step0 tid e e eu1 eu2):
+  exists ae aeu2,
+    <<ASTATE_STEP: State.step ae aeu1.(AExecUnit.state) aeu2.(AExecUnit.state)>> /\
+    <<ALOCAL_STEP: ALocal.step ae aeu1.(AExecUnit.local) aeu2.(AExecUnit.local)>> /\
+    <<EVENT: sim_event e ae>> /\
+    <<STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state)>>.
+Proof.
+  destruct eu1 as [st1 lc1 mem1].
+  destruct eu2 as [st2 lc2 mem2].
+  destruct aeu1 as [[astmt1 armap1] alc1].
+  inv EU. inv STEP. ss. subst. inv STATE; inv LOCAL; inv EVENT; ss.
+  - inv LC.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 1.
+    + econs; ss.
+    + ss.
+  - inv LC.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 2. ss.
+    + econs; ss.
+    + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+  - inv STEP. ss.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 3; ss.
+    + econs 2; ss.
+    + econs; ss. apply sim_rmap_weak_add; ss.
+  - inv STEP. ss.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 4; ss.
+    + econs 3; ss. inv WRITABLE. i. specialize (EX H). des.
+      admit.
+    + econs; ss.
+    + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+  - inv STEP. destruct ex0; ss.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 4; ss.
+    + econs 4; ss.
+    + econs; ss.
+    + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+  - inv STEP.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 5; ss.
+    + econs 5; ss.
+    + econs; ss.
+  - inv STEP.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 5; ss.
+    + econs 5; ss.
+    + econs; ss.
+  - inv LC.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 6; ss.
+    + econs; ss.
+    + econs; ss.
+      exploit sim_rmap_weak_expr; eauto. intro X. inv X.
+      inv VAL. rewrite H0. ss.
+  - inv LC.
+    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+    + econs 7. ss.
+    + econs; ss.
+    + ss.
+Admitted.
+
+Lemma promising_pf_sim_traces
+      p m
+      (STEP: Machine.pf_exec p m):
+  exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
+    <<SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts>> /\
+    <<TR: IdMap.Forall2
+            (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+            trs m.(Machine.tpool)>> /\
+    <<ATR: IdMap.Forall2
+             (fun tid atr aeu => exists l, atr = aeu :: l)
+             atrs PRE.(Valid.aeus)>>.
+Proof.
+  inv STEP. exploit state_exec_rtc_state_step; eauto. i. des.
+  eapply Machine.equiv_no_promise in NOPROMISE; eauto. revert NOPROMISE.
+  cut (exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
+    <<SIM: sim_traces p (Machine.mem m2') trs atrs ws rs covs vexts>> /\
+    <<TR: forall tid, opt_rel
+            (fun tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) (Machine.mem m2')) :: l)
+            (IdMap.find tid trs)
+            (IdMap.find tid (Machine.tpool m2'))>> /\
+    <<ATR: IdMap.Forall2
+             (fun tid atr aeu => exists l, atr = aeu :: l)
+             atrs PRE.(Valid.aeus)>>).
+  { inv EQUIV. rewrite MEM. i. des. esplits; eauto. ii. rewrite TPOOL. ss. }
+  clear m STEP2 EQUIV.
+  apply clos_rt_rt1n_iff, clos_rt_rtn1_iff in EXEC. induction EXEC.
+  { eexists (IdMap.map (fun x => [x]) (IdMap.mapi (fun _ _ => _) p)).
+    eexists (IdMap.map (fun x => [x]) (IdMap.mapi (fun _ _ => _) p)).
+    eexists (IdMap.mapi (fun _ _ => [fun _ => None]) p).
+    eexists (IdMap.mapi (fun _ _ => [fun _ => None]) p).
+    eexists (IdMap.mapi (fun _ _ => bot) p).
+    eexists (IdMap.mapi (fun _ _ => bot) p).
+    eexists (Execution.mk (IdMap.mapi (fun _ _ => _) p) bot bot bot bot bot bot).
+    eexists (@Valid.mk_pre_ex _ _ (IdMap.mapi (fun tid stmts => AExecUnit.mk (State.init stmts) ALocal.init) p)  _ _ _ _ _ _).
+    hexploit rtc_promise_step_spec; eauto. s. intro X.
+    s. splits; cycle 1.
+    - i. specialize (X tid). rewrite ? IdMap.map_spec, ? IdMap.mapi_spec in *.
+      rewrite X. destruct (IdMap.find tid p); ss. econs. eauto.
+    - ii. rewrite ? IdMap.map_spec, ? IdMap.mapi_spec. destruct (IdMap.find id p); ss. eauto.
+    - ii. rewrite ? IdMap.map_spec, ? IdMap.mapi_spec. destruct (IdMap.find id p) eqn:STMTS; ss. econs.
+      econs 1; ss. rewrite IdMap.mapi_spec, STMTS. s. ss.
+  }
+  des.
+  destruct y as [tpool1 mem1].
+  destruct z as [tpool2 mem2].
+  ss. inv H. ss. subst. inv STEP. inv STEP0. ss. subst.
+  generalize (TR tid). rewrite FIND. intro Y. inv Y. des. subst. rename H0 into TRS. symmetry in TRS.
+  generalize (SIM tid). intro Y. inv Y; [congr|]. rewrite TRS in H0. inv H0.
+  hexploit sim_trace_last; eauto. i. des. subst. simplify.
+  exploit promising_pf_sim_step; eauto.
+  { inv REL6; eauto. s.
+    unfold init_with_promises in FIND0. ss.
+    rewrite IdMap.mapi_spec, STMT in *. inv FIND0.
+    apply sim_state_weak_init.
+  }
+  { instantiate (1 := ExecUnit.mk _ _ _). econs; ss; eauto. }
+  i. des.
+
+  eexists (IdMap.add tid _ trs).
+  eexists (IdMap.add tid _ atrs).
+  eexists (IdMap.add tid _ ws).
+  eexists (IdMap.add tid _ rs).
+  eexists (IdMap.add tid _ covs).
+  eexists (IdMap.add tid _ vexts).
+  eexists (Execution.mk _ _ _ _ _ _ _).
+  eexists (@Valid.mk_pre_ex _ _ (IdMap.add tid _ PRE.(Valid.aeus))  _ _ _ _ _ _).
+  s. splits; cycle 1.
+  - i. rewrite ? IdMap.add_spec. condtac; eauto.
+  - ii. rewrite ? IdMap.add_spec. condtac; eauto.
+  - s. ii. rewrite ? IdMap.add_spec. condtac; eauto. inversion e1. subst. clear e1 X. econs.
+    econs 2; eauto. econs; eauto.
+Grab Existential Variables.
+all: ss.
+1: { ii. generalize (PRE.(Valid.AEUS) id). intro X.
+     rewrite IdMap.add_spec. condtac; ss. inversion e1. subst. clear e1 X0.
+     generalize (ATR tid). rewrite <- H. intro Y. inv Y. des. inv REL.
+     rewrite <- H6 in X. inv X. econs. etrans; eauto.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+4: { ii. rewrite IdMap.mapi_spec. destruct (IdMap.find id p); ss. econs. refl. }
+3: { unfold IdMap.map.
+
+     (* TODO: move *)
+     Lemma IdMap_mapi_mapi
+           A B C
+           (f: Id.t -> A -> B)
+           (g: Id.t -> B -> C)
+           m:
+       IdMap.mapi g (IdMap.mapi f m) = IdMap.mapi (fun tid a => g tid (f tid a)) m.
+     Proof.
+       unfold IdMap.mapi. generalize 1%positive. induction m; ss.
+       i. rewrite IHm1, IHm2. f_equal. destruct o; ss.
+     Qed.
+
+     rewrite IdMap_mapi_mapi. f_equal.
+}
+1: { apply bot. (* it's ex's co. *) }
+1: { apply bot. (* it's ex's rf. *) }
+Qed.      
 
 Lemma w_property
       p mem tid tr atr wl rl cov vext
