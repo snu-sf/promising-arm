@@ -1760,22 +1760,93 @@ Proof.
 Qed.
 
 Lemma sim_traces_cov_po_loc_aux
-      p mem tid tr atr wl rl cov vext aeu atr' covf cov'
+      p mem tid tr atr wl rl cov vext r rl' w wl' eu tr' aeu atr' covf cov'
       (SIM: sim_trace p mem tid tr atr wl rl cov vext)
+      (RL: rl = r :: rl')
+      (WL: wl = w :: wl')
+      (EU: tr = eu :: tr')
       (AEU: atr = aeu :: atr')
       (COV: cov = covf :: cov'):
-  forall iid1 iid2 label1 label2
-    (PO: iid1 < iid2)
-    (LABEL1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid1 = Some label1)
-    (LABEL2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid2 = Some label2)
-    (REL: Execution.label_loc label1 label2),
-     <<PO_LOC_WRITE:
-       Label.is_write label2 ->
-       Time.lt (covf iid1) (covf iid2)>> /\
-     <<PO_LOC_READ:
-       Label.is_read label2 ->
-       Time.le (covf iid1) (covf iid2)>>.
+  <<W: forall iid loc ts (W: w iid = Some (loc, ts)), le ts (eu.(ExecUnit.local).(Local.coh) loc)>> /\
+  (* TODO: enable it *)
+  (* (forall iid loc ts (R: r iid = Some (loc, ts), le ts (eu.(ExecUnit.local).(Local.coh) loc)) /\ *)
+  <<LABEL: forall iid1 iid2 label1 label2
+     (PO: iid1 < iid2)
+     (LABEL1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid1 = Some label1)
+     (LABEL2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid2 = Some label2)
+     (REL: Execution.label_loc label1 label2),
+      <<PO_LOC_WRITE:
+        Label.is_write label2 ->
+        Time.lt (covf iid1) (covf iid2)>> /\
+      <<PO_LOC_READ:
+        Label.is_read label2 ->
+        Time.le (covf iid1) (covf iid2)>>>>.
 Proof.
+  revert r rl' w wl' eu tr' aeu atr' covf cov' RL WL EU AEU COV. induction SIM.
+  { i. simplify. ss. splits; ss. i. destruct iid1; ss. }
+  i. simplify.
+  destruct eu1 as [st1 lc1 mem1].
+  destruct eu as [st2 lc2 mem2].
+  destruct aeu1 as [ast1 alc1].
+  destruct aeu as [ast2 alc2].
+  ss. exploit IHSIM; eauto. i. des.
+  inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
+  - (* internal *)
+    admit.
+  - (* read *)
+    inv LOCAL; ss. inv ASTATE_STEP; ss. splits; eauto.
+    { i. etrans; eauto. inv STEP. s. rewrite fun_add_spec. condtac; ss. inversion e. subst. ss. }
+    i. unfold ALocal.next_eid in *.
+    apply nth_error_app_inv in LABEL1.
+    apply nth_error_app_inv in LABEL2.
+    des.
+    + repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+      all: try apply Nat.eqb_eq in X0; ss; subst; try lia.
+      eapply LABEL; eauto.
+    + lia.
+    + apply nth_error_singleton_inv in LABEL0. des. subst.
+      repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+      all: try apply Nat.eqb_neq in X0; ss; try lia.
+      splits; ss. exploit sim_trace_vext_cov; eauto. i. des. simplify. ss.
+      
+      
+      admit.
+    + apply nth_error_singleton_inv in LABEL0. des. subst.
+      repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; try lia.
+  - (* write *)
+    inv ASTATE_STEP; ss; eauto.
+    destruct res1; ss. destruct val; ss. unfold ALocal.next_eid in *.
+    apply nth_error_app_inv in LABEL1.
+    apply nth_error_app_inv in LABEL2.
+    des.
+    + repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+      all: try apply Nat.eqb_eq in X0; ss; subst; try lia.
+      eauto.
+    + apply nth_error_singleton_inv in LABEL3. des. subst.
+      repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+      all: try apply Nat.eqb_neq in X0; ss; try lia.
+      admit.
+    + lia.
+    + apply nth_error_singleton_inv in LABEL3. des. subst.
+      repeat condtac; ss.
+      all: try apply Nat.eqb_eq in X; ss; try lia.
+  - (* isb *)
+    destruct res1; ss. destruct val; ss. eauto.
+  - (* write *)
+    apply nth_error_app_inv in LABEL1. des; cycle 1.
+    { apply nth_error_singleton_inv in LABEL0. des. subst.
+      inv REL. inv X.
+    }
+    apply nth_error_app_inv in LABEL2. des; cycle 1.
+    { apply nth_error_singleton_inv in LtABEL3. des. subst.
+      inv REL. inv Y.
+    }
+    eauto.
 Admitted.
 
 Lemma sim_traces_cov_po_loc
