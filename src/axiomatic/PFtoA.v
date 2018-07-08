@@ -676,7 +676,35 @@ Proof.
     inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
   }
   { (* read *)
-    inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT. econs; ss.
+    inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT.
+
+    (* TODO: move *)
+    Lemma sim_trace_sim_state_weak
+          p mem tid
+          tr eu tr'
+          atr aeu atr'
+          wl w wl'
+          rl r rl'
+          covl cov covl'
+          vextl vext vextl'
+          (SIM: sim_trace p mem tid tr atr wl rl covl vextl)
+          (EU: tr = eu :: tr')
+          (AEU: atr = aeu :: atr')
+          (RL: rl = r :: rl')
+          (WL: wl = w :: wl')
+          (COV: covl = cov :: covl')
+          (VEXT: vextl = vext :: vextl'):
+      sim_state_weak eu.(ExecUnit.state) aeu.(AExecUnit.state).
+    Proof.
+      subst. inv SIM; ss.
+      rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
+      eapply sim_state_weak_init.
+    Qed.
+
+    exploit sim_trace_sim_state_weak; eauto. s. intro Y. inv Y. ss. inv STMTS.
+    exploit sim_rmap_weak_expr; eauto. intro Y. inv Y.
+
+    econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WPROP2); eauto.
@@ -693,15 +721,15 @@ Proof.
         des_ifs; cycle 1.
         { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
         rewrite fun_add_spec. condtac; [|congr].
-        admit. (* rprop1 *)
+        esplits; eauto.
+        * rewrite VAL. eauto.
+        * admit. (* TODO: memory should be the same *)
     - i. des_ifs.
       + apply Nat.eqb_eq in Heq. subst. esplits; eauto.
         * rewrite List.nth_error_app2, Nat.sub_diag; [|refl].
-          admit. (* rprop2 *)
+          s. rewrite VAL. eauto.
         * rewrite fun_add_spec. des_ifs; [|congr]. eauto.
-          destruct ts; [left|right]; eauto.
-          revert MSG. unfold Memory.read, Memory.get_msg. ss.
-          admit. (* rprop2 *)
+          admit. (* memory *)
       + exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WCV); eauto. s. i. des. des_ifs.
@@ -719,11 +747,14 @@ Proof.
     - admit. (* po *)
   }
   { (* write *)
-    inv LOCAL; inv EVENT; [|by inv STEP]. inv STEP. econs; ss.
+    inv LOCAL; inv EVENT; [|by inv STEP]. inv STEP. inv STATE. ss. econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. rewrite Promises.unset_o. des_ifs.
       { inv e. right. esplits; ss.
-        admit.
-        admit.
+        - instantiate (1 := ALocal.next_eid alc1). des_ifs; cycle 1.
+          { apply Nat.eqb_neq in Heq. congr. }
+          admit. (* memory *)
+        - rewrite List.nth_error_app2, Nat.sub_diag; ss.
+          admit. (* memory *)
       }
       des; [left|right]; splits; ss.
       + i. des_ifs; eauto. apply Nat.eqb_eq in Heq. subst. ii. inv H.
@@ -731,9 +762,31 @@ Proof.
       + esplits; eauto.
         * des_ifs; eauto. apply Nat.eqb_eq in Heq. subst. admit. (* wprop1 *)
         * eapply nth_error_app_mon. eauto.
-    - admit. (* wprop2 *)
-    - admit. (* wprop3 *)
-    - admit. (* wprop4 *)
+    - i. unfold ALocal.next_eid in *. apply nth_error_app_inv in GET. des.
+      + des_ifs.
+        { apply Nat.eqb_eq in Heq. subst. lia. }
+        eapply IH.(WPROP2); eauto.
+      + apply nth_error_singleton_inv in GET0. des.
+        des_ifs; cycle 1.
+        { apply Nat.eqb_neq in Heq. lia. }
+        esplits; eauto.
+        * admit. (* sim_event? *)
+        * admit. (* memory *)
+    - i. unfold ALocal.next_eid in *. des_ifs.
+      + apply Nat.eqb_eq in Heq. subst. rewrite fun_add_spec. des_ifs; [|congr].
+        destruct ts; ss. splits.
+        { unfold Time.lt, Time.bot. lia. }
+        esplits; eauto.
+        * rewrite List.nth_error_app2, Nat.sub_diag; ss.
+          admit. (* memory *)
+        * admit. (* memory *)
+      + exploit IH.(WPROP3); eauto. i. des. esplits; eauto.
+        eapply nth_error_app_mon. eauto.
+    - i. unfold ALocal.next_eid in *. des_ifs.
+      + apply Nat.eqb_eq in Heq. apply Nat.eqb_eq in Heq0. subst. ss.
+      + rewrite fun_add_spec in *. des_ifs; [|congr]. admit. (* ? *)
+      + rewrite fun_add_spec in *. des_ifs; [|congr]. admit. (* ? *)
+      + eapply IH.(WPROP4); eauto.
     - i. exploit IH.(RPROP1); eauto.
       apply nth_error_app_inv in GET. des; eauto.
       apply nth_error_singleton_inv in GET0. des. congr.
