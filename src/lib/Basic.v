@@ -347,6 +347,74 @@ Proof.
   - i. erewrite IHl; ss.
 Qed.
 
+Definition lastn A (n: nat) (l: list A) :=
+  List.rev (List.firstn n (List.rev l)).
+
+Lemma lastn_snoc A n (l:list A) x:
+  lastn (S n) (l ++ [x]) = (lastn n l) ++ [x].
+Proof.
+  revert n. induction l using List.rev_ind; ss.
+  unfold lastn. s. rewrite List.rev_app_distr. ss.
+Qed.
+
+Lemma lastn_cons A n a (l:list A)
+      (N: n <= length l):
+  lastn n (a::l) = lastn n l.
+Proof.
+  revert n N. induction l using List.rev_ind; ss.
+  { i. destruct n; ss. unfold lastn. s. destruct n; lia. }
+  i. destruct n; ss. rewrite List.app_comm_cons, ? lastn_snoc. f_equal.
+  eapply IHl. rewrite List.app_length in N. ss. lia.
+Qed.
+
+Lemma lastn_one A
+      (l: list A)
+      (LENGTH: List.length l >= 1):
+  exists a, lastn 1 l = [a].
+Proof.
+  destruct l using List.rev_ind; ss; [lia|]. rewrite lastn_snoc. s. eauto.
+Qed.
+
+Lemma lastn_all A n (l: list A)
+      (N: n >= length l):
+  lastn n l = l.
+Proof.
+  revert n N. induction l using List.rev_ind; ss.
+  { destruct n; ss. }
+  i. rewrite List.app_length in N. ss. destruct n; [lia|].
+  rewrite lastn_snoc, IHl; ss. lia.
+Qed.
+
+Lemma lastn_length A n (l: list A):
+  length (lastn n l) = min n (length l).
+Proof.
+  revert n. induction l using List.rev_ind; ss.
+  { destruct n; ss. }
+  i. destruct n; ss. rewrite lastn_snoc, ? List.app_length, IHl. s.
+  rewrite (Nat.add_comm (length l)). s. lia.
+Qed.
+
+Lemma lastn_S A n (l: list A)
+      (LENGTH: List.length l > 0):
+  exists a l', lastn (S n) l = a :: l'.
+Proof.
+  generalize (lastn_length (S n) l). i.
+  destruct (lastn (S n) l) eqn:LASTN; eauto.
+  destruct l; ss. lia.
+Qed.
+
+Lemma lastn_S1 A
+      (l: list A) n a l'
+      (N: n < List.length l)
+      (LASTN: lastn (S n) l = a :: l'):
+  lastn n l = l'.
+Proof.
+  rewrite <- List.rev_length in N. apply List.nth_error_Some in N.
+  destruct (List.nth_error (List.rev l) n) eqn:NTH; ss.
+  revert LASTN. unfold lastn. erewrite List_firstn_S; eauto.
+  rewrite List.rev_app_distr. s. i. inv LASTN. ss.
+Qed.
+
 Fixpoint List_find_pos A (pred:A -> bool) (l:list A): option nat :=
   match l with
   | [] => None
