@@ -823,7 +823,7 @@ Hint Constructors sim_event.
 
 Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
   forall (tr: list (ExecUnit.t (A:=unit))) (atr: list AExecUnit.t)
-     (wl: list (nat -> option (Loc.t * Time.t))) (rl: list (nat -> option Time.t))
+     (wl: list (nat -> option (Loc.t * Time.t))) (rl: list (nat -> option (Loc.t * Time.t)))
      (cov: list (nat -> Time.t)) (vext: list (nat -> Time.t)), Prop :=
 | sim_trace_init
     st lc stmts
@@ -848,7 +848,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
     (R: r2 = match e with
                | Event.read _ _ vloc _ =>
                  (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                            then Some (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val))
+                            then Some (vloc.(ValA.val), (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)))
                             else r1 eid)
                | _ => r1
                end)
@@ -880,7 +880,7 @@ Definition sim_traces
            (trs: IdMap.t (list (ExecUnit.t (A:=unit))))
            (atrs: IdMap.t (list AExecUnit.t))
            (ws: IdMap.t (list (nat -> option (Loc.t * Time.t))))
-           (rs: IdMap.t (list (nat -> option Time.t)))
+           (rs: IdMap.t (list (nat -> option (Loc.t * Time.t))))
            (covs: IdMap.t (list (nat -> Time.t)))
            (vexts: IdMap.t (list (nat -> Time.t)))
   : Prop :=
@@ -1264,12 +1264,12 @@ Lemma r_property
       forall eid ex ord loc val
          (GET: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)),
       exists ts tid',
-        r eid = Some ts /\
+        r eid = Some (loc, ts) /\
         __guard__ ((ts = Time.bot /\ val = Val.default) \/
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>> /\
     <<RPROP2:
-      forall eid ts (GET: r eid = Some ts),
-      exists ex ord loc val tid',
+      forall eid loc ts (GET: r eid = Some (loc, ts)),
+      exists ex ord val tid',
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
         __guard__ ((ts = Time.bot /\ val = Val.default) \/
          Memory.get_msg ts mem = Some (Msg.mk loc val tid'))>>.
@@ -1324,13 +1324,14 @@ Inductive co_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (eid1 eid
     (TS: Time.lt ts1 ts2)
 .
 
-Inductive rf_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (rs: IdMap.t (list (nat -> option Time.t))) (eid1 eid2: eidT): Prop :=
+Inductive rf_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (rs: IdMap.t (list (nat -> option (Loc.t *Time.t)))) (eid1 eid2: eidT): Prop :=
 | rf_gen_intro
-    w wl ts1 loc1 r rl ts2
+    w wl ts1 loc1 r rl loc2 ts2
     (WS: IdMap.find eid1.(fst) ws = Some (w::wl))
     (W: w eid1.(snd) = Some (loc1, ts1))
     (RS: IdMap.find eid2.(fst) rs = Some (r::rl))
-    (R: r eid2.(snd) = Some ts2)
+    (R: r eid2.(snd) = Some (loc2, ts2))
+    (LOC: loc1 = loc2)
     (TS: ts1 = ts2)
 .
 
@@ -1431,7 +1432,7 @@ Lemma sim_traces_rf1_aux
   forall eid1 ex1 ord1 loc val
      (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
     (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default >> /\
-     <<R: exists r rl, IdMap.find eid1.(fst) rs = Some (r::rl) /\ r eid1.(snd) = Some Time.bot>>) \/
+     <<R: exists r rl loc, IdMap.find eid1.(fst) rs = Some (r::rl) /\ r eid1.(snd) = Some (loc, Time.bot)>>) \/
     (exists eid2 ex2 ord2,
         <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
         <<RF: (rf_gen ws rs) eid2 eid1>>).
@@ -1562,7 +1563,7 @@ Lemma sim_trace_vext_cov
     (forall eid ts (R: r eid = Some ts),
         (exists ex ord loc val,
             List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val)) /\
-        cov eid = ts).
+        cov eid = ts.(snd)).
 Proof.
   induction SIM; esplits; eauto; i; ss.
   - des. simplify. inv EVENT.
