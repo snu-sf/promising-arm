@@ -90,8 +90,7 @@ Proof.
   all: assert (EID1: eid1 = length (ALocal.labels alc1)) by (clear - LABEL l; lia); subst.
   all: exploit LABELS; eauto; ss.
   all: try by clear; rewrite List.app_length; s; lia.
-  all: intro NTH; apply nth_error_snoc_inv_last in NTH; des; try lia.
-  all: inv NTH.
+  all: intro NTH; apply nth_error_snoc_inv_last in NTH; inv NTH.
   rewrite EU, AEU, COV, VEXT, <- WL, <- RL in SIMTR.
   exploit sim_trace_sim_th; try exact SIMTR; eauto. intro L'.
   exploit L'.(RPROP1); ss.
