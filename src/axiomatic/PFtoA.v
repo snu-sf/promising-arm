@@ -768,7 +768,7 @@ Proof.
     destruct aeu2 as [[astmts2 armap2] alc2].
     ss. inv STEP0. ss. subst.
     inv STATE. inv STATE1. ss. subst.
-    inv STATE0; inv LOCAL; ss; inv EVENT0; inv EVENT; ss.
+    inv STATE0; inv LOCAL0; ss; inv EVENT0; inv EVENT; ss.
     - (* skip *)
       inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
       + econs; ss. apply L.

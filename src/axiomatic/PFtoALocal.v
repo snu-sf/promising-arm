@@ -684,13 +684,13 @@ Proof.
           destruct (equiv_dec (ValA.val (sem_expr rmap0 eloc0)) loc); ss. inv e0.
           exploit IH.(RPROP1); eauto. i. des.
           exploit IH.(RPROP2); eauto. s. i. des. subst.
-          exploit sim_rmap_weak_expr; eauto. i. inv x2. rewrite VAL1 in COH0.
+          exploit sim_rmap_weak_expr; eauto. i. inv x2. rewrite VAL1 in COH.
           etrans; eauto.
         * destruct (equiv_dec loc0 loc); ss. inv e0.
           destruct (equiv_dec (ValA.val (sem_expr rmap0 eloc0)) loc); ss. inv e0.
           exploit IH.(WPROP2); eauto. i. des.
           exploit IH.(WPROP3); eauto. s. i. des. subst.
-          exploit sim_rmap_weak_expr; eauto. i. inv x3. rewrite VAL1 in COH0.
+          exploit sim_rmap_weak_expr; eauto. i. inv x3. rewrite VAL1 in COH.
           etrans; eauto.
       + apply nth_error_singleton_inv in LABEL0. des. subst.
         repeat condtac; ss.
