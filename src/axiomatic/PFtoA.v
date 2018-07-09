@@ -763,7 +763,7 @@ Proof.
     - admit. (* po *)
   }
   { (* write *)
-    inv LOCAL; inv EVENT; inv RES; inv STEP. inv STATE. ss. econs; ss.
+    inv LOCAL; inv EVENT; inv RES; inv STEP; ss. inv STATE. ss. econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. rewrite Promises.unset_o. des_ifs.
       { inv e. right. esplits; ss.
         - instantiate (1 := ALocal.next_eid alc1). des_ifs; cycle 1.
