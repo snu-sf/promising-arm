@@ -333,22 +333,18 @@ Proof.
   { (* state step *)
     inv STEP0. inv STEP. ss. subst. inv STATE; inv LOCAL0; inv EVENT.
     - (* skip *)
-      apply Local.internal_bot_inv in LC. subst.
       eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
-        * econs 1; eauto. econs; eauto.
+        * econs 1; eauto.
         * s. econs 1.
-      + econs; ss. econs; ss; try by apply LOCAL.
-        rewrite bot_join; [|by apply View.order]. apply LOCAL.
+      + econs; ss.
     - (* assign *)
-      apply Local.internal_bot_inv in LC. subst.
       eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
-        * econs 1; eauto. econs; eauto.
+        * econs 1; eauto.
         * s. econs 2. ss.
       + econs; ss. econs; ss; try by apply LOCAL.
-        * apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
-        * rewrite bot_join; [|by apply View.order]. destruct lc1. ss.
+        apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
     - (* read *)
       inv STEP.
       match goal with
@@ -628,8 +624,8 @@ Proof.
     - (* if *)
       inv LC. eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
-        * econs 1; eauto. econs; eauto.
-        * econs 6; ss.
+        * econs 7; eauto. econs; eauto.
+        * econs; ss.
       + exploit sim_rmap_expr; eauto. i. inv x1. exploit TS.
         { rewrite <- VCAP. s. rewrite <- join_r. refl. }
         intro ELOC. econs; ss.
@@ -638,13 +634,11 @@ Proof.
         apply sim_view_join; try by apply LOCAL.
         rewrite ELOC. econs. ss.
     - (* dowhile *)
-      apply Local.internal_bot_inv in LC. subst.
       eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
-        * econs 1; eauto. econs; eauto.
+        * econs 1; eauto.
         * econs 7. ss.
-      + econs; ss. econs; ss; try by apply LOCAL.
-        rewrite bot_join; [|by apply View.order]. apply LOCAL.
+      + econs; ss.
   }
 Admitted.
 

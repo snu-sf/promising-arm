@@ -164,14 +164,13 @@ Module ALocal.
 
   Inductive step (event:Event.t (A:=nat -> Prop)) (alocal1:t) (alocal2:t): Prop :=
   | step_internal
-      ctrl_e
-      (EVENT: event = (Event.internal ctrl_e))
+      (EVENT: event = Event.internal)
       (ALOCAL: alocal2 =
                mk
                  alocal1.(labels)
                  alocal1.(addr)
                  alocal1.(data)
-                 (alocal1.(ctrl) ∪ (ctrl_e × (le (next_eid alocal1))))
+                 alocal1.(ctrl)
                  alocal1.(rmw)
                  alocal1.(exbank))
   | step_read
@@ -219,6 +218,17 @@ Module ALocal.
                  alocal1.(addr)
                  alocal1.(data)
                  alocal1.(ctrl)
+                 alocal1.(rmw)
+                 alocal1.(exbank))
+  | step_control
+      ctrl_e
+      (EVENT: event = (Event.control ctrl_e))
+      (ALOCAL: alocal2 =
+               mk
+                 alocal1.(labels)
+                 alocal1.(addr)
+                 alocal1.(data)
+                 (alocal1.(ctrl) ∪ (ctrl_e × (le (next_eid alocal1))))
                  alocal1.(rmw)
                  alocal1.(exbank))
   .

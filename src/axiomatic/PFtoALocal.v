@@ -90,9 +90,8 @@ Proof.
 Qed.
 
 Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:=nat -> Prop)), Prop :=
-| sim_event_internal
-    ctrl1 ctrl2:
-    sim_event (Event.internal ctrl1) (Event.internal ctrl2)
+| sim_event_internal:
+    sim_event Event.internal Event.internal
 | sim_event_read
     ex1 ord1 vloc1 val1
     ex2 ord2 vloc2 val2
@@ -114,6 +113,9 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
     b1 b2
     (BARRIER: b1 = b2):
     sim_event (Event.barrier b1) (Event.barrier b2)
+| sim_event_control
+    ctrl1 ctrl2:
+    sim_event (Event.control ctrl1) (Event.control ctrl2)
 .
 Hint Constructors sim_event.
 
@@ -275,15 +277,15 @@ Proof.
   destruct eu2 as [st2 lc2 mem2].
   destruct aeu1 as [[astmt1 armap1] alc1].
   inv STATE1. inv STEP. ss. subst. inv STATE; inv LOCAL; inv EVENT; ss.
-  - inv LC.
-    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+  - eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 1.
     + econs; ss.
     + ss.
+    + ss.
     + inv LOCAL1; [econs 1|econs 2]; eauto.
-  - inv LC.
-    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+  - eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 2. ss.
+    + econs; ss.
     + econs; ss.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + inv LOCAL1; [econs 1|econs 2]; eauto.
@@ -348,15 +350,15 @@ Proof.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 6; ss.
-    + econs; ss.
+    + econs 6; ss.
     + econs; ss.
       exploit sim_rmap_weak_expr; eauto. intro X. inv X.
-      inv VAL. rewrite H0. ss.
+      inv VAL. rewrite <- H0. ss.
     + inv LOCAL1; [econs 1|econs 2]; eauto.
-  - inv LC.
-    eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+  - eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 7. ss.
     + econs; ss.
+    + ss.
     + ss.
     + inv LOCAL1; [econs 1|econs 2]; eauto.
 Qed.
@@ -617,7 +619,7 @@ Proof.
   i. rename x into IH.
   inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
   { (* internal *)
-    inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
+    inv LOCAL; ss. inv EVENT. econs; ss; try by apply IH.
   }
   { (* read *)
     inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT.
@@ -835,5 +837,8 @@ Proof.
         { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
         eapply IH.(PO); eauto.
     }
+  }
+  { (* internal *)
+    inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
   }
 Admitted.

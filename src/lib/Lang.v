@@ -213,7 +213,8 @@ End SEM.
 
 Module Event.
   Inductive t A `{_: orderC A} :=
-  | internal (ctrl:A)
+  | internal
+  | control (ctrl:A)
   | read (ex:bool) (ord:OrdR.t) (vloc:ValA.t (A:=A)) (res:ValA.t (A:=A))
   | write (ex:bool) (ord:OrdW.t) (vloc:ValA.t (A:=A)) (vval:ValA.t (A:=A)) (res:ValA.t (A:=A))
   | barrier (b:Barrier.t)
@@ -238,13 +239,13 @@ Section State.
   Inductive step: forall (e:Event.t (A:=A)) (st1 st2:t), Prop :=
   | step_skip
       stmts rmap:
-      step (Event.internal bot)
+      step Event.internal
            (mk ((stmt_instr instr_skip)::stmts) rmap)
            (mk stmts rmap)
   | step_assign
       lhs rhs stmts rmap rmap'
       (RMAP: rmap' = RMap.add lhs (sem_expr rmap rhs) rmap):
-      step (Event.internal bot)
+      step Event.internal
            (mk ((stmt_instr (instr_assign lhs rhs))::stmts) rmap)
            (mk stmts rmap')
   | step_load
@@ -271,13 +272,13 @@ Section State.
       cond vcond s1 s2 stmts rmap stmts'
       (COND: vcond = sem_expr rmap cond)
       (STMTS: stmts' = (if vcond.(ValA.val) <> 0%Z then s1 else s2) ++ stmts):
-      step (Event.internal vcond.(ValA.annot))
+      step (Event.control vcond.(ValA.annot))
            (mk ((stmt_if cond s1 s2)::stmts) rmap)
            (mk stmts' rmap)
   | step_dowhile
       s cond stmts rmap stmts'
       (STMTS: stmts' = s ++ [stmt_if cond ((stmt_dowhile s cond) :: stmts) stmts]):
-      step (Event.internal bot)
+      step Event.internal
            (mk ((stmt_dowhile s cond)::stmts) rmap)
            (mk stmts' rmap)
   .

@@ -57,7 +57,7 @@ Proof.
                          lc0.(Local.exbank)
                          (Promises.set (S (length mem1)) lc0.(Local.promises))).
         inv LOCAL0.
-        { econs 1; eauto. inv LC. econs; ss. }
+        { econs 1; eauto. }
         { econs 2; eauto. inv STEP. ss.
           exploit ExecUnit.read_wf; try exact MSG. i.
           econs; eauto; ss.
@@ -87,6 +87,7 @@ Proof.
         { econs 4; eauto. inv STEP. econs; eauto. }
         { econs 5; eauto. inv STEP. econs; eauto. }
         { econs 6; eauto. inv STEP. econs; eauto. }
+        { econs 7; eauto. inv LC. econs; eauto. }
       * rewrite ? IdMap.add_add. eauto.
   - (* diff thread *)
     inv STEP. inv STEP1. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
@@ -96,7 +97,7 @@ Proof.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|by eauto].
         inversion e0. subst. congr.
       * econs. econs; eauto; ss.
-        inv LOCAL.
+        instantiate (1 := lc2). inv LOCAL.
         { econs 1; eauto. }
         { econs 2; eauto. inv STEP. econs; eauto.
           - ii. eapply LATEST; eauto.
@@ -120,6 +121,7 @@ Proof.
         { econs 4; eauto. }
         { econs 5; eauto. }
         { econs 6; eauto. }
+        { econs 7; eauto. }
       * apply IdMap.add_add_diff. ss.
 Qed.
 

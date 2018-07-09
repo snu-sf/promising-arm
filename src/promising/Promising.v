@@ -286,10 +286,8 @@ Section Eqts.
   Hint Constructors eqts_val.
 
   Inductive eqts_event: forall (e1:Event.t (A:=View.t (A:=A))) (e2:Event.t (A:=View.t (A:=B))), Prop :=
-  | eqts_event_internal
-      ctrl1 ctrl2
-      (CTRL: eqts_view ctrl1 ctrl2):
-      eqts_event (Event.internal ctrl1) (Event.internal ctrl2)
+  | eqts_event_internal:
+      eqts_event Event.internal Event.internal
   | eqts_event_read
       ex ord vloc1 vloc2 res1 res2
       (VLOC: eqts_val vloc1 vloc2)
@@ -304,6 +302,10 @@ Section Eqts.
   | eqts_event_barrier
       b:
       eqts_event (Event.barrier b) (Event.barrier b)
+  | eqts_event_control
+      ctrl1 ctrl2
+      (CTRL: eqts_view ctrl1 ctrl2):
+      eqts_event (Event.control ctrl1) (Event.control ctrl2)
   .
   Hint Constructors eqts_event.
 End Eqts.
@@ -477,8 +479,8 @@ Section Local.
   .
   Hint Constructors promise.
 
-  Inductive internal (ctrl:View.t) (lc1 lc2:t): Prop :=
-  | internal_intro
+  Inductive control (ctrl:View.t) (lc1 lc2:t): Prop :=
+  | control_intro
       (LC2: lc2 =
             mk
               lc1.(coh)
@@ -492,7 +494,7 @@ Section Local.
               lc1.(exbank)
               lc1.(promises))
   .
-  Hint Constructors internal.
+  Hint Constructors control.
 
   Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
@@ -630,9 +632,8 @@ Section Local.
 
   Inductive step (event:Event.t (A:=View.t (A:=A))) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
   | step_internal
-      ctrl
-      (EVENT: event = (Event.internal ctrl))
-      (LC: internal ctrl lc1 lc2)
+      (EVENT: event = Event.internal)
+      (LC: lc2 = lc1)
   | step_read
       ex ord vloc res
       (EVENT: event = Event.read ex ord vloc res)
@@ -652,6 +653,10 @@ Section Local.
       rr rw wr ww
       (EVENT: event = Event.barrier (Barrier.dmb rr rw wr ww))
       (STEP: dmb rr rw wr ww lc1 lc2)
+  | step_control
+      ctrl
+      (EVENT: event = Event.control ctrl)
+      (LC: control ctrl lc1 lc2)
   .
   Hint Constructors step.
 
@@ -688,9 +693,9 @@ Section Local.
     - destruct ts; ss. destruct ts; ss.
   Qed.
 
-  Lemma internal_bot_inv
+  Lemma control_bot_inv
         lc1 lc2
-        (LC: internal bot lc1 lc2):
+        (LC: control bot lc1 lc2):
     lc2 = lc1.
   Proof.
     inv LC. destruct lc1. s. f_equal.
@@ -825,12 +830,8 @@ Section ExecUnit.
     }
 
     inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
-    - inv LC. econs; ss. econs; viewtac.
-      inv CTRL. rewrite <- TS. viewtac.
-    - inv LC. econs; ss.
-      + eauto using rmap_add_wf, expr_wf.
-      + econs; viewtac.
-        inv CTRL. rewrite <- TS. viewtac.
+    - econs; ss.
+      eauto using rmap_add_wf, expr_wf.
     - inv RES. inv VIEW. inv VLOC. inv VIEW.
       inv STEP. ss. subst.
       econs; ss.
@@ -882,8 +883,6 @@ Section ExecUnit.
     - inv STEP. econs; ss. econs; viewtac.
     - inv LC. econs; ss. econs; viewtac.
       inv CTRL. rewrite <- TS. eauto using expr_wf.
-    - inv LC. econs; ss. econs; viewtac.
-      inv CTRL. rewrite <- TS. viewtac.
   Qed.
 
   Lemma state_step_wf tid eu1 eu2

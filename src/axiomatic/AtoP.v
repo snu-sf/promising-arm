@@ -406,8 +406,7 @@ Proof.
       { econs; ss. }
       econs 1; ss.
     + econs; ss.
-      inv SIM_LOCAL; econs; eauto. s.
-      apply sim_view_join; ss. econs. ss.
+      inv SIM_LOCAL; econs; eauto.
   - (* assign *)
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs 1. econs; ss.
@@ -415,8 +414,7 @@ Proof.
       econs 1; ss.
     + econs; ss.
       * econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr; ss.
-      * inv SIM_LOCAL; econs; eauto. s.
-        apply sim_view_join; ss. econs. ss.
+      * inv SIM_LOCAL; econs; eauto.
   - (* read *)
     exploit LABEL.
     { rewrite List.nth_error_app2; [|refl]. rewrite Nat.sub_diag. ss. }
@@ -1184,7 +1182,7 @@ Proof.
     eexists (ExecUnit.mk _ _ _). esplits.
     + econs. econs; ss.
       { econs; ss. }
-      econs; ss.
+      econs 7; ss.
     + econs; ss.
       * econs; eauto. s.
         generalize (sim_rmap_expr cond RMAP). intro X. inv X.
@@ -1200,8 +1198,7 @@ Proof.
       { econs; ss. }
       * econs; ss.
     + econs; ss.
-      inv SIM_LOCAL; econs; eauto. s.
-      apply sim_view_join; ss. econs. ss.
+      inv SIM_LOCAL; econs; eauto.
 Qed.
 
 Lemma sim_eu_rtc_step

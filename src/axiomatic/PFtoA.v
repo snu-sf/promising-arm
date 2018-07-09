@@ -770,16 +770,14 @@ Proof.
     inv STATE. inv STATE1. ss. subst.
     inv STATE0; inv LOCAL0; ss; inv EVENT0; inv EVENT; ss.
     - (* skip *)
-      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
       + econs; ss. apply L.
       + econs; ss; try by apply L.
-        rewrite bot_join; [|exact Time.order]. apply L.
     - (* assign *)
-      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
       + econs; ss. apply sim_rmap_add; try by apply L.
         apply sim_rmap_expr. apply L.
       + econs; ss; try by apply L.
-        rewrite bot_join; [|exact Time.order]. apply L.
     - (* read *)
       admit.
     - (* write *)
@@ -1039,10 +1037,9 @@ Proof.
 
         eapply sim_view_le; [apply join_l|]. apply L.
     - (* dowhile *)
-      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
       + econs; ss; try by apply L.
       + econs; ss; try by apply L.
-        eapply sim_view_le; [apply join_l|]. apply L.
   }
   des. econs; ss.
 Admitted.  
