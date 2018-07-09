@@ -217,15 +217,24 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
     sim_event (Event.internal ctrl1) (Event.internal ctrl2)
 | sim_event_read
     ex1 ord1 vloc1 val1
-    ex2 ord2 vloc2 val2:
+    ex2 ord2 vloc2 val2
+    (EX: ex1 = ex2)
+    (ORD: ord1 = ord2)
+    (VLOC: sim_val_weak vloc1 vloc2)
+    (VAL: sim_val_weak val1 val2):
     sim_event (Event.read ex1 ord1 vloc1 val1) (Event.read ex2 ord2 vloc2 val2)
 | sim_event_write
     ex1 ord1 vloc1 vval1 res1
     ex2 ord2 vloc2 vval2 res2
-    (FAILURE: res1.(ValA.val) = res2.(ValA.val)):
+    (EX: ex1 = ex2)
+    (ORD: ord1 = ord2)
+    (VLOC: sim_val_weak vloc1 vloc2)
+    (VVAL: sim_val_weak vval1 vval2)
+    (RES: sim_val_weak res1 res2):
     sim_event (Event.write ex1 ord1 vloc1 vval1 res1) (Event.write ex2 ord2 vloc2 vval2 res2)
 | sim_event_barrier
-    b1 b2:
+    b1 b2
+    (BARRIER: b1 = b2):
     sim_event (Event.barrier b1) (Event.barrier b2)
 .
 Hint Constructors sim_event.
@@ -385,29 +394,36 @@ Proof.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 3; ss.
     + econs 2; ss.
-    + econs; ss. apply sim_rmap_weak_add; ss.
+    + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+    + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
   - inv STEP. ss.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 4; ss.
     + econs 3; ss. inv WRITABLE. i. specialize (EX H). des.
-      admit.
+      admit. (* exclusive *)
     + econs; ss.
+      * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+      * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
   - inv STEP. destruct ex0; ss.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 4; ss.
     + econs 4; ss.
     + econs; ss.
+      * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+      * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
   - inv STEP.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 5; ss.
     + econs 5; ss.
     + econs; ss.
+    + econs; ss.
   - inv STEP.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 5; ss.
     + econs 5; ss.
+    + econs; ss.
     + econs; ss.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
@@ -722,12 +738,12 @@ Proof.
         { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
         rewrite fun_add_spec. condtac; [|congr].
         esplits; eauto.
-        * rewrite VAL. eauto.
+        * rewrite VAL0. eauto.
         * admit. (* TODO: memory should be the same *)
     - i. des_ifs.
       + apply Nat.eqb_eq in Heq. subst. esplits; eauto.
         * rewrite List.nth_error_app2, Nat.sub_diag; [|refl].
-          s. rewrite VAL. eauto.
+          s. rewrite VAL0. eauto.
         * rewrite fun_add_spec. des_ifs; [|congr]. eauto.
           admit. (* memory *)
       + exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
@@ -747,7 +763,7 @@ Proof.
     - admit. (* po *)
   }
   { (* write *)
-    inv LOCAL; inv EVENT; [|by inv STEP]. inv STEP. inv STATE. ss. econs; ss.
+    inv LOCAL; inv EVENT; inv RES; inv STEP. inv STATE. ss. econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. rewrite Promises.unset_o. des_ifs.
       { inv e. right. esplits; ss.
         - instantiate (1 := ALocal.next_eid alc1). des_ifs; cycle 1.
@@ -772,7 +788,7 @@ Proof.
         des_ifs; cycle 1.
         { apply Nat.eqb_neq in Heq. lia. }
         esplits; eauto.
-        * admit. (* sim_event? *)
+        * inv VLOC. rewrite VAL0. eauto.
         * admit. (* memory *)
     - i. unfold ALocal.next_eid in *. des_ifs.
       + apply Nat.eqb_eq in Heq. subst. rewrite fun_add_spec. des_ifs; [|congr].
