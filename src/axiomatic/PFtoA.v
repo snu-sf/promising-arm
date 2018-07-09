@@ -838,7 +838,63 @@ Proof.
         exploit LABELS0; eauto.
         { rewrite List.app_length. s. lia. }
         { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
-    + admit. (* vcap *)
+    + rewrite List.app_length, Nat.add_1_r.
+      ii. inv EID. inv REL.
+      * admit. (* ctrl should be local *)
+      * (* TODO: move *)
+        Lemma addr_po_step ex:
+          (ex.(Execution.addr) ⨾ Execution.po) =
+          ((ex.(Execution.addr) ⨾ Execution.po) ∪ ex.(Execution.addr)) ⨾
+          Execution.po_adj.
+        Proof.
+          rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+          rewrite Execution.po_po_adj at 1.
+          rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
+          rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
+          refl.
+        Qed.
+        
+        rewrite addr_po_step in H0.
+        
+        (*TODO: move *)
+        Lemma step r eid tid n:
+          (r ⨾ Execution.po_adj) eid (tid, S n) = r eid (tid, n).
+        Proof.
+          propext. econs; i.
+          - inv H. des. inv H1. destruct x. ss. inv N. auto.
+          - econs. split; eauto.
+        Qed.
+
+        rewrite step in H0.
+        inv H0.
+        { eapply VCAP; eauto. econs; eauto. econs 2; eauto. }
+        { (* TODO: move *)
+          Lemma addr_eid
+                p ex (PRE: Valid.pre_ex p ex)
+                eid tid eid2
+                (ADDR: ex.(Execution.addr) eid (tid, eid2)):
+            exists eid1, eid = (tid, eid1).
+          Proof.
+          Admitted.
+
+          exploit addr_eid; eauto. i. des. subst.
+          exploit ADDR0; eauto.
+          { rewrite List.app_length. ss. clear. lia. }
+          i.
+
+          (* TODO: move *)
+          Lemma addr_inv
+                p mem tid tr aeu atr wl rl covl vextl
+                eid1 eid2
+                (SIM: sim_trace p mem tid tr (aeu::atr) wl rl covl vextl)
+                (EID2: eid2 >= List.length aeu.(AExecUnit.local).(ALocal.labels))
+                (ADDR: aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2):
+            False.
+          Proof.
+          Admitted.
+
+          exploit addr_inv; eauto. ss.
+        }
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
