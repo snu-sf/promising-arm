@@ -419,20 +419,16 @@ Module AExecUnit.
           { apply label_is_mon. }
           { apply label_is_mon. }
         * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
-        * i. apply nth_error_app_inv in LABEL. des.
-          { eapply RMW1. eauto. }
-          { apply nth_error_singleton_inv in LABEL0. des. congr. }
+        * i. apply nth_error_snoc_inv in LABEL. des; ss.
+          eapply RMW1. eauto.
         * i. exploit RMW2; eauto. i. des. esplits; eauto using nth_error_app_mon.
           i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr.
-        * ii. apply nth_error_app_inv in H. des.
+        * ii. apply nth_error_snoc_inv in H. des; ss.
           { destruct ex0.
             { inv EB. unfold ALocal.next_eid in *. lia. }
             eapply EXBANK; eauto.
           }
-          { apply nth_error_singleton_inv in H0. des. inv H1.
-            replace c with (length (ALocal.labels local1)) in * by lia.
-            inv EB. unfold ALocal.next_eid in *. lia.
-          }
+          { subst. inv H0. inv EB. unfold ALocal.next_eid in *. lia. }
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -472,13 +468,9 @@ Module AExecUnit.
         * ii. inv H; eauto. destruct ex0; ss. inv H0.
           exploit EX; eauto. i. des. rewrite H in x0. inv x0. inv x1.
           apply List.nth_error_Some. congr.
-        * i. apply nth_error_app_inv in LABEL. des.
+        * i. apply nth_error_snoc_inv in LABEL. des.
           { exploit RMW1; eauto. i. inv x. econs. left. eauto. }
-          { apply nth_error_singleton_inv in LABEL0. des. inv LABEL1.
-            replace n with (length (ALocal.labels local1)) in * by lia.
-            exploit EX; eauto. i. des.
-            econs. right. econs; eauto.
-          }
+          { subst. inv LABEL0. exploit EX; eauto. i. des. econs. right. econs; eauto. }
         * i. inv RMW0.
           { exploit RMW2; eauto. i. des. esplits.
             - apply nth_error_app_mon. eauto.
@@ -491,13 +483,12 @@ Module AExecUnit.
             esplits.
             - apply nth_error_app_mon. eauto.
             - rewrite List.nth_error_app2, Nat.sub_diag; ss.
-            - ii. apply nth_error_app_inv in H. des.
+            - ii. apply nth_error_snoc_inv in H. des.
               + eapply EXBANK; eauto.
               + unfold ALocal.next_eid in *. lia.
           }
-        * ii. destruct ex0; ss. apply nth_error_app_inv in H. des.
-          { eapply EXBANK; eauto. }
-          { apply nth_error_singleton_inv in H0. des. inv H1. }
+        * ii. destruct ex0; ss. apply nth_error_snoc_inv in H. des; ss.
+          eapply EXBANK; eauto.
       + econs; ss.
         * esplits; eauto.
         * left. ss.
@@ -518,15 +509,13 @@ Module AExecUnit.
           { apply label_is_mon. }
           { apply label_is_mon. }
         * ii. econs; ss. apply label_is_mon. eapply CTRL_LABEL. eauto.
-        * i. apply nth_error_app_inv in LABEL. des; eauto.
-          apply nth_error_singleton_inv in LABEL0. des. inv LABEL1.
+        * i. apply nth_error_snoc_inv in LABEL. des; eauto. inv LABEL0.
         * i. exploit RMW2; eauto. i. des. esplits.
           { apply nth_error_app_mon. eauto. }
           { apply nth_error_app_mon. eauto. }
           { i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr. }
-        * ii. apply nth_error_app_inv in H. des.
-          { eapply EXBANK; eauto. }
-          { apply nth_error_singleton_inv in H0. des. inv H1. }
+        * ii. apply nth_error_snoc_inv in H. des; ss.
+          eapply EXBANK; eauto.
       + econs; ss. eexists; eauto.
     - splits.
       + inv WF. econs; ss.

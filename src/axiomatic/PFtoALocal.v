@@ -630,8 +630,7 @@ Proof.
     - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WPROP2); eauto.
-      apply nth_error_app_inv in GET. des; eauto.
-      apply nth_error_singleton_inv in GET0. des. congr.
+      apply nth_error_snoc_inv in GET. des; eauto. congr.
     - i. exploit IH.(WPROP3); eauto. s. i. des. des_ifs.
       { exfalso. apply Nat.eqb_eq in Heq. subst.
         unfold ALocal.next_eid in *.
@@ -642,12 +641,10 @@ Proof.
       + rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
       + eapply nth_error_app_mon. eauto.
     - eapply IH.(WPROP4).
-    - i. apply nth_error_app_inv in GET. des.
+    - i. apply nth_error_snoc_inv in GET. des.
       + exploit IH.(RPROP1); eauto. i. des. esplits; eauto.
         des_ifs. apply Nat.eqb_eq in Heq. subst. unfold ALocal.next_eid in *. lia.
-      + apply nth_error_singleton_inv in GET0. des.
-        replace eid with (length (ALocal.labels alc1)) in * by lia.
-        des_ifs; cycle 1.
+      + des_ifs; cycle 1.
         { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
         rewrite fun_add_spec. condtac; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
@@ -669,17 +666,15 @@ Proof.
         * rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
         * eapply nth_error_app_mon. eauto.
     - i. unfold ALocal.next_eid in *.
-      apply nth_error_app_inv in LABEL1. apply nth_error_app_inv in LABEL2. des.
+      apply nth_error_snoc_inv in LABEL1. apply nth_error_snoc_inv in LABEL2. des.
       + repeat condtac.
         all: try apply Nat.eqb_eq in X; ss; subst; try lia.
         all: try apply Nat.eqb_eq in X0; ss; subst; try lia.
         eapply IH.(PO); eauto.
       + lia.
-      + apply nth_error_singleton_inv in LABEL0. des. subst.
-        repeat condtac; ss.
+      + subst. repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; subst; try lia.
         all: try apply Nat.eqb_neq in X0; ss; try lia.
-        replace iid2 with (length (ALocal.labels alc1)) in * by lia.
         splits; ss. rewrite fun_add_spec. des_ifs; [|congr].
         inv REL. destruct label1; ss.
         * destruct (equiv_dec loc0 loc); ss. inv e0.
@@ -694,8 +689,7 @@ Proof.
           exploit IH.(WPROP3); eauto. s. i. des. subst.
           exploit sim_rmap_weak_expr; eauto. i. inv x3. rewrite VAL1 in COH.
           etrans; eauto.
-      + apply nth_error_singleton_inv in LABEL0. des. subst.
-        repeat condtac; ss.
+      + subst. repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; try lia.
   }
   { (* write *)
@@ -716,12 +710,11 @@ Proof.
           assert (H: List.nth_error (ALocal.labels alc1) (length (ALocal.labels alc1)) <> None) by (ii; congr).
           apply List.nth_error_Some in H. lia.
         * eapply nth_error_app_mon. eauto.
-    - i. unfold ALocal.next_eid in *. apply nth_error_app_inv in GET. des.
+    - i. unfold ALocal.next_eid in *. apply nth_error_snoc_inv in GET. des.
       + des_ifs.
         { apply Nat.eqb_eq in Heq. subst. lia. }
         eapply IH.(WPROP2); eauto.
-      + apply nth_error_singleton_inv in GET0. des.
-        des_ifs; cycle 1.
+      + des_ifs; cycle 1.
         { apply Nat.eqb_neq in Heq. lia. }
         esplits; eauto.
         * inv VLOC. rewrite VAL0. eauto.
@@ -750,8 +743,7 @@ Proof.
         rewrite MSG in x5. inv x5. clear -WRITABLE x3. unfold le in x3. inv WRITABLE. lia.
       + eapply IH.(WPROP4); eauto.
     - i. exploit IH.(RPROP1); eauto.
-      apply nth_error_app_inv in GET. des; eauto.
-      apply nth_error_singleton_inv in GET0. des. congr.
+      apply nth_error_snoc_inv in GET. des; eauto. congr.
     - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
       * des_ifs.
         exfalso. apply Nat.eqb_eq in Heq. subst.
@@ -763,14 +755,13 @@ Proof.
       * eapply nth_error_app_mon. eauto.
     - inv ASTATE_STEP; ss; eauto. subst.
       inv VLOC. inv VVAL. rewrite VAL0, VAL1 in *. unfold ALocal.next_eid in *.
-      i. apply nth_error_app_inv in LABEL1. apply nth_error_app_inv in LABEL2. des.
+      i. apply nth_error_snoc_inv in LABEL1. apply nth_error_snoc_inv in LABEL2. des.
       + repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; subst; try lia.
         all: try apply Nat.eqb_eq in X0; ss; subst; try lia.
         eapply IH.(PO); eauto.
       + lia.
-      + apply nth_error_singleton_inv in LABEL0. des. subst.
-        repeat condtac; ss.
+      + subst. repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; subst; try lia.
         all: try apply Nat.eqb_neq in X0; ss; try lia.
         splits; ss. rewrite fun_add_spec. des_ifs; [|congr].
@@ -785,8 +776,7 @@ Proof.
           exploit IH.(WPROP2); eauto. i. des.
           exploit IH.(WPROP3); eauto. s. i. des. subst.
           eapply Nat.le_lt_trans; eauto. inv WRITABLE. rewrite VAL0 in *. ss.
-      + apply nth_error_singleton_inv in LABEL0. des. subst.
-        repeat condtac; ss.
+      + subst. repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; try lia.
   }
   { (* write failure *)
@@ -800,20 +790,18 @@ Proof.
       - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
         eapply nth_error_app_mon. eauto.
       - i. exploit IH.(WPROP2); eauto.
-        apply nth_error_app_inv in GET. des; eauto.
-        apply nth_error_singleton_inv in GET0. des. congr.
+        apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(WPROP3); eauto. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
       - eapply IH.(WPROP4).
       - i. exploit IH.(RPROP1); eauto.
-        apply nth_error_app_inv in GET. des; eauto.
-        apply nth_error_singleton_inv in GET0. des. congr.
+        apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
-      - i. apply nth_error_app_inv in LABEL1. des; cycle 1.
-        { apply nth_error_singleton_inv in LABEL0. des. subst. inv REL. inv X. }
-        apply nth_error_app_inv in LABEL2. des; cycle 1.
-        { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
+      - i. apply nth_error_snoc_inv in LABEL1. des; cycle 1.
+        { subst. inv REL. inv X. }
+        apply nth_error_snoc_inv in LABEL2. des; cycle 1.
+        { subst. inv REL. inv Y. }
         eapply IH.(PO); eauto.
     }
     { (* isb *)
@@ -821,20 +809,18 @@ Proof.
       - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
         eapply nth_error_app_mon. eauto.
       - i. exploit IH.(WPROP2); eauto.
-        apply nth_error_app_inv in GET. des; eauto.
-        apply nth_error_singleton_inv in GET0. des. congr.
+        apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(WPROP3); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
       - eapply IH.(WPROP4).
       - i. exploit IH.(RPROP1); eauto.
-        apply nth_error_app_inv in GET. des; eauto.
-        apply nth_error_singleton_inv in GET0. des. congr.
+        apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
-      - i. apply nth_error_app_inv in LABEL1. des; cycle 1.
-        { apply nth_error_singleton_inv in LABEL0. des. subst. inv REL. inv X. }
-        apply nth_error_app_inv in LABEL2. des; cycle 1.
-        { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
+      - i. apply nth_error_snoc_inv in LABEL1. des; cycle 1.
+        { subst. inv REL. inv X. }
+        apply nth_error_snoc_inv in LABEL2. des; cycle 1.
+        { subst. inv REL. inv Y. }
         eapply IH.(PO); eauto.
     }
   }

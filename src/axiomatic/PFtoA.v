@@ -538,8 +538,7 @@ Lemma nth_error_not_last A (l: list A) a b n
       (N: Nat.eqb n (List.length l) = false):
   n < List.length l.
 Proof.
-  apply nth_error_app_inv in NTH. des; ss.
-  apply nth_error_singleton_inv in NTH0. des. subst.
+  apply nth_error_snoc_inv in NTH. des; ss. subst.
   apply Nat.eqb_neq in N. lia.
 Qed.
 

@@ -493,6 +493,18 @@ Proof.
   - destruct n; ss.
 Qed.
 
+Lemma nth_error_snoc_inv
+      A
+      (l:list A) x
+      n a
+      (FIND: List.nth_error (l ++ [x]) n = Some a):
+  (n < length l /\ List.nth_error l n = Some a) \/
+  (n = length l /\ x = a).
+Proof.
+  exploit nth_error_app_inv; eauto. i. des; [left|right]; ss.
+  exploit nth_error_singleton_inv; eauto. i. des. subst. splits; ss. lia.
+Qed.
+
 Lemma nth_error_app_mon
       A
       (l1 l2:list A)

@@ -132,9 +132,7 @@ Module Memory.
     { inversion e. subst. exists (S (length mem)), x.(Msg.val). splits.
       - i. unfold read in READ. destruct ts'; [lia|]. ss.
         destruct (nth_error (mem ++ [x]) ts') eqn:NTH; ss.
-        apply nth_error_app_inv in NTH. des; [lia|].
-        apply nth_error_singleton_inv in NTH0. des. subst.
-        replace ts' with (length mem) by lia. ss.
+        apply nth_error_snoc_inv in NTH. des; [lia|]. subst. ss.
       - unfold read. ss. rewrite nth_error_app2, Nat.sub_diag; ss. condtac; ss.
     }
     des. exists ts, val. splits.
@@ -143,11 +141,9 @@ Module Memory.
       { erewrite read_mon; eauto. }
       unfold read in *. destruct ts'; ss.
       destruct (nth_error (mem ++ [x]) ts') eqn:NTH; ss.
-      apply nth_error_app_inv in NTH. des; ss.
+      apply nth_error_snoc_inv in NTH. des; ss.
       { rewrite NTH0 in READ'. ss. }
-      apply nth_error_singleton_inv in NTH0. des. subst.
-      replace ts' with (length mem) in * by lia.
-      revert READ. condtac; ss. inversion e. subst. congr.
+      subst. revert READ. condtac; ss. inversion e. subst. congr.
     - apply read_mon. ss.
   Qed.
 End Memory.

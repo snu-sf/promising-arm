@@ -1310,11 +1310,9 @@ Proof.
         esplits; eauto. apply nth_error_app_mon. eauto.
     + intro Y. apply IHmem in Y. des.
       esplits; eauto. apply nth_error_app_mon. eauto.
-  - i. des. apply nth_error_app_inv in H. des.
+  - i. des. apply nth_error_snoc_inv in H. des; ss.
     { condtac; eauto. rewrite Promises.set_o. condtac; eauto. }
-    apply nth_error_singleton_inv in H0. des. subst.
-    replace ts with (length mem) in * by lia.
-    s. condtac; ss; [|congr]. rewrite Promises.set_o. condtac; [|congr]. ss.
+    subst. condtac; ss; [|congr]. rewrite Promises.set_o. condtac; [|congr]. ss.
 Qed.
 
 Definition init_with_promises (p:program) (mem:Memory.t): Machine.t :=
