@@ -521,11 +521,24 @@ Proof.
     + right. auto.
 Qed.
 
+Lemma nth_error_last A (l: list A) a n
+      (N: Nat.eqb n (List.length l) = true):
+  List.nth_error (l ++ [a]) n = Some a.
+Proof.
+Admitted.
+
+Lemma nth_error_not_last A (l: list A) a b n
+      (NTH: List.nth_error (l ++ [a]) n = Some b)
+      (N: Nat.eqb n (List.length l) = false):
+  n < List.length l.
+Proof.
+Admitted.
+
 Lemma sim_traces_sim_eu
-      p mem trs atrs ws rs covs vexts
+      p trs atrs ws rs covs vexts
       m ex
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
-      (NOPROMISE: Machine.no_promise m)
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
@@ -535,7 +548,7 @@ Lemma sim_traces_sim_eu
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -569,6 +582,7 @@ Lemma sim_traces_sim_eu
         (FR: ex.(Execution.fr) (tid, eid1) eid2),
         Time.lt (vext eid1) ((v_gen vexts) eid2)>>.
 Proof.
+  rename STEP into MACHINE_STEP.
   i. generalize (SIM tid). intro X. inv X; simplify.
   revert eu aeu tr' atr' cov covl' vext vextl' EU AEU COV VEXT. induction n.
   { i.
@@ -656,20 +670,58 @@ Proof.
     admit.
   }
   { (* FR *)
-    ii. inv FR0.
+    ii. generalize FR0. intro X. inv X.
     - admit.
-    - (* inv H0. inv H6. inv H0. inv H6. *)
-      (* exploit LABELS0; eauto. intro LABEL1. destruct l; ss. *)
-      (* rewrite VEXT0; eauto. *)
-      (* exploit r_property; try exact SIM2. i. des. simplify. *)
-      (* exploit RPROP1; eauto. i. des. *)
-      (* + inv SIM2. inv EVENT; ss. *)
-      (* generalize (ATR tid). intro ATR1. inv ATR1; try congr. des. simplify. *)
-      (* destruct PRE. unfold Execution.label in EID. ss. *)
-      (* rewrite LABELS1 in EID. rewrite IdMap.map_spec in EID. *)
-      (* rewrite <- H9 in EID. ss. simplify. *)
-      (* exploit w_property; try exact REL6. i. des. *)
-      admit.
+    - inv H0. inv H4. inv H0. inv H4.
+      exploit LABELS0; eauto. intro LABEL1. destruct l; ss.
+      exploit sim_trace_sim_th; try exact SIM2; eauto. i. destruct x0.
+      exploit RPROP1; eauto. i. des. unguardH x0. des.
+      + inv SIM2.
+        destruct eu1 as [st1 lc1 mem1], eu as [st2 lc2 mem2].
+        destruct aeu1 as [ast1 alc1], aeu as [ast2 alc2].
+        inv EVENT; ss.
+        * eapply FR; eauto. inv ALOCAL_STEP; ss.
+        * des_ifs; cycle 1.
+          { eapply FR; eauto. inv ALOCAL_STEP; ss.
+            eapply nth_error_not_last; eauto. }
+          { inv STEP. ss. inv LOCAL; ss. inv STEP. inv EVENT. ss.
+            rewrite fun_add_spec in H4.
+            destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)); try congr.
+            admit.
+          }
+        * inv STEP. ss. inv LOCAL; ss; inv EVENT.
+          { inv STEP. ss. inv ALOCAL_STEP; ss.
+            - destruct (Nat.eqb eid1 (ALocal.next_eid alc1)) eqn:HEID1.
+              + rewrite nth_error_last in LABEL1; auto. inv LABEL1.
+              + eapply FR; eauto. eapply nth_error_not_last; eauto.
+            - inv EVENT. inv RES. ss. }
+          { inv STEP. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+        * inv STEP. ss. inv LOCAL; ss; inv EVENT.
+          { inv STEP. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+          { inv STEP. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+      + exploit sim_traces_memory; eauto. i. des.
+        generalize (SIM tid'). intro SIM'. inv SIM'; try congr. simplify.
+        exploit sim_trace_last; try exact REL0. i. des. subst.
+        exploit sim_trace_sim_th; try exact REL0; eauto. i. destruct x3.
+        exploit WPROP0; eauto. i. des.
+        * inv MACHINE_STEP. inv NOPROMISE.
+          generalize (TR tid'). intro TR'. inv TR'; try congr. des. simplify.
+          destruct b. exploit PROMISES; eauto. i.
+          ss. rewrite x4 in *. rewrite Promises.lookup_bot in x1. ss.
+        * exfalso. apply H6. econs. rewrite RF.
+          instantiate (1 := (tid', eid)).
+          exploit sim_trace_last; try exact REL6. i. des. subst.
+          econs; try refl; ss; eauto.
+          admit. (* should prove that r includes r2 *)
   }
   splits; eauto.
   (* SIM_EU *)
