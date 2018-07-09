@@ -762,11 +762,7 @@ Proof.
       + esplits; eauto.
         * des_ifs; eauto. apply Nat.eqb_eq in Heq. subst. unfold ALocal.next_eid in *.
           assert (H: List.nth_error (ALocal.labels alc1) (length (ALocal.labels alc1)) <> None) by (ii; congr).
-          apply List.nth_error_Some in x2. lia.
-          rewrite List.nth_error_app2, Nat.sub_diag in x2; [|refl].
-          
-          rewrite fun_add_spec. des_ifs; [|congr].
-          admit. (* wprop1 *)
+          apply List.nth_error_Some in H. lia.
         * eapply nth_error_app_mon. eauto.
     - i. unfold ALocal.next_eid in *. apply nth_error_app_inv in GET. des.
       + des_ifs.
