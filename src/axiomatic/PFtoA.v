@@ -758,7 +758,63 @@ Proof.
   assert (OBR: sim_ob_read tid ex (v_gen vexts) eu2 aeu2).
   { admit. }
   assert (FR: sim_fr tid ex (v_gen vexts) eu2 aeu2).
-  { admit. }
+  { exploit sim_traces_ex; try exact EU; eauto. intro X. destruct X.
+    ii. generalize FR0. intro X. inv X.
+    - admit.
+    - inv H. inv H1. inv H. inv H1.
+      exploit LABELS0; eauto. intro LABEL1. destruct l; ss.
+      rewrite EU, AEU, COV, VEXT in SIMTR.
+      rewrite <- WL in SIMTR. rewrite <- RL in SIMTR.
+      exploit sim_trace_sim_th; try exact SIMTR; eauto. i. destruct x0.
+      exploit RPROP1; eauto. i. des. unguardH x0. des.
+      + destruct eu1 as [st1 lc1 mem1], eu2 as [st2 lc2 mem2].
+        destruct aeu1 as [ast1 alc1], aeu2 as [ast2 alc2].
+        inv EVENT; ss.
+        * eapply FR; eauto. inv ALOCAL_STEP; ss.
+        * des_ifs; cycle 1.
+          { eapply FR; eauto. inv ALOCAL_STEP; ss.
+            eapply nth_error_not_last; eauto. }
+          { inv STEP0. ss. inv LOCAL0; ss. inv STEP0. inv EVENT. ss.
+            rewrite fun_add_spec in H1.
+            destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)); try congr.
+            admit.
+          }
+        * inv STEP0. ss. inv LOCAL0; ss; inv EVENT.
+          { inv STEP0. ss. inv ALOCAL_STEP; ss.
+            - destruct (Nat.eqb eid1 (ALocal.next_eid alc1)) eqn:HEID1.
+              + rewrite nth_error_last in LABEL1; auto. inv LABEL1.
+              + eapply FR; eauto. eapply nth_error_not_last; eauto.
+            - inv EVENT. inv RES. ss. }
+          { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+        * inv STEP0. ss. inv LOCAL0; ss; inv EVENT.
+          { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+          { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+            destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+            - rewrite nth_error_last in LABEL1; eauto. inv LABEL1.
+            - eapply nth_error_not_last; eauto. }
+        * inv STEP0. ss. inv LOCAL0; ss; inv EVENT.
+          inv LC0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+      + exploit sim_traces_memory; eauto. i. des.
+        generalize (SIM tid'). intro SIM'. inv SIM'; try congr. simplify.
+        exploit sim_trace_last; try exact REL0. i. des. subst.
+        exploit sim_trace_sim_th; try exact REL0; eauto. i. destruct x3.
+        exploit WPROP0; eauto. i. des.
+        * inv STEP. inv NOPROMISE.
+          generalize (TR tid'). intro TR'. inv TR'; try congr. des. simplify.
+          destruct b. exploit PROMISES0; eauto. i.
+          ss. rewrite x4 in *. rewrite Promises.lookup_bot in x1. ss.
+        * exfalso. apply H3. econs. rewrite RF.
+          instantiate (1 := (tid', eid)).
+          exploit sim_trace_last; try exact REL6. i. des. subst.
+          econs; try refl; ss; eauto.
+          admit. (* should prove that r includes r2 *)
+  }
   assert (SL: sim_state tid (v_gen vexts) eu2.(ExecUnit.state) aeu2.(AExecUnit.state) /\
               sim_local tid ex (v_gen vexts) eu2.(ExecUnit.local) aeu2.(AExecUnit.local)).
   { destruct eu1 as [[stmts1 rmap1] lc1 mem1].
