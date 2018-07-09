@@ -600,7 +600,8 @@ Proof.
   revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT. induction SIM.
   { i. simplify. ss. econs; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
-      left. splits; ss. admit. (* promises_from_mem *)
+      left. splits; ss. destruct ts; ss.
+      eapply promises_from_mem_lookup. eauto.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       destruct eid; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
@@ -827,4 +828,6 @@ Proof.
   { (* internal *)
     inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
   }
-Admitted.
+Grab Existential Variables.
+all: auto. (* tid *)
+Qed.
