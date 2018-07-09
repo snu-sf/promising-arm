@@ -800,6 +800,9 @@ Proof.
             - eapply nth_error_not_last; eauto. }
         * inv STEP0. ss. inv LOCAL0; ss; inv EVENT.
           inv LC0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss.
+          destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1.
+          { rewrite nth_error_last in LABEL1; eauto. inv LABEL1. }
+          { eapply nth_error_not_last; eauto. }
       + exploit sim_traces_memory; eauto. i. des.
         generalize (SIM tid'). intro SIM'. inv SIM'; try congr. simplify.
         exploit sim_trace_last; try exact REL0. i. des. subst.
