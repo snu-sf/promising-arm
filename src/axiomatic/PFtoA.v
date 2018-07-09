@@ -436,6 +436,42 @@ Proof.
   inv SIM; ss. lia.
 Qed.
 
+Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
+  LABELS:
+    forall eid label
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (LABEL: Execution.label (tid, eid) ex = Some label),
+      List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some label;
+  ADDR:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.addr) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2;
+  DATA:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (DATA: ex.(Execution.data) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.data) eid1 eid2;
+  CTRL:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (CTRL: ex.(Execution.ctrl) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2;
+  RMW:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.rmw) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2;
+  XCOV:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen covs) (tid, eid) = cov eid;
+  XVEXT:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen vexts) (tid, eid) = vext eid;
+}.
+
 Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
       ex
@@ -451,39 +487,7 @@ Lemma sim_traces_ex
       (AEU: lastn (S n) atr = aeu :: atr')
       (COV: lastn (S n) covl = cov :: covl')
       (VEXT: lastn (S n) vextl = vext :: vextl'):
-  <<LABELS:
-    forall eid label
-      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (LABEL: Execution.label (tid, eid) ex = Some label),
-      List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some label>> /\
-  <<ADDR:
-    forall eid1 eid2
-      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (ADDR: ex.(Execution.addr) (tid, eid1) (tid, eid2)),
-      aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2>> /\
-  <<DATA:
-    forall eid1 eid2
-      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (DATA: ex.(Execution.data) (tid, eid1) (tid, eid2)),
-      aeu.(AExecUnit.local).(ALocal.data) eid1 eid2>> /\
-  <<CTRL:
-    forall eid1 eid2
-      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (CTRL: ex.(Execution.ctrl) (tid, eid1) (tid, eid2)),
-      aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2>> /\
-  <<RMW:
-    forall eid1 eid2
-      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (ADDR: ex.(Execution.rmw) (tid, eid1) (tid, eid2)),
-      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2>> /\
-  <<COV:
-    forall eid
-      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
-      (v_gen covs) (tid, eid) = cov eid>> /\
-  <<VEXT:
-    forall eid
-      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
-      (v_gen vexts) (tid, eid) = vext eid>>.
+  sim_ex tid ex covs vexts aeu cov vext.
 Proof.
 Admitted.
 
@@ -525,16 +529,539 @@ Lemma nth_error_last A (l: list A) a n
       (N: Nat.eqb n (List.length l) = true):
   List.nth_error (l ++ [a]) n = Some a.
 Proof.
-Admitted.
+  apply Nat.eqb_eq in N. subst.
+  rewrite List.nth_error_app2, Nat.sub_diag; ss. 
+Qed.
 
 Lemma nth_error_not_last A (l: list A) a b n
       (NTH: List.nth_error (l ++ [a]) n = Some b)
       (N: Nat.eqb n (List.length l) = false):
   n < List.length l.
 Proof.
+  apply nth_error_app_inv in NTH. des; ss.
+  apply nth_error_singleton_inv in NTH0. des. subst.
+  apply Nat.eqb_neq in N. lia.
+Qed.
+
+Definition sim_view (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  forall eid (EID: eids eid), le (vext eid) view.
+
+Inductive sim_view_rev (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+| sim_view_rev_bot
+    (VIEW: view = bot)
+| sim_view_rev_event
+    eid
+    (EID: eids eid)
+    (VIEW: le view (vext eid))
+.
+Hint Constructors sim_view_rev.
+
+Definition sim_view_eq (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
+  sim_view vext view eids /\ sim_view_rev vext view eids.
+
+Inductive sim_val (tid:Id.t) (vext:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat -> Prop)): Prop :=
+| sim_val_intro
+    (VAL: vala.(ValA.val) = avala.(ValA.val))
+    (VIEW: sim_view vext vala.(ValA.annot).(View.ts) (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)))
+.
+Hint Constructors sim_val.
+
+Inductive sim_rmap (tid:Id.t) (vext:eidT -> Time.t) (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
+| sim_rmap_intro
+    (RMAP: IdMap.Forall2 (fun reg => sim_val tid vext) rmap armap)
+.
+Hint Constructors sim_rmap.
+
+Inductive sim_state (tid:Id.t) (vext:eidT -> Time.t) (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
+| sim_state_intro
+    (STMTS: state.(State.stmts) = astate.(State.stmts))
+    (RMAP: sim_rmap tid vext state.(State.rmap) astate.(State.rmap))
+.
+Hint Constructors sim_state.
+
+Lemma sim_rmap_add
+      tid vext rmap armap reg vala avala
+      (SIM: sim_rmap tid vext rmap armap)
+      (VAL: sim_val tid vext vala avala):
+  sim_rmap tid vext (RMap.add reg vala rmap) (RMap.add reg avala armap).
+Proof.
+  econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
+  inv SIM. condtac; eauto.
+Qed.
+
+Lemma sim_rmap_expr
+      tid vext rmap armap e
+      (SIM: sim_rmap tid vext rmap armap):
+  sim_val tid vext (sem_expr rmap e) (sem_expr armap e).
+Proof.
+  inv SIM. induction e; s.
+  - (* const *)
+    econs; ss. ii. inv EID. inv H0.
+  - (* reg *)
+    specialize (RMAP reg). unfold RMap.find. inv RMAP; ss.
+    econs; ss. ii. inv EID. inv H2.
+  - (* op1 *)
+    inv IHe. econs; ss. congr.
+  - (* op2 *)
+    inv IHe1. inv IHe2. econs; ss.
+    + congr.
+    + ii. des. inv EID0.
+      * etrans; [|eapply join_l]; eauto.
+      * etrans; [|eapply join_r]; eauto.
+Qed.
+
+Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
+  COH: forall loc,
+        sim_view
+          vext
+          (local.(Local.coh) loc)
+          (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VRP: sim_view
+         vext
+         local.(Local.vrp).(View.ts)
+         (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VWP: sim_view
+         vext
+         local.(Local.vwp).(View.ts)
+         (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VRM: sim_view
+         vext
+         local.(Local.vrm).(View.ts)
+         (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VWM: sim_view
+         vext
+         local.(Local.vwm).(View.ts)
+         (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VCAP: sim_view
+          vext
+          local.(Local.vcap).(View.ts)
+          (inverse (sim_local_vcap ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VREL: sim_view
+          vext
+          local.(Local.vrel).(View.ts)
+          (inverse (sim_local_vrel ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  FWDBANK: forall loc,
+      (exists eid,
+          <<TS_NONZERO: (local.(Local.fwdbank) loc).(FwdItem.ts) > 0>> /\
+          <<WRITE: sim_local_fwd ex loc eid (tid, List.length (alocal.(ALocal.labels)))>> /\
+          <<TS: vext eid = (local.(Local.fwdbank) loc).(FwdItem.ts)>> /\
+          <<VIEW: sim_view
+                    vext
+                    (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)
+                    (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))>> /\
+          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/
+      ((local.(Local.fwdbank) loc) = FwdItem.init /\
+       forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid));
+  EXBANK: opt_rel
+            (fun aeb eb =>
+               ex.(Execution.label_is) (Label.is_reading eb.(Exbank.loc)) (tid, aeb) /\
+               sim_view_eq
+                 vext
+                 eb.(Exbank.ts)
+                 (inverse ex.(Execution.rf) (eq (tid, aeb))) /\
+               sim_view
+                 vext
+                 eb.(Exbank.view).(View.ts)
+                 (eq (tid, aeb)))
+            alocal.(ALocal.exbank) local.(Local.exbank);
+  PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
+      exists n,
+        <<N: (length alocal.(ALocal.labels)) <= n>> /\
+        <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
+        <<VIEW: vext (tid, n) = view>>;
+}.
+Hint Constructors sim_local.
+
+Definition sim_ob_write
+           (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
+  forall eid1 eid2
+    (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+    (OB: ex.(ob') eid1 (tid, eid2))
+    (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
+    Time.lt (vext eid1) (vext (tid, eid2)).
+
+Definition sim_ob_read
+           (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
+  forall eid1 eid2
+    (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+    (AOB: ex.(ob') eid1 (tid, eid2))
+    (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
+    Time.le (vext eid1) (vext (tid, eid2)).
+
+Definition sim_fr
+           (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
+  forall eid1 eid2
+    (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+    (FR: ex.(Execution.fr) (tid, eid1) eid2),
+    Time.lt (vext (tid, eid1)) (vext eid2).
+
+Inductive sim_th'
+          (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+          (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop := {
+  ST: sim_state tid vext eu.(ExecUnit.state) aeu.(AExecUnit.state);
+  LC: sim_local tid ex vext eu.(ExecUnit.local) aeu.(AExecUnit.local);
+  OBW: sim_ob_write tid ex vext eu aeu;
+  OBR: sim_ob_read tid ex vext eu aeu;
+  FR: sim_fr tid ex vext eu aeu;
+}.
+Hint Constructors sim_th'.
+
+Lemma sim_traces_sim_th'_step
+      p trs atrs ws rs covs vexts
+      m ex
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid tr atr covl vextl
+    n eu1 eu2 tr' aeu1 aeu2 atr' cov1 cov2 covl' vext1 vext2 vextl'
+    (FIND_TR: IdMap.find tid trs = Some tr)
+    (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_COVL: IdMap.find tid covs = Some covl)
+    (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+    (EU: lastn (S n) tr = eu2 :: eu1 :: tr')
+    (AEU: lastn (S n) atr = aeu2 :: aeu1 :: atr')
+    (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
+    (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
+    (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
+    sim_th' tid ex (v_gen vexts) eu2 aeu2.
+Proof.
+  i. rename SIM_TH' into L.
+  generalize (SIM tid). intro X. inv X; simplify. rename c into wl, d into rl.
+  destruct n.
+  { generalize (lastn_length 1 tr). rewrite EU. destruct tr; ss. }
+  exploit sim_trace_lastn; eauto. instantiate (1 := S n). intro SIMTR.
+  exploit sim_traces_ex; eauto. intro EX2.
+  inversion SIMTR; subst; simplify; [congr|].
+  repeat match goal with
+         | [H1: lastn ?a ?b = ?c, H2: ?d = lastn ?a ?b |- _] =>
+           rewrite H1 in H2; inv H2
+         end.
+  exploit sim_trace_sim_state_weak; eauto. intro STATE1.
+  rename H2 into WS, H3 into RS, H4 into WL, H5 into RL.
+  assert (OBW: sim_ob_write tid ex (v_gen vexts) eu2 aeu2).
+  { admit. }
+  assert (OBR: sim_ob_read tid ex (v_gen vexts) eu2 aeu2).
+  { admit. }
+  assert (FR: sim_fr tid ex (v_gen vexts) eu2 aeu2).
+  { admit. }
+  assert (SL: sim_state tid (v_gen vexts) eu2.(ExecUnit.state) aeu2.(AExecUnit.state) /\
+              sim_local tid ex (v_gen vexts) eu2.(ExecUnit.local) aeu2.(AExecUnit.local)).
+  { destruct eu1 as [[stmts1 rmap1] lc1 mem1].
+    destruct eu2 as [[stmts2 rmap2] lc2 mem2].
+    destruct aeu1 as [[astmts1 armap1] alc1].
+    destruct aeu2 as [[astmts2 armap2] alc2].
+    ss. inv STEP0. ss. subst.
+    inv STATE. inv STATE1. ss. subst.
+    inv STATE0; inv LOCAL; ss; inv EVENT0; inv EVENT; ss.
+    - (* skip *)
+      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      + econs; ss. apply L.
+      + econs; ss; try by apply L.
+        rewrite bot_join; [|exact Time.order]. apply L.
+    - (* assign *)
+      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      + econs; ss. apply sim_rmap_add; try by apply L.
+        apply sim_rmap_expr. apply L.
+      + econs; ss; try by apply L.
+        rewrite bot_join; [|exact Time.order]. apply L.
+    - (* read *)
+      admit.
+    - (* write *)
+      admit.
+    (* econs; ss. *)
+    (* { econs; ss. apply sim_rmap_add; ss. inv STEP. econs; ss. *)
+    (*   ii. des. subst. destruct (equiv_dec arch riscv); ss. destruct eid. ss. subst. *)
+    (*   unfold ALocal.next_eid in *. *)
+    (*   rewrite VEXT1; cycle 1. *)
+    (*   { rewrite List.app_length. s. clear. lia. } *)
+    (*   condtac; cycle 1. *)
+    (*   { apply Nat.eqb_neq in X. ss. } *)
+    (*   rewrite fun_add_spec. condtac; ss. *)
+    (*   inv WRITABLE. apply Nat.lt_le_incl. ss. *)
+    (* } *)
+    - (* write failure *)
+      inv STEP0. inv RES. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      + econs; ss. apply sim_rmap_add; try by apply L. econs; ss. ii. des. ss.
+      + econs; ss; try by apply L.
+    - (* isb *)
+      inv STEP0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      econs; ss.
+      { econs; ss. apply L. }
+      destruct L.(LC). ss. econs; ss.
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_coh_step. rewrite inverse_step.
+        rewrite inverse_union. ii. des; [apply COH0|]; eauto.
+        inv EID. inv REL. inv H. inv H0. inv H2.
+        apply Label.is_writing_inv in LABEL. des. subst. inv H1.
+        * exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+        * inv H. exploit RF2; eauto. i. des.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrp_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VRP; eauto. i. rewrite <- join_l. ss.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x1. inv LABEL. }
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x1. inv LABEL. }
+        * inv EID. inv REL. inv H. inv H1.
+          rewrite <- join_r. apply L. econs; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vwp_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VWP; eauto.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x1. inv LABEL. }
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x1. inv LABEL. }
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrm_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VRM; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vwm_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VWM; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + admit. (* vcap *)
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrel_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VREL; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+      + admit. (* fwdbank *)
+      + admit. (* promise *)
+    - (* dmb *)
+      inv STEP0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      econs; ss.
+      { econs; ss. apply L. }
+      destruct L.(LC). ss. econs; ss.
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_coh_step. rewrite inverse_step.
+        rewrite inverse_union. ii. des; [apply COH0|]; eauto.
+        inv EID. inv REL. inv H. inv H0. inv H2.
+        apply Label.is_writing_inv in LABEL. des. subst. inv H1.
+        * exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+        * inv H. exploit RF2; eauto. i. des.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrp_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VRP; eauto. i. rewrite <- join_l. ss.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss. i. simplify.
+          destruct rr; ss.
+          rewrite <- join_r, <- join_l. apply L. econs; eauto. econs; eauto.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss. i. simplify.
+          destruct wr; ss.
+          rewrite <- join_r, <- join_r, <- join_l. apply L. econs; eauto. econs; eauto.
+        * inv EID. inv REL. inv H. inv H1. inv H2.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vwp_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VWP; eauto. i. rewrite <- join_l. ss.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss. i. simplify.
+          destruct rw; ss.
+          rewrite <- join_r, <- join_l. apply L. econs; eauto. econs; eauto.
+        * inv EID. inv REL. inv H. inv H1. inv H. inv H2. inv H3.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss. i. simplify.
+          destruct ww; ss.
+          rewrite <- join_r, <- join_r, <- join_l. apply L. econs; eauto. econs; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrm_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VRM; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vwm_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VWM; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss; cycle 1.
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+          { rewrite List.app_length. s. lia. }
+      + admit. (* vcap *)
+      + rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_vrel_step. rewrite inverse_step.
+        rewrite ? inverse_union. ii. des.
+        * exploit VREL; eauto.
+        * inv EID. inv REL. inv H0. destruct l; ss.
+          exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
+      + admit. (* fwdbank *)
+      + admit. (* promise *)
+    - (* if *)
+      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      + econs; ss; try by apply L.
+      + econs; ss; try by apply L.
+
+        (* TODO: move *)
+        Lemma sim_view_le
+              (vext:eidT -> Time.t) (v1 v2:Time.t) (eids:eidT -> Prop)
+              (LE: le v1 v2)
+              (SIM: sim_view vext v1 eids):
+          sim_view vext v2 eids.
+        Proof.
+          ii. etrans; eauto.
+        Qed.
+
+        eapply sim_view_le; [apply join_l|]. apply L.
+    - (* dowhile *)
+      inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+      + econs; ss; try by apply L.
+      + econs; ss; try by apply L.
+        eapply sim_view_le; [apply join_l|]. apply L.
+  }
+  des. econs; ss.
+Admitted.  
+
+Lemma sim_traces_sim_th'
+      p trs atrs ws rs covs vexts
+      m ex
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid n tr atr covl vextl
+    eu tr' aeu atr' cov covl' vext vextl'
+    (N: n < length tr)
+    (FIND_TR: IdMap.find tid trs = Some tr)
+    (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_COVL: IdMap.find tid covs = Some covl)
+    (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+    (EU: lastn (S n) tr = eu :: tr')
+    (AEU: lastn (S n) atr = aeu :: atr')
+    (COV: lastn (S n) covl = cov :: covl')
+    (VEXT: lastn (S n) vextl = vext :: vextl'),
+    sim_th' tid ex (v_gen vexts) eu aeu.
+Proof.
+  intro tid. generalize (SIM tid). intro X. inv X; [by i|]. induction n.
+  { (* init *)
+    i. simplify. rename c into wl, d into rl.
+    exploit (lastn_one tr).
+    { exploit sim_trace_last; eauto. }
+    i. des.
+    exploit (lastn_one atr).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    (* exploit (lastn_one covl). *)
+    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
+    (* i. des. *)
+    (* exploit (lastn_one vextl). *)
+    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
+    (* i. des. *)
+    rewrite EU in x0. symmetry in x0. inv x0.
+    rewrite AEU in x1. symmetry in x1. inv x1.
+    (* rewrite COV in x2. symmetry in x2. inv x2. *)
+    (* rewrite VEXT in x3. symmetry in x3. inv x3. *)
+    exploit sim_trace_lastn; eauto. rewrite AEU. i.
+    inv x0. ss. splits; i; try lia.
+    admit.
+  }
+  i. simplify. rename c into wl, d into rl.
+  exploit sim_trace_length; eauto. intro LEN. guardH LEN.
+  exploit lastn_S1; try exact EU; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact AEU; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact COV; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact VEXT; [unguardH LEN; des; lia|i].
+  subst. exploit sim_trace_lastn; eauto. instantiate (1 := n). i.
+  exploit sim_trace_last; eauto. i. des.
+  exploit IHn; try exact HDTR; eauto; [lia|]. i.
+  eapply sim_traces_sim_th'_step; eauto.
+  - rewrite EU, HDTR. ss.
+  - rewrite AEU, HDATR. ss.
+  - rewrite COV, HDCOVL. ss.
+  - rewrite VEXT, HDVEXTL. ss.
 Admitted.
 
-Lemma sim_traces_sim_eu
+Lemma sim_traces_sim_th''
       p trs atrs ws rs covs vexts
       m ex
       (STEP: Machine.pf_exec p m)
@@ -563,24 +1090,7 @@ Lemma sim_traces_sim_eu
     (AEU: lastn (S n) atr = aeu :: atr')
     (COV: lastn (S n) covl = cov :: covl')
     (VEXT: lastn (S n) vextl = vext :: vextl'),
-    <<SIM_EU: sim_eu tid ex (v_gen vexts) eu aeu>> /\
-    <<OB_WRITE:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (OB: ex.(ob') eid1 (tid, eid2))
-        (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
-        Time.lt ((v_gen vexts) eid1) (vext eid2)>> /\
-    <<OB_READ:
-      forall eid1 eid2
-        (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (AOB: ex.(ob') eid1 (tid, eid2))
-        (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
-        Time.le ((v_gen vexts) eid1) (vext eid2)>> /\
-    <<FR:
-      forall eid1 eid2
-        (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-        (FR: ex.(Execution.fr) (tid, eid1) eid2),
-        Time.lt (vext eid1) ((v_gen vexts) eid2)>>.
+    sim_th' tid ex (v_gen vexts) eu aeu.
 Proof.
   rename STEP into MACHINE_STEP.
   i. generalize (SIM tid). intro X. inv X; simplify.
