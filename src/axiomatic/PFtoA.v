@@ -866,7 +866,64 @@ Proof.
           exploit EX2.(LABELS); eauto; ss; cycle 1.
           { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
           { rewrite List.app_length. s. lia. }
-      + admit. (* vcap *)
+      + (* vcap *)
+        rewrite List.app_length, Nat.add_1_r.
+        ii. inv EID. inv REL.
+        * admit. (* ctrl should be local *)
+        * (* TODO: move *)
+          Lemma addr_po_step ex:
+            (ex.(Execution.addr) ⨾ Execution.po) =
+            ((ex.(Execution.addr) ⨾ Execution.po) ∪ ex.(Execution.addr)) ⨾
+                                                                         Execution.po_adj.
+          Proof.
+            rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+            rewrite Execution.po_po_adj at 1.
+            rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
+            rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
+            refl.
+          Qed.
+          
+          rewrite addr_po_step in H.
+          
+          (*TODO: move *)
+          Lemma step r eid tid n:
+            (r ⨾ Execution.po_adj) eid (tid, S n) = r eid (tid, n).
+          Proof.
+            propext. econs; i.
+            - inv H. des. inv H1. destruct x. ss. inv N. auto.
+            - econs. split; eauto.
+          Qed.
+
+          rewrite step in H.
+          inv H.
+          { eapply VCAP; eauto. econs; eauto. econs 2; eauto. }
+          { (* TODO: move *)
+            Lemma addr_eid
+                  p ex (PRE: Valid.pre_ex p ex)
+                  eid tid eid2
+                  (ADDR: ex.(Execution.addr) eid (tid, eid2)):
+              exists eid1, eid = (tid, eid1).
+            Proof.
+            Admitted.
+
+            exploit addr_eid; eauto. i. des. subst.
+            exploit ADDR; eauto; ss.
+            { rewrite List.app_length. ss. clear. lia. }
+            i.
+
+            (* TODO: move *)
+            Lemma addr_inv
+                  p mem tid tr aeu atr wl rl covl vextl
+                  eid1 eid2
+                  (SIM: sim_trace p mem tid tr (aeu::atr) wl rl covl vextl)
+                  (EID2: eid2 >= List.length aeu.(AExecUnit.local).(ALocal.labels))
+                  (ADDR: aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2):
+              False.
+            Proof.
+            Admitted.
+
+            exploit addr_inv; eauto. ss.
+          }
       + rewrite List.app_length, Nat.add_1_r.
         i. rewrite sim_local_vrel_step. rewrite inverse_step.
         rewrite ? inverse_union. ii. des.
@@ -1187,6 +1244,7 @@ Proof.
       exploit sim_trace_sim_th; try exact SIM2; eauto. i. destruct x0.
       exploit RPROP1; eauto. i. des. unguardH x0. des.
       + inv SIM2.
+        rename LOCAL into SIM_LOCAL_WEAK.
         destruct eu1 as [st1 lc1 mem1], eu as [st2 lc2 mem2].
         destruct aeu1 as [ast1 alc1], aeu as [ast2 alc2].
         inv EVENT; ss.
@@ -1239,7 +1297,8 @@ Proof.
   destruct aeu1 as [[astmts1 armap1] alc1].
   destruct eu as [[stmts2 rmap2] lc2 mem2].
   destruct aeu as [[astmts2 armap2] alc2].
-  inv SIM2. inv SIM_EU. inv STATE0. inv STATE. ss. subst.
+  inv SIM2. rename LOCAL into SIM_LOCAL_WEAK.
+  inv SIM_EU. inv STATE0. inv STATE. ss. subst.
   rename LOCAL into SIM_LOCAL. inv STEP. ss.
   inv EVENT; inv STATE; inv LOCAL; inv EVENT; inv ASTATE_STEP; inv ALOCAL_STEP; inv EVENT; ss.
   - (* skip *)
