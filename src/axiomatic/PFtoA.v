@@ -1533,6 +1533,14 @@ Proof.
         [|assert (FR': c)]]
   end.
   { (* OB WRITE *)
+    
+  (* OB_WRITE : forall (eid1 : eidT) (eid2 : nat), *)
+  (*            eid2 < length (ALocal.labels (AExecUnit.local aeu1)) -> *)
+  (*            ob' ex eid1 (tid, eid2) -> *)
+  (*            Execution.label_is ex (fun label : Label.t => Label.is_write label) (tid, eid2) -> *)
+  (*            Time.lt (v_gen vexts eid1) (vext1 eid2) *)
+
+
     admit.
   }
   { (* OB READ *)
@@ -1582,6 +1590,17 @@ Proof.
   - (* read *)
     admit.
   - (* write success *)
+    econs; ss.
+    { econs; ss. apply sim_rmap_add; ss. inv STEP. econs; ss.
+      ii. des. subst. destruct (equiv_dec arch riscv); ss. destruct eid. ss. subst.
+      unfold ALocal.next_eid in *.
+      rewrite VEXT1; cycle 1.
+      { rewrite List.app_length. s. clear. lia. }
+      condtac; cycle 1.
+      { apply Nat.eqb_neq in X. ss. }
+      rewrite fun_add_spec. condtac; ss.
+      inv WRITABLE. apply Nat.lt_le_incl. ss.
+    }
     admit.
   - (* write fail *)
     inv RES. inv STEP. ss.
