@@ -147,7 +147,8 @@ Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:L
             alocal.(ALocal.exbank) local.(Local.exbank);
   PROMISES: forall view (VIEW: Promises.lookup view local.(Local.promises)),
       exists n,
-        <<N: (length alocal.(ALocal.labels)) <= n>> /\
+        <<N: (length alocal.(
+                ALocal.labels)) <= n>> /\
         <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
         <<VIEW: vext (tid, n) = view>>;
 }.
@@ -178,6 +179,20 @@ Inductive sim_state_weak (state:State.t (A:=View.t (A:=unit))) (astate:State.t (
     (RMAP: sim_rmap_weak state.(State.rmap) astate.(State.rmap))
 .
 Hint Constructors sim_state_weak.
+
+Inductive sim_local_weak (local: Local.t (A:=unit)) (alocal: ALocal.t): Prop :=
+| sim_local_weak_none
+    (LOCAL_EX: local.(Local.exbank) = None)
+    (ALOCAL_EX: alocal.(ALocal.exbank) = None)
+| sim_local_weak_some
+    eb aeb ex ord loc val
+    (LOCAL_EX: local.(Local.exbank) = Some eb)
+    (ALOCAL_EX: alocal.(ALocal.exbank) = Some aeb)
+    (LABEL_EX: List.nth_error alocal.(ALocal.labels) aeb = Some (Label.read ex ord loc val))
+    (EX_EX: ex = true)
+    (EX_LOC: loc = eb.(Exbank.loc))
+.
+Hint Constructors sim_local_weak.
 
 Lemma sim_state_weak_init stmts:
   sim_state_weak (State.init stmts) (State.init stmts).
@@ -256,6 +271,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
     (ALOCAL_STEP: ALocal.step ae aeu1.(AExecUnit.local) aeu2.(AExecUnit.local))
     (EVENT: sim_event e ae)
     (STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state))
+    (LOCAL: sim_local_weak eu2.(ExecUnit.local) aeu2.(AExecUnit.local))
     (W: w2 = match e with
              | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
@@ -382,43 +398,63 @@ Ltac simplify :=
 
 Lemma promising_pf_sim_step
       tid e (eu1 eu2:ExecUnit.t (A:=unit)) aeu1
-      (EU: sim_state_weak eu1.(ExecUnit.state) aeu1.(AExecUnit.state))
+      (STATE1: sim_state_weak eu1.(ExecUnit.state) aeu1.(AExecUnit.state))
+      (LOCAL1: sim_local_weak eu1.(ExecUnit.local) aeu1.(AExecUnit.local))
       (STEP: ExecUnit.state_step0 tid e e eu1 eu2):
   exists ae aeu2,
     <<ASTATE_STEP: State.step ae aeu1.(AExecUnit.state) aeu2.(AExecUnit.state)>> /\
     <<ALOCAL_STEP: ALocal.step ae aeu1.(AExecUnit.local) aeu2.(AExecUnit.local)>> /\
     <<EVENT: sim_event e ae>> /\
-    <<STATE: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state)>>.
+    <<STATE2: sim_state_weak eu2.(ExecUnit.state) aeu2.(AExecUnit.state)>> /\
+    <<LOCAL2: sim_local_weak eu2.(ExecUnit.local) aeu2.(AExecUnit.local)>>.
 Proof.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
   destruct aeu1 as [[astmt1 armap1] alc1].
-  inv EU. inv STEP. ss. subst. inv STATE; inv LOCAL; inv EVENT; ss.
+  inv STATE1. inv STEP. ss. subst. inv STATE; inv LOCAL; inv EVENT; ss.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 1.
     + econs; ss.
     + ss.
+    + inv LOCAL1; [econs 1|econs 2]; eauto.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 2. ss.
     + econs; ss.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+    + inv LOCAL1; [econs 1|econs 2]; eauto.
   - inv STEP. ss.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 3; ss.
     + econs 2; ss.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+    + destruct ex0.
+      * econs 2; ss.
+        rewrite List.nth_error_app2, minus_diag; ss.
+        specialize (@sim_rmap_weak_expr rmap armap1 eloc RMAP). i.
+        inv H. rewrite VAL. refl.
+      * inv LOCAL1; [econs 1|econs 2]; eauto; ss.
+        rewrite List.nth_error_app1; eauto.
+        eapply List.nth_error_Some. ii. congr.
   - inv STEP. ss.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 4; ss.
     + econs 3; ss. inv WRITABLE. i. specialize (EX H). des.
-      admit. (* exclusive *)
+      inv LOCAL1; try congr.
+      rewrite TSX in LOCAL_EX. inv LOCAL_EX.
+      esplits; eauto. rewrite LABEL_EX; eauto.
     + econs; ss.
       * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
       * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+    + destruct ex0; eauto.
+      inv LOCAL1; [econs 1|econs 2]; ss.
+      { eauto. }
+      { eauto. }
+      rewrite List.nth_error_app1; eauto.
+      eapply List.nth_error_Some. ii. congr.
   - inv STEP. destruct ex0; ss.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 4; ss.
@@ -427,18 +463,25 @@ Proof.
       * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
       * eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
+    + eauto.
   - inv STEP.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 5; ss.
     + econs 5; ss.
     + econs; ss.
     + econs; ss.
+    + inv LOCAL1; [econs 1|econs 2]; eauto; ss.
+      rewrite List.nth_error_app1; eauto.
+      eapply List.nth_error_Some. ii. congr.
   - inv STEP.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 5; ss.
     + econs 5; ss.
     + econs; ss.
     + econs; ss.
+    + inv LOCAL1; [econs 1|econs 2]; eauto; ss.
+      rewrite List.nth_error_app1; eauto.
+      eapply List.nth_error_Some. ii. congr.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 6; ss.
@@ -446,12 +489,14 @@ Proof.
     + econs; ss.
       exploit sim_rmap_weak_expr; eauto. intro X. inv X.
       inv VAL. rewrite H0. ss.
+    + inv LOCAL1; [econs 1|econs 2]; eauto.
   - inv LC.
     eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
     + econs 7. ss.
     + econs; ss.
     + ss.
-Admitted.
+    + inv LOCAL1; [econs 1|econs 2]; eauto.
+Qed.
 
 Lemma promising_pf_sim_traces
       p m
@@ -507,6 +552,11 @@ Proof.
     unfold init_with_promises in FIND0. ss.
     rewrite IdMap.mapi_spec, STMT in *. inv FIND0.
     apply sim_state_weak_init.
+  }
+  { inv REL6; eauto. s.
+    unfold init_with_promises in FIND0. ss.
+    rewrite IdMap.mapi_spec, STMT in *. inv FIND0.
+    auto.
   }
   { instantiate (1 := ExecUnit.mk _ _ _). econs; ss; eauto. }
   i. des.
@@ -566,7 +616,7 @@ all: ss.
 }
 1: { apply bot. (* it's ex's co. *) }
 1: { apply bot. (* it's ex's rf. *) }
-Qed.      
+Qed.
 
 Inductive sim_th
           (p:program) (mem:Memory.t) (tid:Id.t)
@@ -692,6 +742,7 @@ Proof.
       destruct eid; ss.
     - i. destruct iid1; ss.
   }
+  clear LOCAL.
   i. simplify.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu as [st2 lc2 mem2].

@@ -677,6 +677,7 @@ Proof.
       exploit sim_trace_sim_th; try exact SIM2; eauto. i. destruct x0.
       exploit RPROP1; eauto. i. des. unguardH x0. des.
       + inv SIM2.
+        rename LOCAL into SIM_LOCAL_WEAK.
         destruct eu1 as [st1 lc1 mem1], eu as [st2 lc2 mem2].
         destruct aeu1 as [ast1 alc1], aeu as [ast2 alc2].
         inv EVENT; ss.
@@ -729,7 +730,8 @@ Proof.
   destruct aeu1 as [[astmts1 armap1] alc1].
   destruct eu as [[stmts2 rmap2] lc2 mem2].
   destruct aeu as [[astmts2 armap2] alc2].
-  inv SIM2. inv SIM_EU. inv STATE0. inv STATE. ss. subst.
+  inv SIM2. rename LOCAL into SIM_LOCAL_WEAK.
+  inv SIM_EU. inv STATE0. inv STATE. ss. subst.
   rename LOCAL into SIM_LOCAL. inv STEP. ss.
   inv EVENT; inv STATE; inv LOCAL; inv EVENT; inv ASTATE_STEP; inv ALOCAL_STEP; inv EVENT; ss.
   - (* skip *)
