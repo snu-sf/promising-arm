@@ -20,7 +20,7 @@ Require Import PromisingArch.promising.Promising.
 Require Import PromisingArch.promising.StateExecFacts.
 Require Import PromisingArch.axiomatic.Axiomatic.
 Require Import PromisingArch.axiomatic.CommonAxiomatic.
-Require Import PromisingArch.axiomatic.PFtoALocal.
+Require Import PromisingArch.axiomatic.PFtoA1.
 
 Set Implicit Arguments.
 
@@ -435,3 +435,58 @@ Proof.
   rewrite ? lastn_cons; try lia. eapply IHtr.
   inv SIM; ss. lia.
 Qed.
+
+Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
+  LABELS:
+    forall eid label
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (LABEL: Execution.label (tid, eid) ex = Some label),
+      List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some label;
+  ADDR:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.addr) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2;
+  DATA:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (DATA: ex.(Execution.data) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.data) eid1 eid2;
+  CTRL:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (CTRL: ex.(Execution.ctrl) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2;
+  RMW:
+    forall eid1 eid2
+      (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (ADDR: ex.(Execution.rmw) (tid, eid1) (tid, eid2)),
+      aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2;
+  XCOV:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen covs) (tid, eid) = cov eid;
+  XVEXT:
+    forall eid
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
+      (v_gen vexts) (tid, eid) = vext eid;
+}.
+
+Lemma sim_traces_ex
+      p mem trs atrs ws rs covs vexts
+      ex
+      tid n atr aeu atr' covl cov covl' vextl vext vextl'
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE))
+      (FIND_ATR: IdMap.find tid atrs = Some atr)
+      (FIND_COVL: IdMap.find tid covs = Some covl)
+      (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+      (AEU: lastn (S n) atr = aeu :: atr')
+      (COV: lastn (S n) covl = cov :: covl')
+      (VEXT: lastn (S n) vextl = vext :: vextl'):
+  sim_ex tid ex covs vexts aeu cov vext.
+Proof.
+Admitted.

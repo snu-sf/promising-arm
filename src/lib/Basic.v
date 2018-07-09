@@ -505,6 +505,16 @@ Proof.
   exploit nth_error_singleton_inv; eauto. i. des. subst. splits; ss. lia.
 Qed.
 
+Lemma nth_error_snoc_inv_last
+      A
+      (l:list A) x
+      a
+      (FIND: List.nth_error (l ++ [x]) (length l) = Some a):
+  x = a.
+Proof.
+  exploit nth_error_snoc_inv; eauto. i. des; ss. lia.
+Qed.
+
 Lemma nth_error_app_mon
       A
       (l1 l2:list A)
