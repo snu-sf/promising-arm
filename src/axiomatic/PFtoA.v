@@ -906,7 +906,7 @@ Proof.
         { apply nth_error_singleton_inv in LABEL3. des. subst. inv REL. inv Y. }
         eapply IH.(PO); eauto.
     }
- }
+  }
 Admitted.
 
 (* Lemma sim_trace_cov_po_loc *)
@@ -1180,8 +1180,8 @@ Proof.
   exploit sim_trace_last; try exact REL6; eauto. i. des. simplify.
   exploit sim_trace_sim_th; try exact REL6; eauto. intro TH2.
   exploit TH1.(WPROP3); eauto. i. des.
-  exploit TH2.(RPROP2); eauto. i. des. unguardH x4. des; subst; ss.
-  rewrite x4 in x2. inv x2.
+  exploit TH2.(RPROP2); eauto. i. des. unguardH x6. des; subst; ss.
+  rewrite x6 in x3. inv x3.
   generalize (ATR tid1). intro ATR1. inv ATR1; try congr.
   generalize (ATR tid2). intro ATR2. inv ATR2; try congr.
   des. simplify. destruct PRE, ex. unfold Execution.label. ss.
@@ -1300,14 +1300,13 @@ Proof.
       exploit sim_trace_sim_th; try exact REL6; eauto. intro TH1.
       exploit TH1.(WPROP2); eauto. i. des.
       exploit TH1.(WPROP3); eauto. i. des.
-      clear ex2 ord1 val0 x3 x4.
       generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify.
       exploit sim_trace_last; try exact REL0; eauto. i. des. simplify.
       exploit sim_trace_sim_th; try exact REL0; eauto. intro TH2.
       exploit TH1.(WCV); eauto. i. des.
       exploit TH2.(RCV); eauto. i. des.
       unfold v_gen. ss. rewrite <- H12. rewrite <- H7.
-      rewrite x7, x4. auto.
+      rewrite x7, x10. auto.
     + exfalso.
       rewrite RF in *. eapply H3. unfold codom_rel.
       eexists. eauto.
@@ -1586,9 +1585,14 @@ Proof.
   exploit sim_traces_ex; try exact AEU; eauto. i. des.
   clear IHn. (* clear as much as possible *)
   splits; cycle 1.
-  { admit. }
-  { admit. }
-  { i. inv FR0.
+  { (* OB WRITE *)
+    admit.
+  }
+  { (* OB READ *)
+    admit.
+  }
+  { (* FR *)
+    i. inv FR0.
     - admit.
     - (* inv H0. inv H6. inv H0. inv H6. *)
       (* exploit LABELS0; eauto. intro LABEL1. destruct l; ss. *)
@@ -1603,7 +1607,44 @@ Proof.
       (* exploit w_property; try exact REL6. i. des. *)
       admit.
   }
-  admit.
+  (* SIM_EU *)
+  destruct eu1 as [[stmts1 rmap1] lc1 mem1].
+  destruct aeu1 as [[astmts1 armap1] alc1].
+  destruct eu as [[stmts2 rmap2] lc2 mem2].
+  destruct aeu as [[astmts2 armap2] alc2].
+  inv SIM2. inv SIM_EU. inv STATE0. inv STATE. ss. subst.
+  rename LOCAL into SIM_LOCAL. inv STEP. ss.
+  inv EVENT; inv STATE; inv LOCAL; inv EVENT; inv ASTATE_STEP; inv ALOCAL_STEP; inv EVENT; ss.
+  - (* skip *)
+    econs; ss. inv LC. inv SIM_LOCAL. econs; ss.
+    ii. etrans; [|eapply join_l]. eauto.
+  - (* assign *)
+    econs; ss.
+    + econs; ss. apply sim_rmap_add; ss. apply sim_rmap_expr; ss.
+    + inv LC. inv SIM_LOCAL. econs; ss.
+      ii. etrans; [|eapply join_l]. eauto.
+  - (* if *)
+    econs; ss.
+    inv LC. inv SIM_LOCAL. econs; ss.
+    ii. etrans; [|eapply join_l]. eauto.
+  - (* do while *)
+    econs; ss.
+    inv LC. inv SIM_LOCAL. econs; ss.
+    ii. etrans; [|eapply join_l]. eauto.
+  - (* read *)
+    admit.
+  - (* write success *)
+    admit.
+  - (* write fail *)
+    inv RES. inv STEP. ss.
+  - (* write success *)
+    inv RES. inv STEP. ss.
+  - (* write fail *)
+    admit.
+  - (* isb *)
+    admit.
+  - (* dmb *)
+    admit.
 Admitted.
 
 Lemma sim_traces_vext_valid
