@@ -106,7 +106,7 @@ Definition sim_local_vrp ex :=
    ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘ ⨾
    Execution.po) ∪
 
-  ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
+  (((ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po) ⨾
    ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
    Execution.po) ∪
 
@@ -124,7 +124,7 @@ Lemma sim_local_vrp_step ex:
      Execution.po ⨾
      ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘) ∪
 
-    ((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po)) ⨾
+    (((ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po) ⨾
      ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘) ∪
 
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
@@ -165,7 +165,7 @@ Proof.
     rewrite ? seq_assoc. econs. splits; [|by econs; eauto].
     rewrite <- ? seq_assoc. ss.
   - left. left. right. right.
-    inv H0. des. econs. splits; eauto.
+    inv H0. des. rewrite seq_assoc. econs. splits; eauto.
     right. rewrite seq_assoc. econs. splits; eauto. econs; ss. econs; eauto.
   - right. left. left. right.
     inv H. des. econs. splits; eauto.
@@ -268,25 +268,18 @@ Proof.
 Qed.
 
 Definition sim_local_vcap ex :=
-  ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po).
+  (ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po.
 
-Lemma sim_local_vcap_po
-      p ex
-      (EX: Valid.ex p ex):
-  (sim_local_vcap ex ⨾ Execution.po) ⊆ sim_local_vcap ex.
+Lemma sim_local_vcap_step ex:
+  sim_local_vcap ex =
+  (sim_local_vcap ex ∪ (ex.(Execution.ctrl) ∪ ex.(Execution.addr))) ⨾
+  Execution.po_adj.
 Proof.
-  unfold sim_local_vcap. ii. inv H. des. inv H0.
-  - left. eapply Valid.ctrl_po; eauto. econs. splits; eauto.
-  - right. inv H. des. econs. splits; eauto. etrans; eauto.
-Qed.
-
-Lemma sim_local_vcap_po_adj
-      p ex
-      (EX: Valid.ex p ex):
-  (sim_local_vcap ex ⨾ Execution.po_adj) ⊆ sim_local_vcap ex.
-Proof.
-  ii. eapply sim_local_vcap_po; eauto.
-  inv H. des. econs. splits; eauto. apply Execution.po_adj_po. ss.
+  unfold sim_local_vcap. rewrite (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  rewrite Execution.po_po_adj at 1.
+  rewrite (clos_refl_union Execution.po), (union_seq _ eq), eq_seq.
+  rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
+  refl.
 Qed.
 
 Definition sim_local_vrel ex :=
