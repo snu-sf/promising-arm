@@ -177,67 +177,34 @@ Proof.
         exploit EX2.(LABELS); eauto; ss; cycle 1.
         { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
         { rewrite List.app_length. s. lia. }
-    + (* vcap *)
-      rewrite List.app_length, Nat.add_1_r.
+    + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vcap_step. rewrite inverse_step.
-      rewrite inverse_union. ii. des.
+      rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto.
-      * admit. (* ctrl/addr doesn't flow into barrier *)
-
-    (* * (* TODO: move *) *)
-    (*   Lemma addr_po_step ex: *)
-    (*     (ex.(Execution.addr) ⨾ Execution.po) = *)
-    (*     ((ex.(Execution.addr) ⨾ Execution.po) ∪ ex.(Execution.addr)) ⨾ *)
-    (*                                                                  Execution.po_adj. *)
-    (*   Proof. *)
-    (*     rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc. *)
-    (*     rewrite Execution.po_po_adj at 1. *)
-    (*     rewrite (clos_refl_union Execution.po), union_seq, eq_seq. *)
-    (*     rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc. *)
-    (*     refl. *)
-    (*   Qed. *)
-        
-    (*   rewrite addr_po_step in H. *)
-        
-    (*   (*TODO: move *) *)
-    (*   Lemma step r eid tid n: *)
-    (*     (r ⨾ Execution.po_adj) eid (tid, S n) = r eid (tid, n). *)
-    (*   Proof. *)
-    (*     propext. econs; i. *)
-    (*     - inv H. des. inv H1. destruct x. ss. inv N. auto. *)
-    (*     - econs. split; eauto. *)
-    (*   Qed. *)
-
-    (*   rewrite step in H. *)
-    (*   inv H. *)
-    (*   { eapply VCAP; eauto. econs; eauto. econs 2; eauto. } *)
-    (*   { (* TODO: move *) *)
-    (*     Lemma addr_eid *)
-    (*           p ex (PRE: Valid.pre_ex p ex) *)
-    (*           eid tid eid2 *)
-    (*           (ADDR: ex.(Execution.addr) eid (tid, eid2)): *)
-    (*       exists eid1, eid = (tid, eid1). *)
-    (*     Proof. *)
-    (*     Admitted. *)
-
-    (*     exploit addr_eid; eauto. i. des. subst. *)
-    (*     exploit ADDR; eauto; ss. *)
-    (*     { rewrite List.app_length. ss. clear. lia. } *)
-    (*     i. *)
-
-    (*     (* TODO: move *) *)
-    (*     Lemma addr_inv *)
-    (*           p mem tid tr aeu atr wl rl covl vextl *)
-    (*           eid1 eid2 *)
-    (*           (SIM: sim_trace p mem tid tr (aeu::atr) wl rl covl vextl) *)
-    (*           (EID2: eid2 >= List.length aeu.(AExecUnit.local).(ALocal.labels)) *)
-    (*           (ADDR: aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2): *)
-    (*       False. *)
-    (*     Proof. *)
-    (*     Admitted. *)
-
-    (*     exploit addr_inv; eauto. ss. *)
-    (*   } *)
+      * inv EID.
+        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(CTRL); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. exploit EX2.(CTRL); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i.
+        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier Barrier.isb]) Label.is_ctrl (List.length alc1.(ALocal.labels))).
+        { admit. (* TODO: use well-formedness *) }
+        inv H.
+        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
+        destruct l; ss.
+      * inv EID.
+        exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i.
+        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier Barrier.isb]) Label.is_access (List.length alc1.(ALocal.labels))).
+        { admit. (* TODO: use well-formedness *) }
+        inv H.
+        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
+        destruct l; ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -327,9 +294,32 @@ Proof.
         { rewrite List.app_length. s. lia. }
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vcap_step. rewrite inverse_step.
-      rewrite inverse_union. ii. des.
+      rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto.
-      * admit. (* ctrl/addr doesn't flow into barrier *)
+      * inv EID.
+        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(CTRL); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. exploit EX2.(CTRL); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i.
+        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier (Barrier.dmb rr rw wr ww)]) Label.is_ctrl (List.length alc1.(ALocal.labels))).
+        { admit. (* TODO: use well-formedness *) }
+        inv H.
+        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
+        destruct l; ss.
+      * inv EID.
+        exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i.
+        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier (Barrier.dmb rr rw wr ww)]) Label.is_access (List.length alc1.(ALocal.labels))).
+        { admit. (* TODO: use well-formedness *) }
+        inv H.
+        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
+        destruct l; ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -341,7 +331,7 @@ Proof.
     + admit. (* fwdbank *)
     + admit. (* promise *)
   - (* if *)
-    inv LC0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
+    inv LC. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     econs; ss.
     { econs; ss. apply L. }
     destruct L.(LC). ss. econs; ss.
@@ -411,10 +401,32 @@ Proof.
         { rewrite List.app_length. s. lia. }
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vcap_step. rewrite inverse_step.
-      rewrite inverse_union. ii. des.
-      * rewrite <- join_l. exploit VCAP; eauto.
-      * rewrite <- join_r.
-        admit. (* use EX2.(CTRL) .. *)
+      rewrite ? inverse_union. ii. des.
+      * rewrite <- join_l. inv EID. exploit VCAP; eauto.
+      * inv EID.
+        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(CTRL); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. inv x0.
+        { rewrite <- join_l. exploit VCAP; eauto.
+          econs; ss.
+          admit. (* reverse of CTRL required *)
+        }
+        inv H. destruct L.(ST). ss.
+        exploit sim_rmap_expr; eauto. i. inv x0.
+        rewrite <- join_r. apply VIEW; eauto.
+      * inv EID.
+        exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i. exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. ss. clear. lia. }
+        i.
+        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.ctrl]) Label.is_access (List.length alc1.(ALocal.labels))).
+        { admit. (* TODO: use well-formedness *) }
+        inv H.
+        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
+        destruct l; ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
