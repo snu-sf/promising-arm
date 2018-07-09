@@ -330,6 +330,20 @@ Proof.
   induction SIM; ss. des. splits; congr.
 Qed.
 
+Lemma sim_trace_memory
+      p mem tid tr atr rl wl covl vextl
+      eu tr'
+      (SIM: sim_trace p mem tid tr atr rl wl covl vextl)
+      (EU: tr = eu :: tr'):
+  mem = eu.(ExecUnit.mem).
+Proof.
+  revert eu tr' EU.
+  induction SIM.
+  - ii. inv EU. ss.
+  - ii. inv EU. exploit IHSIM; try refl. i.
+    inv STEP. ss.
+Qed.
+
 Lemma sim_traces_memory
       p trs atrs rs ws covs vexts
       m
@@ -617,6 +631,40 @@ Inductive sim_th
         Time.le (cov iid1) (cov iid2)>>;
 }.
 
+Lemma sim_trace_sim_state_weak
+      p mem tid
+      tr eu tr'
+      atr aeu atr'
+      wl w wl'
+      rl r rl'
+      covl cov covl'
+      vextl vext vextl'
+      (SIM: sim_trace p mem tid tr atr wl rl covl vextl)
+      (EU: tr = eu :: tr')
+      (AEU: atr = aeu :: atr')
+      (RL: rl = r :: rl')
+      (WL: wl = w :: wl')
+      (COV: covl = cov :: covl')
+      (VEXT: vextl = vext :: vextl'):
+  sim_state_weak eu.(ExecUnit.state) aeu.(AExecUnit.state).
+Proof.
+  subst. inv SIM; ss.
+  rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
+  eapply sim_state_weak_init.
+Qed.
+
+Lemma read_get_msg
+      loc ts mem val
+      (READ: Memory.read loc ts mem = Some val):
+  (ts = Time.bot /\ val = Val.default) \/
+  (exists tid, Memory.get_msg ts mem = Some (Msg.mk loc val tid)).
+Proof.
+  revert READ. unfold Memory.read, Memory.get_msg. destruct ts; ss.
+  - i. inv READ. left. eauto.
+  - destruct (List.nth_error mem ts); ss. des_ifs. i. inv READ. inv e.
+    destruct t. s. right. eauto.
+Qed.
+
 Lemma sim_trace_sim_th
       p mem tid
       tr eu tr'
@@ -632,11 +680,9 @@ Lemma sim_trace_sim_th
       (WL: wl = w :: wl')
       (COV: covl = cov :: covl')
       (VEXT: vextl = vext :: vextl'):
-      (* (MEM: mem = eu.(ExecUnit.mem)): TODO: enable it *)
   sim_th p mem tid eu aeu w r cov vext.
 Proof.
   revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT. induction SIM.
-  (* revert r rl' w wl' eu tr' aeu atr' cov covl' vext vextl' RL WL EU AEU COV VEXT MEM. induction SIM. *)
   { i. simplify. ss. econs; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       left. splits; ss. admit. (* promises_from_mem *)
@@ -651,40 +697,16 @@ Proof.
   destruct eu as [st2 lc2 mem2].
   destruct aeu1 as [ast1 alc1].
   destruct aeu as [ast2 alc2].
-  assert (mem1 = mem) by admit. subst.
+  assert (mem1 = mem); subst.
+  { exploit sim_trace_memory; eauto. }
   ss. exploit IHSIM; eauto.
-  (* { admit. (* mem is preserved *) } *)
-  i. des. rename x into IH.
+  i. rename x into IH.
   inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
   { (* internal *)
     inv LOCAL; ss. inv LC. inv EVENT. econs; ss; try by apply IH.
   }
   { (* read *)
     inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT.
-
-    (* TODO: move *)
-    Lemma sim_trace_sim_state_weak
-          p mem tid
-          tr eu tr'
-          atr aeu atr'
-          wl w wl'
-          rl r rl'
-          covl cov covl'
-          vextl vext vextl'
-          (SIM: sim_trace p mem tid tr atr wl rl covl vextl)
-          (EU: tr = eu :: tr')
-          (AEU: atr = aeu :: atr')
-          (RL: rl = r :: rl')
-          (WL: wl = w :: wl')
-          (COV: covl = cov :: covl')
-          (VEXT: vextl = vext :: vextl'):
-      sim_state_weak eu.(ExecUnit.state) aeu.(AExecUnit.state).
-    Proof.
-      subst. inv SIM; ss.
-      rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
-      eapply sim_state_weak_init.
-    Qed.
-
     exploit sim_trace_sim_state_weak; eauto. s. intro Y. inv Y. ss. inv STMTS.
     exploit sim_rmap_weak_expr; eauto. intro Y. inv Y.
 
@@ -713,20 +735,6 @@ Proof.
         { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
         rewrite fun_add_spec. condtac; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
-
-        (* TODO: move *)
-        Lemma read_get_msg
-              loc ts mem val
-              (READ: Memory.read loc ts mem = Some val):
-          (ts = Time.bot /\ val = Val.default) \/
-          (exists tid, Memory.get_msg ts mem = Some (Msg.mk loc val tid)).
-        Proof.
-          revert READ. unfold Memory.read, Memory.get_msg. destruct ts; ss.
-          - i. inv READ. left. eauto.
-          - destruct (List.nth_error mem ts); ss. des_ifs. i. inv READ. inv e.
-            destruct t. s. right. eauto.
-        Qed.
-
         exploit read_get_msg; eauto. i. des.
         { esplits; eauto. left. eauto. }
         esplits; eauto. right. eauto.
