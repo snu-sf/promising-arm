@@ -488,6 +488,37 @@ Proof.
   apply List.nth_error_Some. congr.
 Qed.
 
+Lemma promises_from_mem_lookup
+      mem ts loc val tid
+      (GET: List.nth_error mem ts = Some (Msg.mk loc val tid)):
+  Promises.lookup (S ts) (promises_from_mem tid mem).
+Proof.
+  revert GET. induction mem using List.rev_ind.
+  { i. apply List.nth_error_In in GET. inv GET. }
+  rewrite promises_from_mem_snoc. condtac.
+  - rewrite Promises.set_o. condtac.
+    + inversion e. inversion e0. subst.
+      rewrite List.nth_error_app2; [|lia].
+      rewrite Nat.sub_diag. ss.
+    + i. apply IHmem.
+      erewrite <- List.nth_error_app1; eauto.
+      assert (H: ts < List.length (mem ++ [x])).
+      { rewrite <- List.nth_error_Some. ii. congr. }
+      rewrite List.app_length in H.
+      rewrite Nat.add_1_r in H. inv H; try lia.
+      exfalso. apply c. ss.
+  - i. apply IHmem.
+    destruct (Nat.eq_dec ts (List.length mem)) eqn:Heq.
+    + inv Heq. rewrite List.nth_error_app2 in GET; try lia.
+      rewrite Nat.sub_diag in GET. ss. inv GET. ss.
+      exfalso. apply c. ss.
+    + rewrite List.nth_error_app1 in GET; auto.
+      assert (H: ts < List.length (mem ++ [x])).
+      { rewrite <- List.nth_error_Some. ii. congr. }
+      rewrite List.app_length in H.
+      rewrite Nat.add_1_r in H. inv H; try lia; congr.
+Qed.
+
 Definition init_with_promises (p:program) (mem:Memory.t): Machine.t :=
   Machine.mk
     (IdMap.mapi (fun tid stmts =>
