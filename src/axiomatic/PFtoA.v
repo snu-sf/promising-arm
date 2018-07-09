@@ -825,7 +825,7 @@ Proof.
     - admit. (* po *)
   }
   { (* write failure *)
-    subst. destruct res1; ss. subst.
+    inv RES. destruct res1. ss. subst.
     inv LOCAL; ss; inv STEP; ss. inv EVENT. econs; ss; try by apply IH.
   }
   { (* barrier *)
