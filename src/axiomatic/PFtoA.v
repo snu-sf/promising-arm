@@ -784,11 +784,21 @@ Proof.
         repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; subst; try lia.
         all: try apply Nat.eqb_neq in X0; ss; try lia.
+        replace iid2 with (length (ALocal.labels alc1)) in * by lia.
         splits; ss. rewrite fun_add_spec. des_ifs; [|congr].
-        (* exploit IH.(WCV); eauto. *)
-        (* exploit IH.(WCV); eauto. *)
-        (* exploit sim_trace_vext_cov; eauto. i. des. simplify. ss. *)
-        admit.
+        inv REL. destruct label1; ss.
+        * destruct (equiv_dec loc0 loc); ss. inv e0.
+          destruct (equiv_dec (ValA.val (sem_expr rmap0 eloc0)) loc); ss. inv e0.
+          exploit IH.(RPROP1); eauto. i. des.
+          exploit IH.(RPROP2); eauto. s. i. des. subst.
+          exploit sim_rmap_weak_expr; eauto. i. inv x2. rewrite VAL1 in COH0.
+          etrans; eauto.
+        * destruct (equiv_dec loc0 loc); ss. inv e0.
+          destruct (equiv_dec (ValA.val (sem_expr rmap0 eloc0)) loc); ss. inv e0.
+          exploit IH.(WPROP2); eauto. i. des.
+          exploit IH.(WPROP3); eauto. s. i. des. subst.
+          exploit sim_rmap_weak_expr; eauto. i. inv x3. rewrite VAL1 in COH0.
+          etrans; eauto.
       + apply nth_error_singleton_inv in LABEL0. des. subst.
         repeat condtac; ss.
         all: try apply Nat.eqb_eq in X; ss; try lia.
@@ -856,7 +866,33 @@ Proof.
       * rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
         inv WRITABLE. apply Nat.lt_le_incl. ss.
       * eapply nth_error_app_mon. eauto.
-    - admit. (* po *)
+    - inv ASTATE_STEP; ss; eauto. subst.
+      inv VLOC. inv VVAL. rewrite VAL0, VAL1 in *. unfold ALocal.next_eid in *.
+      i. apply nth_error_app_inv in LABEL1. apply nth_error_app_inv in LABEL2. des.
+      + repeat condtac; ss.
+        all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+        all: try apply Nat.eqb_eq in X0; ss; subst; try lia.
+        eapply IH.(PO); eauto.
+      + lia.
+      + apply nth_error_singleton_inv in LABEL0. des. subst.
+        repeat condtac; ss.
+        all: try apply Nat.eqb_eq in X; ss; subst; try lia.
+        all: try apply Nat.eqb_neq in X0; ss; try lia.
+        splits; ss. rewrite fun_add_spec. des_ifs; [|congr].
+        inv REL. destruct label1; ss.
+        * destruct (equiv_dec loc0 loc); ss. inv e0.
+          destruct (equiv_dec (ValA.val (sem_expr rmap eloc)) loc); ss. inv e0.
+          exploit IH.(RPROP1); eauto. i. des.
+          exploit IH.(RPROP2); eauto. s. i. des. subst.
+          eapply Nat.le_lt_trans; eauto. inv WRITABLE. rewrite VAL0 in *. ss.
+        * destruct (equiv_dec loc0 loc); ss. inv e0.
+          destruct (equiv_dec (ValA.val (sem_expr rmap eloc)) loc); ss. inv e0.
+          exploit IH.(WPROP2); eauto. i. des.
+          exploit IH.(WPROP3); eauto. s. i. des. subst.
+          eapply Nat.le_lt_trans; eauto. inv WRITABLE. rewrite VAL0 in *. ss.
+      + apply nth_error_singleton_inv in LABEL0. des. subst.
+        repeat condtac; ss.
+        all: try apply Nat.eqb_eq in X; ss; try lia.
   }
   { (* write failure *)
     inv RES. destruct res1. ss. subst.
@@ -908,97 +944,6 @@ Proof.
     }
   }
 Admitted.
-
-(* Lemma sim_trace_cov_po_loc *)
-(*       p mem tid tr atr wl rl cov vext r rl' w wl' eu tr' aeu atr' covf cov' *)
-(*       (SIM: sim_trace p mem tid tr atr wl rl cov vext) *)
-(*       (RL: rl = r :: rl') *)
-(*       (WL: wl = w :: wl') *)
-(*       (EU: tr = eu :: tr') *)
-(*       (AEU: atr = aeu :: atr') *)
-(*       (COV: cov = covf :: cov'): *)
-(*   <<W: forall iid loc ts (W: w iid = Some (loc, ts)), le ts (eu.(ExecUnit.local).(Local.coh) loc)>> /\ *)
-(*   (* TODO: enable it *) *)
-(*   (* (forall iid loc ts (R: r iid = Some (loc, ts), le ts (eu.(ExecUnit.local).(Local.coh) loc)) /\ *) *)
-(*   <<LABEL: forall iid1 iid2 label1 label2 *)
-(*      (PO: iid1 < iid2) *)
-(*      (LABEL1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid1 = Some label1) *)
-(*      (LABEL2: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid2 = Some label2) *)
-(*      (REL: Execution.label_loc label1 label2), *)
-(*       <<PO_LOC_WRITE: *)
-(*         Label.is_write label2 -> *)
-(*         Time.lt (covf iid1) (covf iid2)>> /\ *)
-(*       <<PO_LOC_READ: *)
-(*         Label.is_read label2 -> *)
-(*         Time.le (covf iid1) (covf iid2)>>>>. *)
-(* Proof. *)
-(*   revert r rl' w wl' eu tr' aeu atr' covf cov' RL WL EU AEU COV. induction SIM. *)
-(*   { i. simplify. ss. splits; ss. i. destruct iid1; ss. } *)
-(*   i. simplify. *)
-(*   destruct eu1 as [st1 lc1 mem1]. *)
-(*   destruct eu as [st2 lc2 mem2]. *)
-(*   destruct aeu1 as [ast1 alc1]. *)
-(*   destruct aeu as [ast2 alc2]. *)
-(*   ss. exploit IHSIM; eauto. i. des. *)
-(*   inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto. *)
-(*   - (* internal *) *)
-(*     admit. *)
-(*   - (* read *) *)
-(*     inv LOCAL; ss. inv ASTATE_STEP; ss. splits; eauto. *)
-(*     { i. etrans; eauto. inv STEP. s. rewrite fun_add_spec. condtac; ss. inversion e. subst. ss. } *)
-(*     i. unfold ALocal.next_eid in *. *)
-(*     apply nth_error_app_inv in LABEL1. *)
-(*     apply nth_error_app_inv in LABEL2. *)
-(*     des. *)
-(*     + repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
-(*       eapply LABEL; eauto. *)
-(*     + lia. *)
-(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
-(*       splits; ss. exploit sim_trace_vext_cov; eauto. i. des. simplify. ss. *)
-      
-      
-(*       admit. *)
-(*     + apply nth_error_singleton_inv in LABEL0. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
-(*   - (* write *) *)
-(*     inv ASTATE_STEP; ss; eauto. *)
-(*     destruct res1; ss. destruct val; ss. unfold ALocal.next_eid in *. *)
-(*     apply nth_error_app_inv in LABEL1. *)
-(*     apply nth_error_app_inv in LABEL2. *)
-(*     des. *)
-(*     + repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_eq in X0; ss; subst; try lia. *)
-(*       eauto. *)
-(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; subst; try lia. *)
-(*       all: try apply Nat.eqb_neq in X0; ss; try lia. *)
-(*       admit. *)
-(*     + lia. *)
-(*     + apply nth_error_singleton_inv in LABEL3. des. subst. *)
-(*       repeat condtac; ss. *)
-(*       all: try apply Nat.eqb_eq in X; ss; try lia. *)
-(*   - (* isb *) *)
-(*     destruct res1; ss. destruct val; ss. eauto. *)
-(*   - (* write *) *)
-(*     apply nth_error_app_inv in LABEL1. des; cycle 1. *)
-(*     { apply nth_error_singleton_inv in LABEL0. des. subst. *)
-(*       inv REL. inv X. *)
-(*     } *)
-(*     apply nth_error_app_inv in LABEL2. des; cycle 1. *)
-(*     { apply nth_error_singleton_inv in LtABEL3. des. subst. *)
-(*       inv REL. inv Y. *)
-(*     } *)
-(*     eauto. *)
-(*     hehe *)
-(* Qed. *)
 
 Lemma sim_traces_co1
       p mem trs atrs rs ws covs vexts ex
@@ -1180,8 +1125,9 @@ Proof.
   exploit sim_trace_last; try exact REL6; eauto. i. des. simplify.
   exploit sim_trace_sim_th; try exact REL6; eauto. intro TH2.
   exploit TH1.(WPROP3); eauto. i. des.
-  exploit TH2.(RPROP2); eauto. i. des. unguardH x6. des; subst; ss.
-  rewrite x6 in x3. inv x3.
+  exploit TH2.(RPROP2); eauto. i. des. unguardH x9. des; subst; ss.
+  { rewrite x9 in *. unfold Time.lt in x0. lia. }
+  rewrite x9 in x5. inv x5.
   generalize (ATR tid1). intro ATR1. inv ATR1; try congr.
   generalize (ATR tid2). intro ATR2. inv ATR2; try congr.
   des. simplify. destruct PRE, ex. unfold Execution.label. ss.
@@ -1232,10 +1178,9 @@ Proof.
   exploit sim_trace_sim_th; try exact REL6; eauto. intro TH1.
   exploit sim_trace_last; try exact REL0; eauto. i. des. simplify.
   exploit sim_trace_sim_th; try exact REL0; eauto. intro TH2.
-  exploit TH1.(WCV); eauto. i. des.
-  exploit TH2.(WCV); eauto. i. des.
-  unfold v_gen. ss. rewrite <- H4. rewrite <- H10.
-  rewrite x1, x4. auto.
+  exploit TH1.(WPROP3); eauto. i. des.
+  exploit TH2.(WPROP3); eauto. i. des.
+  unfold v_gen. ss. subst. rewrite <- H4, <- H10. ss.
 Qed.
 
 Lemma sim_traces_cov_rf
@@ -1256,10 +1201,9 @@ Proof.
   exploit sim_trace_sim_th; try exact REL6; eauto. intro TH1.
   exploit sim_trace_last; try exact REL0; eauto. i. des. simplify.
   exploit sim_trace_sim_th; try exact REL0; eauto. intro TH2.
-  exploit TH1.(WCV); eauto. i. des.
-  exploit TH2.(RCV); eauto. i. des.
-  unfold v_gen. ss. rewrite <- H4. rewrite <- H10.
-  rewrite x1, x4. refl.
+  exploit TH1.(WPROP3); eauto. i. des.
+  exploit TH2.(RPROP2); eauto. i. des.
+  unfold v_gen. ss. subst. rewrite <- H4, <- H10. ss.
 Qed.
 
 Lemma sim_traces_cov_fr
@@ -1303,10 +1247,9 @@ Proof.
       generalize (SIM tid1). intro SIM1. inv SIM1; try congr. simplify.
       exploit sim_trace_last; try exact REL0; eauto. i. des. simplify.
       exploit sim_trace_sim_th; try exact REL0; eauto. intro TH2.
-      exploit TH1.(WCV); eauto. i. des.
-      exploit TH2.(RCV); eauto. i. des.
-      unfold v_gen. ss. rewrite <- H12. rewrite <- H7.
-      rewrite x7, x10. auto.
+      exploit TH1.(WPROP3); eauto. i. des.
+      exploit TH2.(RPROP2); eauto. i. des.
+      unfold v_gen. ss. subst. rewrite <- H12, <- H7, x13. ss.
     + exfalso.
       rewrite RF in *. eapply H3. unfold codom_rel.
       eexists. eauto.
@@ -1362,10 +1305,9 @@ Proof.
   exploit sim_trace_sim_th; try exact REL6; eauto. intro TH1.
   exploit sim_trace_last; try exact REL0; eauto. i. des. simplify.
   exploit sim_trace_sim_th; try exact REL0; eauto. intro TH2.
-  exploit TH1.(WCV); eauto. i. des.
-  exploit TH2.(WCV); eauto. i. des.
-  unfold v_gen. ss. rewrite <- H5. rewrite <- H11.
-  rewrite x5, x2. auto.
+  exploit TH1.(WPROP3); eauto. i. des.
+  exploit TH2.(WPROP3); eauto. i. des.
+  unfold v_gen. ss. subst. rewrite <- H5, <- H11, x2, x8. ss.
 Qed.
 
 Lemma sim_trace_lastn
