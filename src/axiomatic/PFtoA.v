@@ -1584,7 +1584,26 @@ Proof.
   - (* write fail *)
     admit.
   - (* isb *)
-    admit.
+    econs; ss.
+    inv STEP. inv SIM_LOCAL. econs; ss.
+    + rewrite List.app_length, Nat.add_1_r.
+      i. rewrite sim_local_coh_step. rewrite inverse_step.
+      rewrite inverse_union. ii. des; [apply COH0|]; eauto.
+      inv EID. inv REL. inv H0. inv H1. inv H5.
+      destruct l; ss. inv H4.
+      * exploit (LABELS0 (length (ALocal.labels alc1))); eauto.
+        { rewrite List.app_length, Nat.add_1_r. ss. }
+        i. rewrite List.nth_error_app2 in x0; ss.
+        rewrite <- minus_n_n in x0. ss.
+      * inv H0. exploit RF2; eauto. i. des.
+        exploit (LABELS0 (length (ALocal.labels alc1))); eauto.
+        { rewrite List.app_length, Nat.add_1_r. ss. }
+        i. rewrite List.nth_error_app2 in x1; ss.
+        rewrite <- minus_n_n in x1. ss.
+    + rewrite List.app_length, Nat.add_1_r.
+      i. rewrite sim_local_vrp_step. rewrite inverse_step.
+      rewrite ? inverse_union. ii. des.
+      * inv EID. inv REL. des_union.
   - (* dmb *)
     admit.
 Admitted.
