@@ -111,7 +111,10 @@ Proof.
     inv H. exploit RF2; eauto. i. des. congr.
   - (* dob *)
     unfold Execution.dob in H. rewrite ? seq_assoc in *. des_union.
-    + admit. (* addr/data; rfi? implies < post-view *)
+    + inv H1. des. inv H1; cycle 1.
+      { inv H2. exploit RF2; eauto. i. des.  congr. }
+      rewrite fun_add_spec. condtac; [|congr].
+      admit. (* addr/data dep.'s post-view < ts *)
     + inv H1. des. inv H1; cycle 1.
       { inv H2. des. inv H2. inv H5. destruct l0; ss. congr. }
       inv H2. eapply Nat.le_lt_trans.
@@ -147,8 +150,28 @@ Proof.
       * econs; eauto. unfold sim_local_vwp. right.
         rewrite ? seq_assoc. ss.
     + inv H. des. inv H2. inv H4. destruct l0; ss. rewrite EID in EID0. inv EID0.
-      (* case analysis on eid1's type: read or write. Use VRM/VWM for read/write. *)
-      admit.
+      exploit Valid.po_label_pre; eauto. i. des.
+      destruct label1; ss.
+      * eapply Nat.le_lt_trans; [apply L.(LC).(VRM)|]; ss; cycle 1.
+        { rewrite fun_add_spec. condtac; [|congr].
+          inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+          rewrite <- join_r, <- join_r, <- join_r, <- join_r, <- join_l.
+          rewrite LABEL1. refl.
+        }
+        {  econs; eauto. unfold sim_local_vrm. econs. splits; eauto.
+           econs; ss. econs; eauto.
+        }
+      * eapply Nat.le_lt_trans; [apply L.(LC).(VWM)|]; ss; cycle 1.
+        { rewrite fun_add_spec. condtac; [|congr].
+          inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+          rewrite <- join_r, <- join_r, <- join_r, <- join_r, <- join_r, <- join_l.
+          rewrite LABEL1. refl.
+        }
+        {  econs; eauto. unfold sim_local_vwm. econs. splits; eauto.
+           econs; ss. econs; eauto.
+        }
+      * admit. (* v_gen vexts eid1 = 0, while 0 < ts (WRITABLE) *)
+      * admit. (* v_gen vexts eid1 = 0, while 0 < ts (WRITABLE) *)
     + destruct (equiv_dec arch riscv); ss.
-      admit. (* write cannot be rmw's target *)
+      admit. (* rmw's source's post-view < ts of write *)
 Admitted.

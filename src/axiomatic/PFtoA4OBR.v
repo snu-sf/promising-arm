@@ -119,13 +119,19 @@ Proof.
     generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
     + rewrite <- TS in H2.
       assert (eid = eid1).
-      { admit. (* equal vext => equal eid *) }
+      { admit. (* equal vext => equal eid *)
+        (* using L'.(WPROP4) and friends *)
+      }
       subst.
       inv WRITE. inv PO. ss. subst. inv H. inv H3. ss.
     + rewrite H1. refl.
   - (* dob *)
     unfold Execution.dob in H. rewrite ? seq_assoc in *. des_union.
-    + admit. (* addr/data; rfi? implies <= post-view *)
+    + inv H1. des. inv H1; cycle 1.
+      { admit. (* fwdbank *) }
+      inv H; cycle 1.
+      { exploit Valid.data_label; eauto. i. des. inv EID2. destruct l0; ss. congr. }
+      admit. (* addr dep.'s post-view <= ts *)
     + inv H1. des. inv H1.
       { inv H2. inv H3. destruct l0; ss. congr. }
       inv H2. des. inv H2.
@@ -143,7 +149,10 @@ Proof.
     destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts x2)); ss. inv e.
     generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
     + apply Bool.negb_true_iff, Bool.andb_false_iff in X0. des.
-      * admit. (* H4 : codom_rel (Execution.rmw ex) x2 *)
+      * admit.
+        (* H3 : Execution.rfi ex x2 (tid, length (ALocal.labels alc1)) *)
+        (* H4 : codom_rel (Execution.rmw ex) x2 *)
+        (* X0 : FwdItem.ex (Local.fwdbank lc1 (ValA.val vloc)) = false *)
       * unguardH H2. des.
         { destruct (equiv_dec arch riscv); ss. }
         { inv H2. destruct l0; ss. rewrite EID in EID0. inv EID0.
