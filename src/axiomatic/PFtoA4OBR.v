@@ -24,7 +24,6 @@ Require Import PromisingArch.axiomatic.CommonAxiomatic.
 Require Import PromisingArch.axiomatic.PFtoA1.
 Require Import PromisingArch.axiomatic.PFtoA2.
 Require Import PromisingArch.axiomatic.PFtoA3.
-Require Import PromisingArch.axiomatic.PFtoA4SL.
 
 Set Implicit Arguments.
 

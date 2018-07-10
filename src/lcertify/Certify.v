@@ -24,11 +24,11 @@ Set Implicit Arguments.
 
 Inductive write_step (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | write_step_intro
-    ex ord vloc vval res e lc
+    ex ord vloc vval res ts e lc
     (EVENT: e = Event.write ex ord vloc vval res)
     (STATE: State.step e eu1.(ExecUnit.state) eu2.(ExecUnit.state))
-    (PROMISE: Local.promise vloc.(ValA.val) vval.(ValA.val) tid eu1.(ExecUnit.local) eu1.(ExecUnit.mem) lc eu2.(ExecUnit.mem))
-    (FULFILL: Local.fulfill ex ord vloc vval res tid lc eu2.(ExecUnit.mem) eu2.(ExecUnit.local))
+    (PROMISE: Local.promise vloc.(ValA.val) vval.(ValA.val) ts tid eu1.(ExecUnit.local) eu1.(ExecUnit.mem) lc eu2.(ExecUnit.mem))
+    (FULFILL: Local.fulfill ex ord vloc vval res ts tid lc eu2.(ExecUnit.mem) eu2.(ExecUnit.local))
 .
 Hint Constructors write_step.
 

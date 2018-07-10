@@ -554,7 +554,7 @@ Proof.
   - etrans; [eauto|]. econs 2; [|refl].
     econs.
     + rewrite TPOOL, IdMap.mapi_spec, FIND. ss.
-    + econs; ss. econs; eauto. ss.
+    + econs; ss.
     + ss.
   - s. ii. rewrite IdMap.add_spec. condtac; ss.
     + inversion e. subst. rewrite IdMap.mapi_spec, FIND. s.

@@ -456,9 +456,8 @@ Section Local.
   Definition init_with_promises (promises: Promises.t): Local.t :=
     mk bot bot bot bot bot bot bot (fun _ => FwdItem.init) None promises.
 
-  Inductive promise (loc:Loc.t) (val:Val.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
+  Inductive promise (loc:Loc.t) (val:Val.t) (ts:Time.t) (tid:Id.t) (lc1:t) (mem1:Memory.t) (lc2:t) (mem2:Memory.t): Prop :=
   | promise_intro
-      ts
       (LC2: lc2 =
             mk
               lc1.(coh)
@@ -492,9 +491,9 @@ Section Local.
   .
   Hint Constructors control.
 
-  Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
-      ts loc val view
+      loc val view
       view_ext1 view_msg view_ext2
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
@@ -546,9 +545,9 @@ Section Local.
   .
   Hint Constructors writable.
 
-  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | fulfill_intro
-      ts loc val
+      loc val
       view_loc view_val view_ext
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
@@ -631,13 +630,13 @@ Section Local.
       (EVENT: event = Event.internal)
       (LC: lc2 = lc1)
   | step_read
-      ex ord vloc res
+      ex ord vloc res ts
       (EVENT: event = Event.read ex ord vloc res)
-      (STEP: read ex ord vloc res lc1 mem lc2)
+      (STEP: read ex ord vloc res ts lc1 mem lc2)
   | step_fulfill
-      ex ord vloc vval res
+      ex ord vloc vval res ts
       (EVENT: event = Event.write ex ord vloc vval res)
-      (STEP: fulfill ex ord vloc vval res tid lc1 mem lc2)
+      (STEP: fulfill ex ord vloc vval res ts tid lc1 mem lc2)
   | step_write_failure
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
@@ -668,7 +667,7 @@ Section Local.
       (VREL: lc.(vrel).(View.ts) <= List.length mem)
       (FWDBANK: forall loc,
           (lc.(fwdbank) loc).(FwdItem.ts) <= lc.(coh) loc /\
-          (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= List.length mem)
+          (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= (lc.(fwdbank) loc).(FwdItem.ts))
       (EXBANK: forall eb, lc.(exbank) = Some eb ->
                      eb.(Exbank.ts) <= lc.(coh) eb.(Exbank.loc) /\
                      exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
@@ -696,6 +695,28 @@ Section Local.
   Proof.
     inv LC. destruct lc1. s. f_equal.
     rewrite bot_join; ss. apply View.order.
+  Qed.
+
+  Lemma fwd_read_view_le
+        tid mem lc
+        (WF: wf tid mem lc)
+        loc ord ts
+        (COH: lc.(coh) loc <= ts):
+    ((lc.(Local.fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts) <= ts.
+  Proof.
+    inv WF. exploit FWDBANK; eauto. i. des.
+    unfold FwdItem.read_view. condtac; ss. etrans; eauto. etrans; eauto. 
+  Qed.
+
+  Lemma read_latest
+        tid mem ex ord vloc res ts lc1 lc2
+        (WF: wf tid mem lc1)
+        (READ: read ex ord vloc res ts lc1 mem lc2):
+    Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem.
+  Proof.
+    inv READ. ss. ii. eapply LATEST; eauto.
+    exploit fwd_read_view_le; eauto. instantiate (1 := ord). i.
+    unfold join, Time.join in *. lia.
   Qed.
 End Local.
 End Local.
@@ -744,9 +765,9 @@ Section ExecUnit.
 
   Inductive promise_step (tid:Id.t) (eu1 eu2:t): Prop :=
   | promise_step_intro
-      loc val
+      loc val ts
       (STATE: eu1.(state) = eu2.(state))
-      (LOCAL: Local.promise loc val tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
+      (LOCAL: Local.promise loc val ts tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
   .
   Hint Constructors promise_step.
 
@@ -817,14 +838,7 @@ Section ExecUnit.
     destruct eu2 as [state2 local2 mem2].
     inv WF. inv STEP. ss. subst.
 
-    assert (FWD:
-              forall loc ord ts,
-                ts <= List.length mem1 ->
-                (((Local.fwdbank local1 loc).(FwdItem.read_view) ts ord).(View.ts) <= length mem1)).
-    { inv LOCAL. i. exploit FWDBANK; eauto. i. des.
-      unfold FwdItem.read_view. condtac; ss. eauto.
-    }
-
+    generalize (Local.fwd_read_view_le LOCAL). intro FWD.
     inv STATE0; inv LOCAL0; inv EVENT; inv LOCAL; ss.
     - econs; ss.
       eauto using rmap_add_wf, expr_wf.
@@ -834,10 +848,10 @@ Section ExecUnit.
       + apply rmap_add_wf; viewtac.
         rewrite TS, <- TS0. viewtac.
         * eauto using expr_wf.
-        * apply FWD. eauto using read_wf.
+        * rewrite FWD; ss. eauto using read_wf.
       + econs; viewtac; eauto using expr_wf.
         all: try by rewrite <- TS0; eauto using expr_wf.
-        all: try by apply FWD; eauto using read_wf.
+        all: try rewrite FWD; eauto using read_wf.
         * i. rewrite fun_add_spec. condtac; viewtac.
           eapply read_wf. eauto.
         * i. rewrite fun_add_spec. condtac; eauto. inversion e. subst. eauto.
@@ -862,7 +876,9 @@ Section ExecUnit.
           revert MSG. unfold Memory.get_msg, Memory.read. destruct ts; ss. i.
           rewrite MSG. s. rewrite X. eauto.
         * i. rewrite ? fun_add_spec. condtac; viewtac.
-          inversion e. subst. rewrite <- TS0, <- TS1. splits; viewtac; eauto using get_msg_wf, expr_wf.
+          inversion e. subst. rewrite <- TS0, <- TS1 in *. splits; viewtac; eauto using get_msg_wf, expr_wf.
+          { etrans; [|apply Nat.lt_le_incl; eauto]. rewrite <- join_l. ss. }
+          { etrans; [|apply Nat.lt_le_incl; eauto]. rewrite <- join_r, <- join_l. ss. }
         * destruct ex0; ss. i. exploit EXBANK; eauto. i. des. rewrite fun_add_spec. splits; eauto.
           condtac; ss. inversion e. rewrite H3 in *. etrans; eauto. clear -COH0. lia.
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
@@ -907,11 +923,10 @@ Section ExecUnit.
     inv WF. inv STEP. ss. subst.
     inv LOCAL. inv LOCAL0. inv MEM2. econs; ss.
     - apply rmap_append_wf. ss.
-    - econs.
+    - econs; eauto.
       all: try rewrite List.app_length; s; try lia.
       + i. rewrite COH. lia.
       + i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
-      + i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
       + i. exploit EXBANK; eauto. i. des. esplits; eauto.
         eapply Memory.read_mon. eauto.
       + i. revert IN. rewrite Promises.set_o. condtac.
@@ -1064,11 +1079,10 @@ Module Machine.
       + refl.
     - i. exploit WF0; eauto. i. inv x. ss. econs; ss.
       + apply ExecUnit.rmap_append_wf. ss.
-      + inv LOCAL. econs.
+      + inv LOCAL. econs; eauto.
         all: try rewrite List.app_length; s; try lia.
         * i. rewrite COH. lia.
         * i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto.
-        * i. exploit FWDBANK; eauto. i. des. splits; eauto. lia.
         * i. exploit EXBANK; eauto. i. des. esplits; eauto.
           eapply Memory.read_mon. eauto.
         * i. exploit PROMISES; eauto. lia.

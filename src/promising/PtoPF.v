@@ -40,7 +40,7 @@ Proof.
     inversion e. i. inv FIND0.
     inv STEP. inv STEP0. inv STEP1. inv LOCAL. inv MEM2. ss. subst.
     eexists (Machine.mk _ _). esplits.
-    + econs; eauto; ss. econs; ss. econs; ss.
+    + econs; eauto; ss. econs; ss.
     + econs; ss.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|congr]. eauto.
       * econs. econs; eauto; ss.
@@ -58,7 +58,7 @@ Proof.
                          (Promises.set (S (length mem1)) lc0.(Local.promises))).
         inv LOCAL0.
         { econs 1; eauto. }
-        { econs 2; eauto. inv STEP. ss.
+        { econs 2; eauto. instantiate (1 := ts). inv STEP. ss.
           exploit ExecUnit.read_wf; try exact MSG. i.
           econs; eauto; ss.
           - ii. eapply LATEST; eauto.
@@ -69,7 +69,7 @@ Proof.
             inv STATE0. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }
-        { econs 3; eauto. inv STEP. inv WRITABLE. ss.
+        { econs 3; eauto. instantiate (1 := ts). inv STEP. inv WRITABLE. ss.
           exploit ExecUnit.get_msg_wf; try exact MSG. i.
           econs; eauto; ss.
           - econs; eauto.
@@ -92,7 +92,7 @@ Proof.
   - (* diff thread *)
     inv STEP. inv STEP1. inv STEP0. inv LOCAL0. inv MEM2. ss. subst.
     eexists (Machine.mk _ _). esplits.
-    + econs; eauto; ss. econs; ss. econs; ss.
+    + econs; eauto; ss. econs; ss.
     + econs; ss.
       * rewrite IdMap.add_spec. instantiate (3 := tid). condtac; [|by eauto].
         inversion e0. subst. congr.
