@@ -470,11 +470,168 @@ Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
     forall eid
       (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
       (v_gen vexts) (tid, eid) = vext eid;
-  LCOV:
-    forall eid
-      (COV: 0 < cov eid),
-      eid < List.length aeu.(AExecUnit.local).(ALocal.labels);
 }.
+
+Lemma sim_traces_sim_ex_step
+      p trs atrs ws rs covs vexts
+      mem ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid atr covl vextl
+    n aeu1 aeu2 atr' cov1 cov2 covl' vext1 vext2 vextl'
+    (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_COVL: IdMap.find tid covs = Some covl)
+    (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+    (AEU: lastn (S n) atr = aeu2 :: aeu1 :: atr')
+    (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
+    (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
+    (SIM_EX: sim_ex tid ex covs vexts aeu2 cov2 vext2),
+    sim_ex tid ex covs vexts aeu1 cov1 vext1.
+Proof.
+  i. rename SIM_EX into L.
+  generalize (SIM tid). intro X. inv X; simplify.
+  destruct n.
+  { generalize (lastn_length 1 atr). rewrite AEU. destruct atr; ss. }
+  exploit sim_trace_lastn; eauto. instantiate (1 := S n). intro SIMTR.
+  inv SIMTR.
+  { rewrite AEU in H. inv H. }
+  repeat match goal with
+         | [H1: lastn ?a ?b = ?c, H2: ?d = lastn ?a ?b |- _] =>
+           rewrite H1 in H2; inv H2
+         end.
+  destruct aeu1 as [ast1 alc1].
+  destruct aeu2 as [ast2 alc2].
+  inv ASTATE_STEP; ss; inv ALOCAL_STEP; inv EVENT0; ss; inv EVENT.
+  Ltac tac :=
+    repeat
+      (try match goal with
+           | [|- context[length (_ ++ _)]] => rewrite List.app_length
+           | [H: List.nth_error (_ ++ [_]) _ = Some _ |- _] =>
+             apply nth_error_snoc_inv in H; des
+           end;
+       ss; subst; unfold ALocal.next_eid in *; eauto; i).
+  all: destruct L; econs; tac.
+  all: try match goal with
+             [|- List.nth_error _ _ = Some _] => try by exploit LABELS0; eauto; tac; lia
+           end.
+  all: try match goal with
+           | [|- ALocal.addr _ _ _] => try by exploit ADDR0; eauto; tac; lia
+           | [|- ALocal.data _ _ _] => try by exploit DATA0; eauto; tac; lia
+           | [|- ALocal.ctrl _ _ _] => try by exploit CTRL0; eauto; tac; lia
+           | [|- ALocal.rmw _ _ _] => try by exploit RMW0; eauto; tac; lia
+           | [|- v_gen _ _ = _] => try by rewrite XCOV0; eauto; tac; lia
+           end.
+  - exploit ADDR0; eauto; tac; try lia.
+    inv x; ss. inv H. lia.
+  - rewrite XCOV0; eauto; tac; try lia.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - rewrite XVEXT0; eauto; tac; try lia.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - exploit ADDR0; eauto; tac; try lia.
+    inv x; ss. inv H. lia.
+  - exploit DATA0; eauto; tac; try lia.
+    inv x; ss. inv H. lia.
+  - exploit RMW0; eauto; tac; try lia.
+    inv x; ss. destruct ex1; ss. inv H. lia.
+  - rewrite XCOV0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - rewrite XVEXT0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - rewrite XCOV0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst. ss.
+  - rewrite XVEXT0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst. ss.
+  - rewrite XVEXT0; eauto; tac; try lia.
+  - exploit CTRL0; eauto; tac; try lia.
+    inv x; ss. inv H. lia.
+  - rewrite XVEXT0; eauto; tac; try lia.
+Qed.
+
+Lemma sim_traces_sim_ex_aux
+      p mem trs atrs ws rs covs vexts
+      ex
+      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
+  forall tid atr covl vextl
+    n aeu atr' cov covl' vext vextl'
+    (N: n < length atr)
+    (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_COVL: IdMap.find tid covs = Some covl)
+    (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
+    (AEU: lastn (S n) atr = aeu :: atr')
+    (COV: lastn (S n) covl = cov :: covl')
+    (VEXT: lastn (S n) vextl = vext :: vextl'),
+    sim_ex tid ex covs vexts aeu cov vext.
+Proof.
+  intros tid. generalize (SIM tid). intro X. inv X; [by i|].
+  intros. remember (length atr - 1 - n) as n'.
+  replace n with (length atr - 1 - n') in * by lia.
+  assert (n' < length atr) by lia. clear Heqn' N n.
+  move n' at top. revert_until H5. induction n'.
+  { (* init *)
+    i. simplify.
+    exploit sim_trace_length; eauto. i. des.
+    rewrite lastn_all in *; try lia. subst.
+    econs.
+    - i. revert LABEL.
+      unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+      destruct (IdMap.find tid (Valid.aeus PRE)) eqn:X; ss.
+      generalize (ATR tid). rewrite X. intro Y. inv Y. des. subst.
+      rewrite <- H7 in H. inv H. ss.
+    - i. rewrite PRE.(Valid.ADDR) in ADDR0. inv ADDR0.
+      rewrite IdMap.map_spec in RELS.
+      destruct ((IdMap.find tid0 (Valid.aeus PRE))) eqn:X; ss.
+      inv REL. inv RELS. ss.
+      generalize (ATR tid). rewrite X. intro Y. inv Y. des. subst.
+      rewrite <- H7 in H. inv H. ss.
+    - i. rewrite PRE.(Valid.DATA) in DATA0. inv DATA0.
+      rewrite IdMap.map_spec in RELS.
+      destruct ((IdMap.find tid0 (Valid.aeus PRE))) eqn:X; ss.
+      inv REL. inv RELS. ss.
+      generalize (ATR tid). rewrite X. intro Y. inv Y. des. subst.
+      rewrite <- H7 in H. inv H. ss.
+    - i. rewrite PRE.(Valid.CTRL) in CTRL0. inv CTRL0.
+      rewrite IdMap.map_spec in RELS.
+      destruct ((IdMap.find tid0 (Valid.aeus PRE))) eqn:X; ss.
+      inv REL. inv RELS. ss.
+      generalize (ATR tid). rewrite X. intro Y. inv Y. des. subst.
+      rewrite <- H7 in H. inv H. ss.
+    - i. rewrite PRE.(Valid.RMW) in ADDR0. inv ADDR0.
+      rewrite IdMap.map_spec in RELS.
+      destruct ((IdMap.find tid0 (Valid.aeus PRE))) eqn:X; ss.
+      inv REL. inv RELS. ss.
+      generalize (ATR tid). rewrite X. intro Y. inv Y. des. subst.
+      rewrite <- H7 in H. inv H. ss.
+    - unfold v_gen. s. rewrite <- H4. ss.
+    - unfold v_gen. s. rewrite <- H5. ss.
+  }
+  i. simplify.
+  exploit sim_trace_length; eauto. intro LEN. guardH LEN.
+  replace (S (length atr - 1 - S n')) with (S (length atr - S (S n'))) in * by lia.
+  exploit sim_trace_lastn; eauto. instantiate (1 := (length atr - 1 - n')). i.
+  exploit sim_trace_last; eauto. i. des.
+  exploit IHn'; try exact HDTR; eauto; [lia|]. i.
+  replace (S (length atr - 1 - n')) with (S (S (length atr - S (S n')))) in * by lia.
+  exploit lastn_S1; try exact HDTR; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact HDATR; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact HDWL; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact HDRL; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact HDCOVL; [unguardH LEN; des; lia|i].
+  exploit lastn_S1; try exact HDVEXTL; [unguardH LEN; des; lia|i].
+  repeat match goal with
+         | [H1: lastn ?a ?b = ?c, H2: lastn ?a ?b = ?d |- _] =>
+           rewrite H1 in H2
+         end.
+  subst. eapply sim_traces_sim_ex_step; eauto.
+Qed.
 
 Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
@@ -493,69 +650,14 @@ Lemma sim_traces_ex
       (VEXT: lastn (S n) vextl = vext :: vextl'):
   sim_ex tid ex covs vexts aeu cov vext.
 Proof.
-Admitted.
-
-(* Inductive ex_le *)
-(*           (aeu1:AExecUnit.t) (cov1:nat -> Time.t) (vext1:nat -> Time.t) *)
-(*           (aeu2:AExecUnit.t) (cov2:nat -> Time.t) (vext2:nat -> Time.t) *)
-(*   : Prop := *)
-(* | ex_le_intro *)
-(*     (AEU: AExecUnit.le aeu1 aeu2) *)
-(*     (COV: forall n (COV1: 0 < cov1 n), cov2 n = cov1 n) *)
-(*     (VEXT: forall n (VEXT1: 0 < vext1 n), vext2 n = vext2 n) *)
-(* . *)
-
-(* Lemma sim_traces_sim_ex_step *)
-(*       p trs atrs ws rs covs vexts *)
-(*       m ex *)
-(*       (STEP: Machine.pf_exec p m) *)
-(*       (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts) *)
-(*       (PRE: Valid.pre_ex p ex) *)
-(*       (CO: ex.(Execution.co) = co_gen ws) *)
-(*       (RF: ex.(Execution.rf) = rf_gen ws rs) *)
-(*       (CO1: Valid.co1 ex) *)
-(*       (CO2: Valid.co2 ex) *)
-(*       (RF1: Valid.rf1 ex) *)
-(*       (RF2: Valid.rf2 ex) *)
-(*       (RF_WF: Valid.rf_wf ex) *)
-(*       (TR: IdMap.Forall2 *)
-(*              (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l) *)
-(*              trs m.(Machine.tpool)) *)
-(*       (ATR: IdMap.Forall2 *)
-(*               (fun _ atr aeu => exists l, atr = aeu :: l) *)
-(*               atrs (Valid.aeus PRE)): *)
-(*   forall tid tr atr covl vextl *)
-(*     n eu1 eu2 tr' aeu1 aeu2 atr' cov1 cov2 covl' vext1 vext2 vextl' *)
-(*     (FIND_TR: IdMap.find tid trs = Some tr) *)
-(*     (FIND_ATR: IdMap.find tid atrs = Some atr) *)
-(*     (FIND_COVL: IdMap.find tid covs = Some covl) *)
-(*     (FIND_VEXTL: IdMap.find tid vexts = Some vextl) *)
-(*     (EU: lastn (S n) tr = eu2 :: eu1 :: tr') *)
-(*     (AEU: lastn (S n) atr = aeu2 :: aeu1 :: atr') *)
-(*     (COV: lastn (S n) covl = cov2 :: cov1 :: covl') *)
-(*     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl') *)
-(*     (* (EX: sim_ex tid ex covl vextl aeu1 a (v_gen vexts) eu1 aeu1), *) *)
-(*     sim_ex tid (v_gen vexts) eu2.(ExecUnit.state) aeu2.(AExecUnit.state). *)
-(* Proof. *)
-(*   i. rename SIM_TH' into L. *)
-(*   generalize (SIM tid). intro X. inv X; simplify. rename c into wl, d into rl. *)
-(*   destruct n. *)
-(*   { generalize (lastn_length 1 tr). rewrite EU. destruct tr; ss. } *)
-(*   exploit sim_trace_lastn; eauto. instantiate (1 := S n). intro SIMTR. *)
-(*   exploit sim_traces_ex; eauto. intro EX2. *)
-(*   inversion SIMTR; subst; simplify; [congr|]. *)
-(*   repeat match goal with *)
-(*          | [H1: lastn ?a ?b = ?c, H2: ?d = lastn ?a ?b |- _] => *)
-(*            rewrite H1 in H2; inv H2 *)
-(*          end. *)
-(*   exploit sim_trace_sim_state_weak; eauto. intro STATE1. *)
-(*   rename H2 into WS, H3 into RS, H4 into WL, H5 into RL. *)
-
-(*   destruct eu1 as [[stmts1 rmap1] lc1 mem1]. *)
-(*   destruct eu2 as [[stmts2 rmap2] lc2 mem2]. *)
-(*   destruct aeu1 as [[astmts1 armap1] alc1]. *)
-(*   destruct aeu2 as [[astmts2 armap2] alc2]. *)
-(*   ss. inv STEP0. ss. subst. *)
-(*   inv STATE. inv STATE1. ss. subst. *)
-(*   inv STATE0; inv LOCAL0; ss; inv EVENT0; inv EVENT; ss. *)
-(* Qed. *)
+  generalize (SIM tid). intro X. inv X; simplify.
+  exploit sim_trace_length; eauto. intro LEN. guardH LEN.
+  exploit sim_trace_last; eauto. i. des. subst.
+  destruct (le_lt_dec (length (aeu0::atr'0)) n).
+  - rewrite lastn_all in *; ss; try by unguardH LEN; des; lia.
+    simplify. eapply sim_traces_sim_ex_aux; eauto.
+    1: instantiate (1 := length tr').
+    all: ss.
+    all: try apply lastn_all; ss; try by unguardH LEN; des; lia.
+  - eapply sim_traces_sim_ex_aux; eauto.
+Qed.    
