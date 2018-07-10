@@ -104,6 +104,51 @@ Proof.
   rewrite x1 in x6. inv x6. clear x3 x4 H1.
   rewrite EX2.(XVEXT); s; cycle 1.
   { rewrite List.app_length. s. clear. lia. }
-  rewrite X. 
-  move OB at bottom. admit.
+  rewrite X.
+  inv STEP0. ss. subst. inv LOCAL0; inv EVENT; inv STEP0; ss.
+  move OB at bottom. unfold ob' in OB. des_union.
+  - (* rfe *)
+    inv H. exploit RF2; eauto. i. des. congr.
+  - (* dob *)
+    unfold Execution.dob in H. rewrite ? seq_assoc in *. des_union.
+    + admit. (* addr/data; rfi? implies < post-view *)
+    + inv H1. des. inv H1; cycle 1.
+      { inv H2. des. inv H2. inv H5. destruct l0; ss. congr. }
+      inv H2. eapply Nat.le_lt_trans.
+      { apply L.(LC).(VCAP); ss. econs; ss. ss. }
+      s. rewrite fun_add_spec. condtac; [|congr].
+      inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+      s. rewrite <- join_r, <- join_r, <- join_l. ss.
+  - (* aob *)
+    unfold Execution.aob in H1. rewrite ? seq_assoc in *.
+    inv H1. des. inv H. des. inv H2. inv H1. guardH H2.
+    inv H4. exploit RF2; eauto. i. des. congr.
+  - (* bob *)
+    unfold Execution.bob in H. rewrite ? seq_assoc in *. des_union.
+    + inv H1. des. inv H1. inv H4. destruct l0; ss. congr.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+      * rewrite fun_add_spec. condtac; [|congr].
+        inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+        rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vwp. left. left.
+        rewrite ? seq_assoc. inv H1. des. inv H1. ss.
+    + inv H. des. inv H2. inv H4. destruct l0; ss. congr.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+      * rewrite fun_add_spec. condtac; [|congr].
+        inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+        rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vwp. left. right.
+        rewrite ? seq_assoc. inv H1. des. inv H1. ss.
+    + inv H. des. inv H2. inv H4. destruct l0; ss. congr.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+      * rewrite fun_add_spec. condtac; [|congr].
+        inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
+        rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vwp. right.
+        rewrite ? seq_assoc. ss.
+    + inv H. des. inv H2. inv H4. destruct l0; ss. rewrite EID in EID0. inv EID0.
+      (* case analysis on eid1's type: read or write. Use VRM/VWM for read/write. *)
+      admit.
+    + destruct (equiv_dec arch riscv); ss.
+      admit. (* write cannot be rmw's target *)
 Admitted.
