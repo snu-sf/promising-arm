@@ -121,12 +121,25 @@ Proof.
   { admit. (* use fr and co *) }
   specialize (EX1 LOC). unfold Memory.exclusive in EX1.
   unfold Memory.no_msgs in EX1.
-  destruct (cov eid'); ss.
+  destruct (cov eid') eqn:Hcov; ss.
   move x5 at bottom.
   unfold Memory.get_msg in x5. ss.
   exploit EX1; try exact x5; eauto.
-  { admit. }
-  { admit. }
+  { inv H.
+    - inv H1. des. inv REL1. inv H11.
+      { rewrite VIEW. ss. }
+      inv EID0. exploit RF_WF; [exact H|exact REL1|]. i. subst.
+      exploit sim_traces_vext_co; try exact H1; eauto. i.
+      unfold v_gen in x1. ss.
+      rewrite <- H8 in x1. rewrite x2 in x1.
+      eapply le_lt_trans; eauto.
+    - inv H1. inv H9. inv H1. inv REL1. inv H13.
+      { rewrite VIEW. ss. }
+      exfalso. apply H12. unfold codom_rel.
+      inv EID0. esplits; eauto. }
+  { (* move Y at bottom. rewrite EX2.(XVEXT) in Y. *)
+    admit.
+  }
   { ss. split.
     - admit.
     - inv H0. auto. }
