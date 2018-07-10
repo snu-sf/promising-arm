@@ -722,6 +722,17 @@ Module IdMap.
       apply elements_2 in FIND'. congr.
   Qed.
 
+  Lemma mapi_mapi
+        A B C
+        (f: Id.t -> A -> B)
+        (g: Id.t -> B -> C)
+        m:
+    mapi g (mapi f m) = mapi (fun tid a => g tid (f tid a)) m.
+  Proof.
+    unfold mapi. generalize 1%positive. induction m; ss.
+    i. rewrite IHm1, IHm2. f_equal. destruct o; ss.
+  Qed.
+
   Lemma add_add A i v1 v2 (m:t A):
     add i v1 (add i v2 m) = add i v1 m.
   Proof.

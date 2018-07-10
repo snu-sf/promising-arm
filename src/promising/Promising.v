@@ -146,6 +146,19 @@ Module Memory.
       subst. revert READ. condtac; ss. inversion e. subst. congr.
     - apply read_mon. ss.
   Qed.
+
+  Lemma latest_lt
+        loc ts1 ts2 ts3 mem msg
+        (LATEST: Memory.latest loc ts1 ts2 mem)
+        (LT: ts1 < ts3)
+        (MSG: Memory.get_msg ts3 mem = Some msg)
+        (LOC: msg.(Msg.loc) = loc):
+    ts2 < ts3.
+  Proof.
+    destruct ts3; ss.
+    destruct (le_lt_dec (S ts3) ts2); ss.
+    exfalso. eapply LATEST; eauto. 
+  Qed.
 End Memory.
 
 Module View.
@@ -708,14 +721,16 @@ Section Local.
     unfold FwdItem.read_view. condtac; ss. etrans; eauto. etrans; eauto. 
   Qed.
 
-  Lemma read_latest
+  Lemma read_spec
         tid mem ex ord vloc res ts lc1 lc2
-        (WF: wf tid mem lc1)
-        (READ: read ex ord vloc res ts lc1 mem lc2):
-    Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem.
+        (WF: Local.wf tid mem lc1)
+        (READ: Local.read ex ord vloc res ts lc1 mem lc2):
+    <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\
+    <<TS: ts = lc2.(Local.coh) vloc.(ValA.val)>>.
   Proof.
-    inv READ. ss. ii. eapply LATEST; eauto.
-    exploit fwd_read_view_le; eauto. instantiate (1 := ord). i.
+    inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits; ss.
+    ii. eapply LATEST; eauto.
+    exploit Local.fwd_read_view_le; eauto. instantiate (1 := ord). i.
     unfold join, Time.join in *. lia.
   Qed.
 End Local.
@@ -1135,7 +1150,7 @@ Module Machine.
   .
   Hint Constructors exec.
 
-  Inductive state_exec (m1 m2:Machine.t): Prop :=
+  Inductive state_exec (m1 m2:t): Prop :=
   | state_exec_intro
       (TPOOL: IdMap.Forall2
                 (fun tid sl1 sl2 =>
@@ -1146,16 +1161,16 @@ Module Machine.
       (MEM: m1.(mem) = m2.(mem))
   .
 
-  Inductive pf_exec (p:program) (m:Machine.t): Prop :=
+  Inductive pf_exec (p:program) (m:t): Prop :=
   | pf_exec_intro
       m1
-      (STEP1: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m1)
+      (STEP1: rtc (step ExecUnit.promise_step) (init p) m1)
       (STEP2: state_exec m1 m)
       (NOPROMISE: no_promise m)
   .
   Hint Constructors pf_exec.
 
-  Inductive equiv (m1 m2:Machine.t): Prop :=
+  Inductive equiv (m1 m2:t): Prop :=
   | equiv_intro
       (TPOOL: IdMap.Equal m1.(tpool) m2.(tpool))
       (MEM: m1.(mem) = m2.(mem))
@@ -1198,5 +1213,47 @@ Module Machine.
     i. des.
     esplits; eauto. rewrite <- STEPS0. condtac; eauto.
     inversion e. subst. rewrite TPOOL in FIND. inv FIND. econs; eauto.
+  Qed.
+
+  Lemma step_get_msg_tpool
+        p m ts msg
+        (STEPS: rtc (step ExecUnit.step) (init p) m)
+        (MSG: Memory.get_msg ts m.(mem) = Some msg):
+    exists sl, IdMap.find msg.(Msg.tid) m.(tpool) = Some sl.
+  Proof.
+    apply clos_rt_rt1n_iff in STEPS.
+    apply clos_rt_rtn1_iff in STEPS.
+    revert ts msg MSG. induction STEPS; ss.
+    { destruct ts; ss. destruct ts; ss. }
+    destruct y as [tpool1 mem1].
+    destruct z as [tpool2 mem2].
+    ss. inv H. ss. i. inv STEP.
+    - rewrite IdMap.add_spec. condtac; eauto.
+      inv STEP0. inv STEP. ss. subst. eauto.
+    - rewrite IdMap.add_spec. condtac; eauto.
+      inv STEP0. ss. subst. inv LOCAL. inv MEM2.
+      apply Memory.get_msg_snoc_inv in MSG. des; eauto. subst.
+      ss. congr.
+  Qed.
+
+  Lemma rtc_promise_step_spec
+        p m
+        (STEP: rtc (step ExecUnit.promise_step) (init p) m):
+    IdMap.Equal m.(tpool) (init_with_promises p m.(mem)).(tpool).
+  Proof.
+    apply clos_rt_rt1n_iff in STEP.
+    apply clos_rt_rtn1_iff in STEP.
+    induction STEP.
+    { s. ii. rewrite IdMap.map_spec, IdMap.mapi_spec.
+      destruct (IdMap.find y p); ss. f_equal. f_equal.
+      rewrite promises_from_mem_nil. ss.
+    }
+    destruct y as [tpool2 mem2].
+    destruct z as [tpool3 mem3].
+    ss. inv H. inv STEP0. inv LOCAL. ss. subst. inv MEM2.
+    ii. generalize (IHSTEP y). rewrite IdMap.add_spec, ? IdMap.mapi_spec.
+    rewrite promises_from_mem_snoc. s.
+    repeat condtac; try congr.
+    inversion e. subst. rewrite FIND. destruct (IdMap.find tid p); ss. i. inv H. ss.
   Qed.
 End Machine.

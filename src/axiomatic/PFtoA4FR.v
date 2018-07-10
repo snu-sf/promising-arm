@@ -120,41 +120,12 @@ Proof.
   rewrite X.
   inv STEP0. ss. subst. inv LOCAL0; inv EVENT.
   generalize L1.(EU_WF). intro WF. inv WF. ss.
-
-  (* TODO: move *)
-  Lemma read_spec
-        `{A: Type, _: orderC A eq}
-        tid mem ex ord vloc res ts (lc1 lc2:Local.t (A:=A))
-        (WF: Local.wf tid mem lc1)
-        (READ: Local.read ex ord vloc res ts lc1 mem lc2):
-    <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\
-    <<TS: ts = lc2.(Local.coh) vloc.(ValA.val)>>.
-  Proof.
-    inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits; ss.
-    ii. eapply LATEST; eauto.
-    exploit Local.fwd_read_view_le; eauto. instantiate (1 := ord). i.
-    unfold join, Time.join in *. lia.
-  Qed.
-
-  Lemma latest_lt
-        loc ts1 ts2 ts3 mem msg
-        (LATEST: Memory.latest loc ts1 ts2 mem)
-        (LT: ts1 < ts3)
-        (MSG: Memory.get_msg ts3 mem = Some msg)
-        (LOC: msg.(Msg.loc) = loc):
-    ts2 < ts3.
-  Proof.
-    destruct ts3; ss.
-    destruct (le_lt_dec (S ts3) ts2); ss.
-    exfalso. eapply LATEST; eauto. 
-  Qed.
-
-  generalize (read_spec LOCAL0 STEP0). i. des. subst.
+  generalize (Local.read_spec LOCAL0 STEP0). i. des. subst.
   exploit sim_traces_cov_fr; eauto.
   { inv STEP. ss. }
   rewrite EX2.(XCOV) in *; s; cycle 1.
   { rewrite List.app_length. s. clear. lia. }
   rewrite X. i.
-  eapply latest_lt; eauto.
+  eapply Memory.latest_lt; eauto.
   all: admit. (* remaining work: finding w's message. *)
 Admitted.

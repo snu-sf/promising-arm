@@ -103,7 +103,7 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
 | sim_event_write
     ex1 ord1 vloc1 vval1 res1
     ex2 ord2 vloc2 vval2 res2
-    (EX: ex1 = ex2)
+    (EX: ex1] = ex2)
     (ORD: ord1 = ord2)
     (VLOC: sim_val_weak vloc1 vloc2)
     (VVAL: sim_val_weak vval1 vval2)
@@ -465,22 +465,7 @@ all: ss.
      inv RELS. inv REL. ss.
 }
 4: { ii. rewrite IdMap.mapi_spec. destruct (IdMap.find id p); ss. econs. refl. }
-3: { unfold IdMap.map.
-
-     (* TODO: move *)
-     Lemma IdMap_mapi_mapi
-           A B C
-           (f: Id.t -> A -> B)
-           (g: Id.t -> B -> C)
-           m:
-       IdMap.mapi g (IdMap.mapi f m) = IdMap.mapi (fun tid a => g tid (f tid a)) m.
-     Proof.
-       unfold IdMap.mapi. generalize 1%positive. induction m; ss.
-       i. rewrite IHm1, IHm2. f_equal. destruct o; ss.
-     Qed.
-
-     rewrite IdMap_mapi_mapi. f_equal.
-}
+3: { unfold IdMap.map. rewrite IdMap.mapi_mapi. f_equal. }
 1: { apply bot. (* it's ex's co. *) }
 1: { apply bot. (* it's ex's rf. *) }
 Qed.
