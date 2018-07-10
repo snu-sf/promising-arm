@@ -78,7 +78,10 @@ Proof.
   destruct (le_lt_dec (length (ALocal.labels (AExecUnit.local aeu1))) eid1); cycle 1.
   { eapply L; eauto. }
   assert (LABEL1: Execution.label_is ex (fun label : Label.t => Label.is_read label) (tid, eid1)).
-  { admit. }
+  { inv FR. inv H.
+    - des. exploit RF2; eauto. i. des. econs; eauto.
+    - inv H. inv H1. inv H. ss.
+  }
   inv LABEL1. destruct l0; ss.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
