@@ -1281,122 +1281,6 @@ Proof.
   esplits; eauto.
 Qed.
 
-Definition promises_from_mem
-           (tid:Id.t) (mem: Memory.t): Promises.t.
-Proof.
-  induction mem using list_rev_rect.
-  - exact bot.
-  - destruct x.
-    apply (if tid0 == tid
-           then Promises.set (S (List.length (List.rev mem))) IHmem
-           else IHmem).
-Defined.
-
-Lemma promises_from_mem_nil tid:
-  promises_from_mem tid Memory.empty = bot.
-Proof.
-  unfold promises_from_mem, list_rev_rect, eq_rect. ss.
-  match goal with
-  | [|- context[match ?c with | eq_refl => _ end]] => destruct c
-  end; ss.
-Qed.
-
-Lemma promises_from_mem_snoc tid mem msg:
-  promises_from_mem tid (mem ++ [msg]) =
-  if msg.(Msg.tid) == tid
-  then Promises.set (S (List.length mem)) (promises_from_mem tid mem)
-  else promises_from_mem tid mem.
-Proof.
-  unfold promises_from_mem at 1, list_rev_rect, eq_rect.
-  match goal with
-  | [|- context[match ?c with | eq_refl => _ end]] => destruct c
-  end; ss.
-  rewrite List.rev_involutive, List.rev_app_distr. ss.
-  destruct msg. s. condtac.
-  - inversion e. subst. rewrite ? List.rev_length.
-    f_equal.
-    unfold promises_from_mem, list_rev_rect, eq_rect.
-    match goal with
-    | [|- context[match ?c with | eq_refl => _ end]] => destruct c
-    end; ss.
-  - unfold promises_from_mem, list_rev_rect, eq_rect.
-    match goal with
-    | [|- context[match ?c with | eq_refl => _ end]] => destruct c
-    end; ss.
-Qed.
-
-Lemma promises_from_mem_spec
-      ts tid mem:
-  Promises.lookup (S ts) (promises_from_mem tid mem) <->
-  exists loc val, List.nth_error mem ts = Some (Msg.mk loc val tid).
-Proof.
-  induction mem using List.rev_ind.
-  { econs.
-    - rewrite promises_from_mem_nil, Promises.lookup_bot. ss.
-    - i. des. destruct ts; ss.
-  }
-  rewrite promises_from_mem_snoc. econs.
-  - condtac.
-    + inversion e. subst. rewrite Promises.set_o. condtac.
-      * inversion e0. subst. i.
-        rewrite List.nth_error_app2, Nat.sub_diag; [|lia]. ss.
-        destruct x. ss. eauto.
-      * intro Y. apply IHmem in Y. des.
-        esplits; eauto. apply nth_error_app_mon. eauto.
-    + intro Y. apply IHmem in Y. des.
-      esplits; eauto. apply nth_error_app_mon. eauto.
-  - i. des. apply nth_error_snoc_inv in H. des; ss.
-    { condtac; eauto. rewrite Promises.set_o. condtac; eauto. }
-    subst. condtac; ss; [|congr]. rewrite Promises.set_o. condtac; [|congr]. ss.
-Qed.
-
-Definition init_with_promises (p:program) (mem:Memory.t): Machine.t :=
-  Machine.mk
-    (IdMap.mapi (fun tid stmts =>
-                   (State.init stmts,
-                    Local.init_with_promises (promises_from_mem tid mem)))
-                p)
-    mem.
-
-Lemma pf_init_with_promises
-      p promises
-      (MEM: forall msg (MSG: List.In msg promises), IdMap.find msg.(Msg.tid) p <> None):
-  exists m,
-    <<STEP: rtc (Machine.step ExecUnit.promise_step) (Machine.init p) m>> /\
-    <<TPOOL: IdMap.Equal m.(Machine.tpool) (init_with_promises p promises).(Machine.tpool)>> /\
-    <<MEM: m.(Machine.mem) = promises>>.
-Proof.
-  revert MEM. induction promises using List.rev_ind; i.
-  { esplits; eauto. ii. s. rewrite IdMap.map_spec, IdMap.mapi_spec.
-    destruct (IdMap.find y p); ss.
-    unfold Local.init, Local.init_with_promises. repeat f_equal.
-    rewrite promises_from_mem_nil. ss.
-  }
-  exploit IHpromises; eauto.
-  { i. apply MEM. apply List.in_app_iff. intuition. }
-  i. des. subst. destruct x.
-  hexploit MEM.
-  { apply List.in_app_iff. right. left. eauto. }
-  match goal with
-  | [|- context[(?f <> None) -> _]] => destruct f eqn:FIND
-  end; ss.
-  intro X. clear X.
-  eexists (Machine.mk _ _). esplits.
-  - etrans; [eauto|]. econs 2; [|refl].
-    econs.
-    + rewrite TPOOL, IdMap.mapi_spec, FIND. ss.
-    + econs; ss.
-    + ss.
-  - s. ii. rewrite IdMap.add_spec. condtac; ss.
-    + inversion e. subst. rewrite IdMap.mapi_spec, FIND. s.
-      unfold Local.init_with_promises. repeat f_equal.
-      rewrite promises_from_mem_snoc. condtac; ss.
-    + rewrite TPOOL, ? IdMap.mapi_spec. destruct (IdMap.find y p); ss.
-      unfold Local.init_with_promises. rewrite promises_from_mem_snoc. s.
-      condtac; ss. congr.
-  - ss.
-Qed.
-
 Theorem axiomatic_to_promising
       p ex
       (EX: Valid.ex p ex):
@@ -1412,7 +1296,7 @@ Proof.
   remember (mem_of_ex ex ob) as mem eqn:MEM.
 
   (* Construct promise steps. *)
-  exploit (pf_init_with_promises p mem); eauto.
+  exploit (Machine.pf_init_with_promises p mem); eauto.
   { i. subst. unfold mem_of_ex in MSG. rewrite in_filter_map_iff in MSG. des.
     exploit Permutation_in; eauto. intro X.
     generalize (Execution.eids_spec ex). i. des.
@@ -1422,7 +1306,7 @@ Proof.
     destruct (IdMap.find (fst a) (Valid.PRE EX).(Valid.aeus)) eqn:Z; ss.
     generalize (EX.(Valid.AEUS) (fst a)). intro W. inv W; ss. congr.
   }
-  unfold IdMap.Equal, init_with_promises. s. i. des. subst.
+  unfold IdMap.Equal, Machine.init_with_promises. s. i. des. subst.
   setoid_rewrite IdMap.mapi_spec in TPOOL.
 
   (* It's sufficient to construct steps from the promised state. *)
@@ -1443,7 +1327,7 @@ Proof.
                 (FIND1: IdMap.find tid p = Some stmts),
              IdMap.find tid m.(Machine.tpool) =
              Some (State.init stmts,
-                   Local.init_with_promises (promises_from_mem tid (Machine.mem m)))).
+                   Local.init_with_promises (Machine.promises_from_mem tid (Machine.mem m)))).
   { i. rewrite TPOOL, FIND1, MEM0. ss. }
   assert (OUT: forall tid st lc
                  (FIND1: IdMap.find tid p = None)
@@ -1475,7 +1359,7 @@ Proof.
           <<STEP: rtc (ExecUnit.state_step (A:=unit) tid)
                       (ExecUnit.mk
                          (State.init stmts)
-                         (Local.init_with_promises (promises_from_mem tid (Machine.mem m)))
+                         (Local.init_with_promises (Machine.promises_from_mem tid (Machine.mem m)))
                          (Machine.mem m))
                       (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> State.is_terminal st2>> /\
@@ -1515,14 +1399,14 @@ Proof.
   exploit (@sim_eu_rtc_step p ex ob tid); eauto.
   { instantiate (1 := ExecUnit.mk
                         (State.init stmts)
-                        (Local.init_with_promises (promises_from_mem tid (mem_of_ex ex ob)))
+                        (Local.init_with_promises (Machine.promises_from_mem tid (mem_of_ex ex ob)))
                         (mem_of_ex ex ob)).
     econs; ss.
     - econs; ss. econs. ii. rewrite ? IdMap.gempty. ss.
     - econs; eauto; ss.
       + right. splits; ss. ii. inv H. inv REL1. inv H. inv H1. ss. lia.
       + econs; i.
-        { destruct view; ss. apply promises_from_mem_spec in H. des.
+        { destruct view; ss. apply Machine.promises_from_mem_spec in H. des.
           exploit in_mem_of_ex; swap 1 2; eauto.
           { eapply Permutation_NoDup; [by symmetry; eauto|].
             eapply Execution.eids_spec; eauto.
@@ -1531,7 +1415,7 @@ Proof.
         }
         { des. inv WRITE. destruct l; ss. exploit label_write_mem_of_ex; eauto. i. des.
           rewrite VIEW in VIEW0. inv VIEW0.
-          unfold Memory.get_msg in MSG. ss. apply promises_from_mem_spec. eauto.
+          unfold Memory.get_msg in MSG. ss. apply Machine.promises_from_mem_spec. eauto.
         }
   }
   { apply AExecUnit.wf_init. }

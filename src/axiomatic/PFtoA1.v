@@ -103,7 +103,7 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
 | sim_event_write
     ex1 ord1 vloc1 vval1 res1
     ex2 ord2 vloc2 vval2 res2
-    (EX: ex1] = ex2)
+    (EX: ex1 = ex2)
     (ORD: ord1 = ord2)
     (VLOC: sim_val_weak vloc1 vloc2)
     (VVAL: sim_val_weak vval1 vval2)
@@ -125,7 +125,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
      (cov: list (nat -> Time.t)) (vext: list (nat -> Time.t)), Prop :=
 | sim_trace_init
     st lc stmts
-    (FIND: IdMap.find tid (init_with_promises p mem).(Machine.tpool) = Some (st, lc))
+    (FIND: IdMap.find tid (Machine.init_with_promises p mem).(Machine.tpool) = Some (st, lc))
     (STMT: IdMap.find tid p = Some stmts):
     sim_trace p mem tid [ExecUnit.mk st lc mem] [AExecUnit.mk (State.init stmts) ALocal.init]
               [fun _ => None] [fun _ => None] [fun _ => Time.bot] [fun _ => Time.bot]
@@ -240,7 +240,7 @@ Proof.
   generalize (SIM tid). intro X. inv X; eauto.
   generalize (TR tid). rewrite <- H0. intro X. inv X.
   inv STEP. hexploit state_exec_rtc_state_step; [by eauto|]. i. des.
-  exploit step_get_msg_tpool.
+  exploit Machine.step_get_msg_tpool.
   - etrans.
     + eapply Machine.rtc_step_mon; [|by eauto]. right. ss.
     + eapply Machine.rtc_step_mon; [|by eauto]. left. ss.
@@ -399,7 +399,7 @@ Proof.
     eexists (IdMap.mapi (fun _ _ => [bot]) p).
     eexists (Execution.mk (IdMap.mapi (fun _ _ => _) p) bot bot bot bot bot bot).
     eexists (@Valid.mk_pre_ex _ _ (IdMap.mapi (fun tid stmts => AExecUnit.mk (State.init stmts) ALocal.init) p)  _ _ _ _ _ _).
-    hexploit rtc_promise_step_spec; eauto. s. intro X.
+    hexploit Machine.rtc_promise_step_spec; eauto. s. intro X.
     s. splits; cycle 1.
     - i. specialize (X tid). rewrite ? IdMap.map_spec, ? IdMap.mapi_spec in *.
       rewrite X. destruct (IdMap.find tid p); ss. econs. eauto.
@@ -416,12 +416,12 @@ Proof.
   hexploit sim_trace_last; eauto. i. des. subst. simplify.
   exploit promising_pf_sim_step; eauto.
   { inv REL6; eauto. s.
-    unfold init_with_promises in FIND0. ss.
+    unfold Machine.init_with_promises in FIND0. ss.
     rewrite IdMap.mapi_spec, STMT in *. inv FIND0.
     apply sim_state_weak_init.
   }
   { inv REL6; eauto. s.
-    unfold init_with_promises in FIND0. ss.
+    unfold Machine.init_with_promises in FIND0. ss.
     rewrite IdMap.mapi_spec, STMT in *. inv FIND0.
     auto.
   }
@@ -590,7 +590,7 @@ Proof.
   { i. simplify. ss. econs; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       left. splits; ss. destruct ts; ss.
-      eapply promises_from_mem_lookup. eauto.
+      eapply Machine.promises_from_mem_lookup. eauto.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       destruct eid; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
@@ -604,11 +604,11 @@ Proof.
         * unfold bot. unfold fun_bot. unfold bot. unfold Time.bot. lia.
         * eexists. unfold bot. unfold fun_bot. unfold Memory.read. ss.
         * destruct ts; ss.
-          exploit promises_from_mem_inv; eauto. i. des.
+          exploit Machine.promises_from_mem_inv; eauto. i. des.
           apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
         * destruct ts; try by inv MSG.
           unfold Memory.get_msg in *. ss. destruct msg.
-          exploit promises_from_mem_lookup; eauto. ss. subst. ss.
+          exploit Machine.promises_from_mem_lookup; eauto. ss. subst. ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
       econs; ss.
       + ii. unfold RMap.init in N. unfold RMap.find in N.
