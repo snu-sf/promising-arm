@@ -95,7 +95,7 @@ Proof.
     inv STEP0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     { econs; ss. apply sim_rmap_add; try apply L.
       inv VAL. ss. subst. econs; ss.
-      admit. (* sim_view post *)
+      admit. (* sim post-view *)
     }
     destruct L.(LC). ss. econs; ss.
     all: try rewrite List.app_length, Nat.add_1_r.
@@ -175,8 +175,14 @@ Proof.
       * exploit VCAP; eauto. i. rewrite <- join_l. ss.
       * inv EID.
         admit. (* no ctrl edge to read *)
-      * inv EID. rewrite <- join_r.
-        admit. (* sim addr *)
+      * (* sim addr *)
+        inv EID. rewrite <- join_r.
+        destruct eid as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro X. inv X. ss. subst.
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. s. clear. lia. }
+        intro X. inv X.
+        { admit. (* well-formedness; addr cannot relate too big event *) }
+        inv H. eapply sim_rmap_expr; eauto. apply L.
     + i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VREL; eauto.
@@ -200,8 +206,14 @@ Proof.
           { rewrite List.app_length. s. lia. }
           rewrite List.nth_error_app2, Nat.sub_diag; ss.
           destruct l; ss. }
-    + destruct ex0; ss. econs. s.
-      admit. (* exbank, mostly post-view = ts *)
+    + destruct ex0; ss. econs. s. splits.
+      * admit. (* reverse of EX2.(LABELS) is required *)
+      * econs.
+        { ii. inv EID. admit. (* read message's ts <= ts I read *) }
+        { admit. (* reverse of the above *) }
+      * ii. subst. erewrite EX2.(XVEXT); eauto; cycle 1.
+        { s. rewrite List.app_length. s. unfold ALocal.next_eid. clear. lia. }
+        des_ifs. apply Nat.eqb_neq in Heq. clear -Heq. lia.
     + i. exploit PROMISES; eauto. i. des. esplits; cycle 1; eauto.
       inv N.
       * inv WRITE. exploit EX2.(LABELS); eauto; ss.
@@ -214,7 +226,8 @@ Proof.
     { econs; ss. apply sim_rmap_add; try apply L.
       econs; ss. unfold ifc. condtac; cycle 1.
       { ii. des. inv EID0. }
-      admit. (* post-view = ts *)
+      ii. des. destruct eid as [tid1 eid1]. ss. subst.
+      admit. (* post-view <= ts *)
     }
     destruct L.(LC). ss. econs; ss.
     all: try rewrite List.app_length, Nat.add_1_r.
@@ -298,9 +311,15 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto. i. rewrite <- join_l. ss.
       * inv EID.
-        admit. (* no ctrl edge to write *)
-      * inv EID. rewrite <- join_r.
-        admit. (* sim addr *)
+        admit. (* no ctrl edge to write. *)
+      * (* sim addr *)
+        inv EID. rewrite <- join_r.
+        destruct eid as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro X. inv X. ss. subst.
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. s. clear. lia. }
+        intro X. inv X.
+        { admit. (* well-formedness; addr cannot relate too big event *) }
+        inv H. eapply sim_rmap_expr; eauto. apply L.
     + i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VREL; eauto. i. rewrite <- join_l. ss.
@@ -312,14 +331,30 @@ Proof.
         admit. (* post-view = ts *)
     + i. rewrite fun_add_spec. condtac; s.
       { inversion e. subst. left. esplits; eauto.
-        - admit. (* ts > 0 *)
+        - destruct ts; ss. clear. lia.
         - instantiate (1 := (tid, length (ALocal.labels alc1))). econs.
           + econs; ss.
-          + admit. (* easy *)
+          + admit. (* reverse of EX2.(LABELS) is required *)
           + i. inv PO. inv PO0. ss. subst. clear -N N0. lia.
         - admit. (* post-view = ts *)
-        - admit. (* sim addr, data *)
-        - admit. (* easy *)
+        - ii. inv EID. inv REL.
+          + (* sim addr *)
+            rewrite <- join_l.
+            destruct eid as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro Y. inv Y. ss. subst.
+            exploit EX2.(ADDR); eauto; ss.
+            { rewrite List.app_length. s. clear. lia. }
+            intro Y. inv Y.
+            { admit. (* well-formedness; addr cannot relate too big event *) }
+            inv H0. eapply sim_rmap_expr; eauto. apply L.
+          + (* sim data *)
+            rewrite <- join_r.
+            destruct eid as [tid1 eid1]. exploit Valid.data_is_po; eauto. intro Y. inv Y. ss. subst.
+            exploit EX2.(DATA); eauto; ss.
+            { rewrite List.app_length. s. clear. lia. }
+            intro Y. inv Y.
+            { admit. (* well-formedness; data cannot relate too big event *) }
+            inv H0. eapply sim_rmap_expr; eauto. apply L.
+        - admit. (* should be easy after chaning sim_local's definition *)
       }
       specialize (FWDBANK loc). des.
       * left. esplits; eauto.
@@ -342,10 +377,8 @@ Proof.
     + intro. rewrite Promises.unset_o. condtac; ss. i.
       exploit PROMISES; eauto. i. des. esplits; cycle 1; eauto.
       inv N.
-      * inv WRITE. exploit EX2.(LABELS); eauto; ss.
-        { rewrite List.app_length. s. lia. }
-        rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0. ss.
-        admit. (* post-view = ts should not be in promise *)
+      * exfalso. apply c.
+        admit. (* post-view = ts *)
       * clear -H. lia.
   - (* write failure *)
     inv STEP0. inv RES. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.

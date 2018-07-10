@@ -113,8 +113,31 @@ Proof.
     unfold Execution.dob in H. rewrite ? seq_assoc in *. des_union.
     + inv H1. des. inv H1; cycle 1.
       { inv H2. exploit RF2; eauto. i. des.  congr. }
-      rewrite fun_add_spec. condtac; [|congr].
-      admit. (* addr/data dep.'s post-view < ts *)
+      rewrite fun_add_spec. condtac; [|congr]. inv WRITABLE.
+      eapply Nat.le_lt_trans; [|apply EXT]. s.
+      inv H.
+      * rewrite <- join_l.
+        destruct eid1 as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro Y. inv Y. ss. subst.
+        rewrite EX2.(XVEXT); s; cycle 1.
+        { s. rewrite List.app_length. s. clear -N. lia. }
+        condtac.
+        { apply Nat.eqb_eq in X1. subst. clear -N. lia. }
+        exploit EX2.(ADDR); eauto; ss.
+        { rewrite List.app_length. s. clear. lia. }
+        intro Y. inv Y.
+        { admit. (* well-formedness; addr cannot relate too big event *) }
+        inv H. admit. (* I don't know how to solve it.. *)
+      * rewrite <- join_l.
+        destruct eid1 as [tid1 eid1]. exploit Valid.data_is_po; eauto. intro Y. inv Y. ss. subst.
+        rewrite EX2.(XVEXT); s; cycle 1.
+        { s. rewrite List.app_length. s. clear -N. lia. }
+        condtac.
+        { apply Nat.eqb_eq in X1. subst. clear -N. lia. }
+        exploit EX2.(DATA); eauto; ss.
+        { rewrite List.app_length. s. clear. lia. }
+        intro Y. inv Y.
+        { admit. (* well-formedness; data cannot relate too big event *) }
+        inv H. admit. (* I don't know how to solve it.. *)
     + inv H1. des. inv H1; cycle 1.
       { inv H2. des. inv H2. inv H5. destruct l0; ss. congr. }
       inv H2. eapply Nat.le_lt_trans.
