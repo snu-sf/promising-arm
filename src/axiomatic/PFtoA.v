@@ -395,7 +395,7 @@ Proof.
     + generalize (TR id). i. inv H; try congr.
       generalize (ATR id). i. inv H; try congr.
       des. simplify. inv REL6; auto.
-      { econs. unfold init_with_promises in *. ss.
+      { econs. unfold Machine.init_with_promises in *. ss.
         rewrite IdMap.mapi_spec in *. rewrite STMT in FIND. ss.
         symmetry in FIND. inv FIND. rewrite H0.
         apply sim_state_weak_init. }
