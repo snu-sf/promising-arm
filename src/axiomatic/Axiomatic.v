@@ -308,12 +308,16 @@ Module AExecUnit.
   | wf_intro
       (REG: wf_rmap aeu.(state).(State.rmap) aeu.(local).(ALocal.labels))
       (ADDR: aeu.(local).(ALocal.addr) ⊆ lt)
+      (ADDR_LIMIT: forall e1 e2 (REL: aeu.(local).(ALocal.addr) e1 e2), e2 < List.length aeu.(local).(ALocal.labels))
       (ADDR_LABEL: aeu.(local).(ALocal.addr) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_access) × (label_is aeu.(local).(ALocal.labels) Label.is_access))
       (DATA: aeu.(local).(ALocal.data) ⊆ lt)
+      (DATA_LIMIT: forall e1 e2 (REL: aeu.(local).(ALocal.data) e1 e2), e2 < List.length aeu.(local).(ALocal.labels))
       (DATA_LABEL: aeu.(local).(ALocal.data) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_access) × (label_is aeu.(local).(ALocal.labels) Label.is_write))
       (CTRL: aeu.(local).(ALocal.ctrl) ⊆ lt)
+      (CTRL_LIMIT: forall e1 e2 (REL: aeu.(local).(ALocal.ctrl) e1 e2), e2 < List.length aeu.(local).(ALocal.labels))
       (CTRL_LABEL: aeu.(local).(ALocal.ctrl) ⊆ (label_is aeu.(local).(ALocal.labels) Label.is_access) × (label_is aeu.(local).(ALocal.labels) Label.is_ctrl))
       (RMW: aeu.(local).(ALocal.rmw) ⊆ lt)
+      (RMW_LIMIT: forall e1 e2 (REL: aeu.(local).(ALocal.rmw) e1 e2), e2 < List.length aeu.(local).(ALocal.labels))
       (RMW1: forall n ord loc val
                (LABEL: List.nth_error aeu.(local).(ALocal.labels) n = Some (Label.write true ord loc val)),
           codom_rel aeu.(local).(ALocal.rmw) n)
@@ -322,7 +326,9 @@ Module AExecUnit.
           exists ord1 loc1 val1 ord2 loc2 val2,
             <<LABEL1: List.nth_error aeu.(local).(ALocal.labels) a = Some (Label.read true ord1 loc1 val1)>> /\
             <<LABEL2: List.nth_error aeu.(local).(ALocal.labels) b = Some (Label.write true ord2 loc2 val2)>> /\
-            <<BETWEEN: forall c ord3 loc3 val3 (C: a < c < b), List.nth_error aeu.(local).(ALocal.labels)c <> Some (Label.read true ord3 loc3 val3)>>)
+            <<BETWEEN: forall c ord3 loc3 val3 (C: a < c < b), List.nth_error aeu.(local).(ALocal.labels) c <> Some (Label.read true ord3 loc3 val3)>>)
+      (EXBANK': forall eb (EB: aeu.(local).(ALocal.exbank) = Some eb),
+          eb < List.length aeu.(local).(ALocal.labels))
       (EXBANK: forall eb c ord3 loc3 val3
                  (EB: aeu.(local).(ALocal.exbank) = Some eb)
                  (C: eb < c),
@@ -401,6 +407,8 @@ Module AExecUnit.
       + destruct local1. refl.
     - splits.
       + inv WF. econs; ss.
+        all: try rewrite List.app_length; s.
+        all: unfold ALocal.next_eid in *.
         * ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
           { inversion e. subst. i. inv N.
             econs.
@@ -408,7 +416,12 @@ Module AExecUnit.
             - ss.
           }
           { i. apply label_is_mon. exploit REG; eauto. }
-        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { exploit ADDR_LIMIT; eauto. }
+          { inv H0. splits; eauto using label_is_lt, wf_rmap_expr. }
+        * i. inv REL.
+          { exploit ADDR_LIMIT; eauto. lia. }
+          { inv H. lia. }
         * ii. inv H.
           { eapply times_mon; [| |by apply ADDR_LABEL].
             - apply label_is_mon.
@@ -420,16 +433,22 @@ Module AExecUnit.
               + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
               + ss.
           }
+        * ii. exploit DATA_LIMIT; eauto. lia.
         * ii. eapply times_mon; [| |by apply DATA_LABEL].
           { apply label_is_mon. }
           { apply label_is_mon. }
+        * ii. exploit CTRL_LIMIT; eauto. lia.
         * ii. econs; ss.
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
+        * ii. exploit RMW_LIMIT; eauto. lia.
         * i. apply nth_error_snoc_inv in LABEL. des; ss.
           eapply RMW1. eauto.
         * i. exploit RMW2; eauto. i. des. esplits; eauto using nth_error_app_mon.
           i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr.
+        * i. destruct ex0; ss.
+          { inv EB. lia. }
+          { exploit EXBANK'; eauto. lia. }
         * ii. apply nth_error_snoc_inv in H. des; ss.
           { destruct ex0.
             { inv EB. unfold ALocal.next_eid in *. lia. }
@@ -441,13 +460,20 @@ Module AExecUnit.
         * left. ss.
     - splits.
       + inv WF. econs; ss.
+        all: try rewrite List.app_length; s.
+        all: unfold ALocal.next_eid in *.
         * ii. revert N. unfold RMap.find, RMap.add. rewrite IdMap.add_spec. condtac.
           { inversion e. subst. s. unfold ifc. condtac; ss. i. subst. econs.
             - unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
             - ss.
           }
           { i. apply label_is_mon. exploit REG; eauto. }
-        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { exploit ADDR_LIMIT; eauto. }
+          { inv H0. splits; eauto using label_is_lt, wf_rmap_expr. }
+        * i. inv REL.
+          { exploit ADDR_LIMIT; eauto. lia. }
+          { inv H. lia. }
         * ii. inv H.
           { eapply times_mon; [| |by apply ADDR_LABEL].
             - apply label_is_mon.
@@ -459,7 +485,12 @@ Module AExecUnit.
               + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
               + ss.
           }
-        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { exploit DATA_LIMIT; eauto. }
+          { inv H0. splits; eauto using label_is_lt, wf_rmap_expr. }
+        * i. inv REL.
+          { exploit DATA_LIMIT; eauto. lia. }
+          { inv H. lia. }
         * ii. inv H.
           { eapply times_mon; [| |by apply DATA_LABEL].
             - apply label_is_mon.
@@ -471,12 +502,16 @@ Module AExecUnit.
               + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
               + ss.
           }
+        * i. exploit CTRL_LIMIT; eauto. lia.
         * ii. econs; ss.
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
-        * ii. inv H; eauto. destruct ex0; ss. inv H0.
-          exploit EX; eauto. i. des. rewrite H in x0. inv x0. inv x1.
-          apply List.nth_error_Some. congr.
+        * ii. inv H.
+          { exploit RMW_LIMIT; eauto. }
+          { destruct ex0; ss. inv H0. splits; eauto using label_is_lt, wf_rmap_expr. }
+        * i. inv REL.
+          { exploit RMW_LIMIT; eauto. lia. }
+          { destruct ex0; ss. inv H. lia. }
         * i. apply nth_error_snoc_inv in LABEL. des.
           { exploit RMW1; eauto. i. inv x. econs. left. eauto. }
           { subst. inv LABEL0. exploit EX; eauto. i. des. econs. right. econs; eauto. }
@@ -496,6 +531,7 @@ Module AExecUnit.
               + eapply EXBANK; eauto.
               + unfold ALocal.next_eid in *. lia.
           }
+        * i. destruct ex0; ss. exploit EXBANK'; eauto. lia.
         * ii. destruct ex0; ss. apply nth_error_snoc_inv in H. des; ss.
           eapply EXBANK; eauto.
       + econs; ss.
@@ -510,34 +546,50 @@ Module AExecUnit.
       + econs; ss. eexists. rewrite List.app_nil_r. ss.
     - splits.
       + inv WF. econs; ss.
+        all: try rewrite List.app_length; s.
+        all: unfold ALocal.next_eid in *.
         * ii. apply label_is_mon. exploit REG; eauto.
+        * i. exploit ADDR_LIMIT; eauto. lia.
         * ii. eapply times_mon; [| |by apply ADDR_LABEL].
           { apply label_is_mon. }
           { apply label_is_mon. }
+        * i. exploit DATA_LIMIT; eauto. lia.
         * ii. eapply times_mon; [| |by apply DATA_LABEL].
           { apply label_is_mon. }
           { apply label_is_mon. }
+        * i. exploit CTRL_LIMIT; eauto. lia.
         * ii. econs; ss.
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
           { apply label_is_mon. eapply CTRL_LABEL. eauto. }
+        * i. exploit RMW_LIMIT; eauto. lia.
         * i. apply nth_error_snoc_inv in LABEL. des; eauto. inv LABEL0.
         * i. exploit RMW2; eauto. i. des. esplits.
           { apply nth_error_app_mon. eauto. }
           { apply nth_error_app_mon. eauto. }
           { i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr. }
+        * i. exploit EXBANK'; eauto. lia.
         * ii. apply nth_error_snoc_inv in H. des; ss.
           eapply EXBANK; eauto.
       + econs; ss. eexists; eauto.
     - splits.
       + inv WF. econs; ss.
+        all: try rewrite List.app_length; s.
+        all: unfold ALocal.next_eid in *.
         * ii. apply label_is_mon. exploit REG; eauto.
+        * i. exploit ADDR_LIMIT; eauto. lia.
         * ii. eapply times_mon; [| |by apply ADDR_LABEL].
           { apply label_is_mon. }
           { apply label_is_mon. }
+        * i. exploit DATA_LIMIT; eauto. lia.
         * ii. eapply times_mon; [| |by apply DATA_LABEL].
           { apply label_is_mon. }
           { apply label_is_mon. }
-        * ii. inv H; eauto. inv H0. eapply label_is_lt. eapply wf_rmap_expr; eauto.
+        * ii. inv H.
+          { exploit CTRL_LIMIT; eauto. }
+          { inv H0. splits; eauto using label_is_lt, wf_rmap_expr. }
+        * i. inv REL.
+          { exploit CTRL_LIMIT; eauto. lia. }
+          { inv H. lia. }
         * ii. inv H.
           { eapply times_mon; [| |by apply CTRL_LABEL].
             - apply label_is_mon.
@@ -549,11 +601,13 @@ Module AExecUnit.
               + unfold ALocal.next_eid. rewrite List.nth_error_app2, Nat.sub_diag; ss.
               + ss.
           }
+        * i. exploit RMW_LIMIT; eauto. lia.
         * i. apply nth_error_snoc_inv in LABEL. des; eauto. inv LABEL0.
         * i. exploit RMW2; eauto. i. des. esplits.
           { apply nth_error_app_mon. eauto. }
           { apply nth_error_app_mon. eauto. }
           { i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr. }
+        * i. exploit EXBANK'; eauto. lia.
         * ii. apply nth_error_snoc_inv in H. des; ss.
           eapply EXBANK; eauto.
       + econs; ss; eauto. left. ss.
