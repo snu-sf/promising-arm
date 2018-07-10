@@ -78,11 +78,25 @@ Proof.
   destruct (le_lt_dec (length (ALocal.labels (AExecUnit.local aeu1))) eid1); cycle 1.
   { eapply L; eauto. }
   assert (LABEL1: Execution.label_is ex (fun label : Label.t => Label.is_read label) (tid, eid1)).
-  { inv FR. inv H.
-    - des. exploit RF2; eauto. i. des. econs; eauto.
+  { inv FR.
+    - inv H. des. exploit RF2; eauto. i. des. econs; eauto.
     - inv H. inv H1. inv H. ss.
   }
+  assert (LABEL2: Execution.label_is ex (fun label : Label.t => Label.is_write label) eid2).
+  { inv FR.
+    - inv H. des. exploit CO2; eauto. i. des. econs; eauto.
+    - inv H. inv H1. ss.
+  }
   inv LABEL1. destruct l0; ss.
+  inv LABEL2. destruct l0; ss.
+  destruct eid2 as [tid2 eid2].
+  generalize (SIM tid2). intro SIMTR2. inv SIMTR2.
+  { generalize (ATR tid2). rewrite <- H. intro X. inv X.
+    unfold Execution.label in EID0. ss.
+    rewrite PRE.(Valid.LABELS), IdMap.map_spec, <- H1 in EID0. ss.
+  }
+  rename REL0 into SIMTR2, a into tr2, b into atr2, c into wl2, d into rl2, e0 into covl2, f into vextl2.
+  rename H0 into TR2, H into ATR2, H2 into WL2, H3 into RL2, H4 into COVL4, H5 into VEXTL5.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
   destruct aeu1 as [ast1 alc1].
@@ -95,75 +109,52 @@ Proof.
   all: try by clear; rewrite List.app_length; s; lia.
   all: intro NTH; apply nth_error_snoc_inv_last in NTH; inv NTH.
   rewrite EU, AEU, COV, VEXT, <- WL, <- RL in SIMTR.
-  exploit sim_trace_sim_th; try exact SIMTR; eauto. intro L'.
-  exploit L'.(RPROP1); ss.
+  exploit sim_trace_sim_th; try exact SIMTR; eauto. intro L2.
+  exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+  exploit L2.(RPROP1); ss.
   { apply nth_error_last. apply Nat.eqb_eq. ss. }
   unfold ALocal.next_eid in *. condtac; cycle 1.
   { apply Nat.eqb_neq in X. congr. }
-  exploit L'.(RPROP2); ss.
-  { rewrite X. eauto. }
-  rewrite X. i. des. inv x1. apply nth_error_snoc_inv_last in x4. inv x4.
-  clear x0 x3 x5 tid'0.
-  rewrite EX2.(XVEXT); s; cycle 1.
+  i. des. inv x0. rewrite EX2.(XVEXT) in *; s; cycle 1.
   { rewrite List.app_length. s. clear. lia. }
-  rewrite X. 
+  rewrite X.
   inv STEP0. ss. subst. inv LOCAL0; inv EVENT.
-  admit. (* should be true from STEP0 *)
+  generalize L1.(EU_WF). intro WF. inv WF. ss.
 
-  (* ii. inversion FR0. *)
-  (* - admit. (* read from non-initial value *) *)
-  (* - inv H. inv H1. inv H. inv H1. *)
-  (*   exploit LABELS; eauto. intro LABEL1. destruct l; ss. *)
-  (*   rewrite EU, AEU, COV, VEXT, <- WL, <- RL in SIMTR. *)
-  (*   exploit sim_trace_sim_th; try exact SIMTR; eauto. intro L'. *)
-  (*   exploit L'.(RPROP1); eauto. i. des. unguardH x1. des. *)
-  (*   + subst. *)
-  (*     inv EVENT; ss. *)
-  (*     * eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*     * des_ifs; cycle 1. *)
-  (*       { eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*         eapply nth_error_not_last; eauto. } *)
-  (*       { inv STEP0. ss. inv LOCAL0; ss. inv STEP0. inv EVENT. ss. *)
-  (*         rewrite fun_add_spec in H1. *)
-  (*         destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)); try congr. *)
-  (*         admit. *)
-  (*       } *)
-  (*     * inv STEP0. ss. inv LOCAL0; ss; inv EVENT. *)
-  (*       { inv STEP0. ss. inv ALOCAL_STEP; ss. *)
-  (*         - destruct (Nat.eqb eid1 (ALocal.next_eid alc1)) eqn:HEID1. *)
-  (*           + rewrite nth_error_last in LABEL1; auto. inv LABEL1. *)
-  (*           + eapply FR; eauto. eapply nth_error_not_last; eauto. *)
-  (*         - inv EVENT. inv RES. ss. } *)
-  (*       { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*         destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1. *)
-  (*         - rewrite nth_error_last in LABEL1; eauto. inv LABEL1. *)
-  (*         - eapply nth_error_not_last; eauto. } *)
-  (*     * inv STEP0. ss. inv LOCAL0; ss; inv EVENT. *)
-  (*       { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*         destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1. *)
-  (*         - rewrite nth_error_last in LABEL1; eauto. inv LABEL1. *)
-  (*         - eapply nth_error_not_last; eauto. } *)
-  (*       { inv STEP0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*         destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1. *)
-  (*         - rewrite nth_error_last in LABEL1; eauto. inv LABEL1. *)
-  (*         - eapply nth_error_not_last; eauto. } *)
-  (*     * inv STEP0. ss. inv LOCAL0; ss; inv EVENT. *)
-  (*       inv LC0. ss. eapply FR; eauto. inv ALOCAL_STEP; ss. *)
-  (*       destruct (Nat.eqb eid1 (List.length (ALocal.labels alc1))) eqn:HEID1. *)
-  (*       { rewrite nth_error_last in LABEL1; eauto. inv LABEL1. } *)
-  (*       { eapply nth_error_not_last; eauto. } *)
-  (*   + exploit sim_traces_memory; eauto. i. des. *)
-  (*     generalize (SIM tid'). intro SIM'. inv SIM'; try congr. simplify. *)
-  (*     exploit sim_trace_last; try exact REL0. i. des. subst. *)
-  (*     exploit sim_trace_sim_th; try exact REL0; eauto. i. destruct x3. *)
-  (*     exploit WPROP0; eauto. i. des. *)
-  (*     * inv STEP. inv NOPROMISE. *)
-  (*       generalize (TR tid'). intro TR'. inv TR'; try congr. des. simplify. *)
-  (*       destruct b. exploit PROMISES0; eauto. i. *)
-  (*       ss. rewrite x4 in *. rewrite Promises.lookup_bot in x1. ss. *)
-  (*     * exfalso. apply H3. econs. rewrite RF. *)
-  (*       instantiate (1 := (tid', eid)). *)
-  (*       exploit sim_trace_last; try exact REL6. i. des. subst. *)
-  (*       econs; try refl; ss; eauto. *)
-  (*       admit. (* should prove that r includes r2 *) *)
+  (* TODO: move *)
+  Lemma read_spec
+        `{A: Type, _: orderC A eq}
+        tid mem ex ord vloc res ts (lc1 lc2:Local.t (A:=A))
+        (WF: Local.wf tid mem lc1)
+        (READ: Local.read ex ord vloc res ts lc1 mem lc2):
+    <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\
+    <<TS: ts = lc2.(Local.coh) vloc.(ValA.val)>>.
+  Proof.
+    inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits; ss.
+    ii. eapply LATEST; eauto.
+    exploit Local.fwd_read_view_le; eauto. instantiate (1 := ord). i.
+    unfold join, Time.join in *. lia.
+  Qed.
+
+  Lemma latest_lt
+        loc ts1 ts2 ts3 mem msg
+        (LATEST: Memory.latest loc ts1 ts2 mem)
+        (LT: ts1 < ts3)
+        (MSG: Memory.get_msg ts3 mem = Some msg)
+        (LOC: msg.(Msg.loc) = loc):
+    ts2 < ts3.
+  Proof.
+    destruct ts3; ss.
+    destruct (le_lt_dec (S ts3) ts2); ss.
+    exfalso. eapply LATEST; eauto. 
+  Qed.
+
+  generalize (read_spec LOCAL0 STEP0). i. des. subst.
+  exploit sim_traces_cov_fr; eauto.
+  { inv STEP. ss. }
+  rewrite EX2.(XCOV) in *; s; cycle 1.
+  { rewrite List.app_length. s. clear. lia. }
+  rewrite X. i.
+  eapply latest_lt; eauto.
+  all: admit. (* remaining work: finding w's message. *)
 Admitted.
