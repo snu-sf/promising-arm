@@ -27,6 +27,7 @@ Require Import PromisingArch.axiomatic.PFtoA3.
 Require Import PromisingArch.axiomatic.PFtoA4OBW.
 Require Import PromisingArch.axiomatic.PFtoA4OBR.
 Require Import PromisingArch.axiomatic.PFtoA4FR.
+Require Import PromisingArch.axiomatic.PFtoA4Atomic.
 Require Import PromisingArch.axiomatic.PFtoA4SL.
 
 Set Implicit Arguments.
@@ -70,6 +71,7 @@ Proof.
   - eapply sim_traces_sim_th'_ob_write; eauto.
   - eapply sim_traces_sim_th'_ob_read; eauto.
   - eapply sim_traces_sim_th'_fr; eauto.
+  - eapply sim_traces_sim_th'_atomic; eauto.
 Qed.
 
 Lemma sim_traces_sim_th'
@@ -175,7 +177,13 @@ Lemma sim_traces_vext_valid
     forall eid1 eid2
       (OB: ex.(ob') eid1 eid2)
       (EID2: ex.(Execution.label_is) Label.is_read eid2),
-      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>>.
+      Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
+  <<ATOMIC:
+    forall eid1 eid2 eid
+      (ATOMIC: ex.(Execution.rmw) eid1 eid2)
+      (FRE: ex.(Execution.fre) eid1 eid)
+      (COE: ex.(Execution.coe) eid eid2),
+      False>>.
 Proof.
 Admitted.
 
@@ -242,8 +250,9 @@ Proof.
       * exploit FR; eauto.
       * exploit sim_traces_vext_co; eauto.
       * exploit OB_WRITE; eauto.
-  - admit.
-Admitted.
+  - exploit sim_traces_vext_valid; eauto. i. des.
+    ii. inv H. inv H1. des. exfalso. eauto.
+Qed.
 
 Lemma internal_acyclic
       ex cov

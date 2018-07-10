@@ -233,6 +233,16 @@ Definition sim_fr
     (FR: ex.(Execution.fr) (tid, eid1) eid2),
     Time.lt (vext (tid, eid1)) (vext eid2).
 
+Definition sim_atomic
+           (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
+  forall eid1 eid2 eid
+    (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
+    (ATOMIC: ex.(Execution.rmw) eid1 (tid, eid2))
+    (FRE: ex.(Execution.fre) eid1 eid)
+    (COE: ex.(Execution.coe) eid (tid, eid2)),
+    False.
+
 Inductive sim_th'
           (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop := {
@@ -241,5 +251,6 @@ Inductive sim_th'
   OBW: sim_ob_write tid ex vext eu aeu;
   OBR: sim_ob_read tid ex vext eu aeu;
   FR: sim_fr tid ex vext eu aeu;
+  ATOMIC: sim_atomic tid ex vext eu aeu;
 }.
 Hint Constructors sim_th'.
