@@ -24,6 +24,7 @@ Require Import PromisingArch.axiomatic.CommonAxiomatic.
 Require Import PromisingArch.axiomatic.PFtoA1.
 Require Import PromisingArch.axiomatic.PFtoA2.
 Require Import PromisingArch.axiomatic.PFtoA3.
+Require Import PromisingArch.axiomatic.PFtoA4SL.
 
 Set Implicit Arguments.
 
@@ -103,6 +104,72 @@ Proof.
   clear x4 H3 tid'0 x2 x0.
   rewrite EX2.(XVEXT); s; cycle 1.
   { rewrite List.app_length. s. clear. lia. }
-  rewrite X. 
-  move AOB at bottom. admit.
+  rewrite X.
+  inv STEP0. ss. subst. inv LOCAL0; inv EVENT. inv STEP0. ss.
+  exploit EX2.(LABELS); eauto; ss.
+  { rewrite List.app_length. s. clear. lia. }
+  i.
+  move AOB at bottom. unfold ob' in AOB. des_union.
+  - (* rfe *)
+    assert (v_gen vexts eid1 = ts).
+    { admit. (* write's post-view = ts *) }
+    subst.
+    rewrite <- join_r. unfold FwdItem.read_view. condtac; ss.
+    destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts eid1)); ss. inv e.
+    generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
+    + rewrite <- TS in H2.
+      assert (eid = eid1).
+      { admit. (* equal vext => equal eid *) }
+      subst.
+      inv WRITE. inv PO. ss. subst. inv H. inv H3. ss.
+    + rewrite H1. refl.
+  - (* dob *)
+    unfold Execution.dob in H. rewrite ? seq_assoc in *. des_union.
+    + admit. (* addr/data; rfi? implies <= post-view *)
+    + inv H1. des. inv H1.
+      { inv H2. inv H3. destruct l0; ss. congr. }
+      inv H2. des. inv H2.
+      rewrite L.(LC).(VRP); ss.
+      * rewrite <- join_l, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vrp. left. right.
+        rewrite ? seq_assoc in H1. econs; eauto.
+  - (* aob *)
+    unfold Execution.aob in H1. rewrite ? seq_assoc in *.
+    inv H1. des. inv H.  des. inv H2. inv H1. guardH H2.
+    assert (v_gen vexts x2 = ts).
+    { admit. (* write's post-view = ts *) }
+    subst.
+    rewrite <- join_r. unfold FwdItem.read_view. condtac; ss.
+    destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts x2)); ss. inv e.
+    generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
+    + apply Bool.negb_true_iff, Bool.andb_false_iff in X0. des.
+      * admit. (* H4 : codom_rel (Execution.rmw ex) x2 *)
+      * unguardH H2. des.
+        { destruct (equiv_dec arch riscv); ss. }
+        { inv H2. destruct l0; ss. rewrite EID in EID0. inv EID0.
+          rewrite LABEL1 in X0. rewrite Bool.orb_comm in X0. ss.
+        }
+    + rewrite H. refl.
+  - (* bob *)
+    unfold Execution.bob in H. rewrite ? seq_assoc in *. des_union.
+    + rewrite L.(LC).(VRP); ss.
+      * rewrite <- join_l, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vrp. left. left. left.
+        rewrite ? seq_assoc. inv H1. des. inv H1. ss.
+    + inv H1. des. inv H1. inv H3. destruct l0; ss. congr.
+    + rewrite L.(LC).(VRP); ss.
+      * rewrite <- join_l, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vrp. left. left. right.
+        rewrite ? seq_assoc. inv H. des. inv H2. ss.
+    + inv H1. des. inv H1. inv H3. destruct l0; ss. congr.
+    + inv H. des. inv H2. inv H3. destruct l0; ss. rewrite EID in EID0. inv EID0. rewrite LABEL1.
+      rewrite L.(LC).(VREL); ss.
+      * rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
+      * econs; ss. unfold sim_local_vrel. ss.
+    + rewrite L.(LC).(VRP); ss.
+      * rewrite <- join_l, <- join_r, <- join_l. ss.
+      * econs; eauto. unfold sim_local_vrp. right.
+        rewrite ? seq_assoc. ss.
+    + inv H. des. inv H2. inv H3. destruct l0; ss. congr.
+    + admit. (* riscv.. bug in promising semantics (low priority) *)
 Admitted.
