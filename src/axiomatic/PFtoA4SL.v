@@ -213,8 +213,34 @@ Proof.
         exploit EX2.(LABELS); eauto; ss.
         { rewrite List.app_length. s. lia. }
         { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
-    + admit. (* fwdbank *)
-    + admit. (* promise *)
+    + i. specialize (FWDBANK loc). des.
+      * left. esplits; eauto.
+        rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_fwd_step. econs.
+        instantiate (1 := (tid, List.length (ALocal.labels alc1))).
+        econs; cycle 1.
+        { econs; ss. }
+        left. econs. split; eauto. econs; ss.
+        admit. (* reverse of EX2.(LABELS) is required *)
+      * right. esplits; eauto.
+        i. specialize (FWDBANK0 eid).
+        rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_fwd_none_step. rewrite inverse_step.
+        ii. inv H. inv REL.
+        { apply FWDBANK0. econs; eauto. }
+        { inv H. inv H1. exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss.
+          destruct l; ss. }
+    + i. exploit PROMISES; eauto. i. des. esplits; cycle 1.
+      { eauto. }
+      { auto. }
+      rewrite List.app_length, Nat.add_1_r. inv N.
+      * inv WRITE. exploit EX2.(LABELS); eauto; ss.
+        { rewrite List.app_length. s. lia. }
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
+        destruct l; ss.
+      * apply le_n_S. auto.
   - (* dmb *)
     inv STEP0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     econs; ss.
@@ -328,8 +354,34 @@ Proof.
         exploit EX2.(LABELS); eauto; ss.
         { rewrite List.app_length. s. lia. }
         { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
-    + admit. (* fwdbank *)
-    + admit. (* promise *)
+    + i. specialize (FWDBANK loc). des.
+      * left. esplits; eauto.
+        rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_fwd_step. econs.
+        instantiate (1 := (tid, List.length (ALocal.labels alc1))).
+        econs; cycle 1.
+        { econs; ss. }
+        left. econs. split; eauto. econs; ss.
+        admit. (* reverse of EX2.(LABELS) is required *)
+      * right. esplits; eauto.
+        i. specialize (FWDBANK0 eid).
+        rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_fwd_none_step. rewrite inverse_step.
+        ii. inv H. inv REL.
+        { apply FWDBANK0. econs; eauto. }
+        { inv H. inv H1. exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss.
+          destruct l; ss. }
+    + i. exploit PROMISES; eauto. i. des. esplits; cycle 1.
+      { eauto. }
+      { auto. }
+      rewrite List.app_length, Nat.add_1_r. inv N.
+      * inv WRITE. exploit EX2.(LABELS); eauto; ss.
+        { rewrite List.app_length. s. lia. }
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
+        destruct l; ss.
+      * apply le_n_S. auto.
   - (* if *)
     inv LC. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     econs; ss.
@@ -435,8 +487,34 @@ Proof.
         exploit EX2.(LABELS); eauto; ss.
         { rewrite List.app_length. s. lia. }
         { rewrite List.nth_error_app2, Nat.sub_diag; ss. }
-    + admit. (* fwdbank *)
-    + admit. (* promise *)
+    + i. specialize (FWDBANK loc). des.
+      * left. esplits; eauto.
+        rewrite List.app_length, Nat.add_1_r.
+        i. rewrite sim_local_fwd_step. econs.
+        instantiate (1 := (tid, List.length (ALocal.labels alc1))).
+        econs; cycle 1.
+        { econs; ss. }
+        left. econs. split; eauto. econs; ss.
+        admit. (* reverse of EX2.(LABELS) is required *)
+      * right. esplits; eauto.
+        i. specialize (FWDBANK0 eid).
+        rewrite List.app_length, Nat.add_1_r.
+        rewrite sim_local_fwd_none_step. rewrite inverse_step.
+        ii. inv H. inv REL.
+        { apply FWDBANK0. econs; eauto. }
+        { inv H. inv H1. exploit EX2.(LABELS); eauto; ss.
+          { rewrite List.app_length. s. lia. }
+          rewrite List.nth_error_app2, Nat.sub_diag; ss.
+          destruct l; ss. }
+    + i. exploit PROMISES; eauto. i. des. esplits; cycle 1.
+      { eauto. }
+      { auto. }
+      rewrite List.app_length, Nat.add_1_r. inv N.
+      * inv WRITE. exploit EX2.(LABELS); eauto; ss.
+        { rewrite List.app_length. s. lia. }
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
+        destruct l; ss.
+      * apply le_n_S. auto.
   - (* dowhile *)
     inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     + econs; ss; try by apply L.
