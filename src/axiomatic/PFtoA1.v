@@ -546,6 +546,8 @@ Inductive sim_th
       <<PO_LOC_READ:
         Label.is_read label2 ->
         Time.le (cov iid1) (cov iid2)>>;
+  EU_WF: ExecUnit.wf tid eu;
+  AEU_WF: AExecUnit.wf aeu;
 }.
 
 Lemma sim_trace_sim_state_weak
@@ -609,6 +611,24 @@ Proof.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       destruct eid; ss.
     - i. destruct iid1; ss.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
+      econs; ss.
+      + econs. i. unfold RMap.find. rewrite IdMap.gempty. ss.
+        unfold bot. unfold Time.bot. lia.
+      + econs; ss; i; try by (unfold bot; unfold Time.bot; lia).
+        * unfold bot. unfold fun_bot. unfold bot. unfold Time.bot. lia.
+        * eexists. unfold bot. unfold fun_bot. unfold Memory.read. ss.
+        * destruct ts; ss.
+          exploit promises_from_mem_inv; eauto. i. des.
+          apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
+        * destruct ts; try by inv MSG.
+          unfold Memory.get_msg in *. ss. destruct msg.
+          exploit promises_from_mem_lookup; eauto. ss. subst. ss.
+    - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
+      econs; ss.
+      + ii. unfold RMap.init in N. unfold RMap.find in N.
+        rewrite IdMap.gempty in N. ss.
+      + ii. apply List.nth_error_In in LABEL. inv LABEL.
   }
   clear LOCAL.
   i. simplify.
@@ -620,6 +640,12 @@ Proof.
   { exploit sim_trace_memory; eauto. }
   ss. exploit IHSIM; eauto.
   i. rename x into IH.
+  assert (EU_WF: ExecUnit.wf tid (ExecUnit.mk st2 lc2 mem2)).
+  { destruct IH.
+    eapply ExecUnit.state_step_wf; eauto. econs; eauto. }
+  assert (AEU_WF: AExecUnit.wf (AExecUnit.mk ast2 alc2)).
+  { destruct IH.
+    eapply AExecUnit.step_future; eauto. }
   inv STEP. inv ALOCAL_STEP; inv EVENT; ss; eauto.
   { (* internal *)
     inv LOCAL; ss. inv EVENT. econs; ss; try by apply IH.
@@ -629,7 +655,7 @@ Proof.
     exploit sim_trace_sim_state_weak; eauto. s. intro Y. inv Y. ss. inv STMTS.
     exploit sim_rmap_weak_expr; eauto. intro Y. inv Y.
 
-    econs; ss.
+    econs; ss; clear EU_WF AEU_WF.
     - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WPROP2); eauto.
@@ -696,7 +722,8 @@ Proof.
         all: try apply Nat.eqb_eq in X; ss; try lia.
   }
   { (* write *)
-    inv LOCAL; inv EVENT; inv RES; inv STEP; ss. inv STATE. ss. econs; ss.
+    inv LOCAL; inv EVENT; inv RES; inv STEP; ss. inv STATE. ss.
+    econs; ss; clear EU_WF AEU_WF.
     - i. exploit IH.(WPROP1); eauto. s. i. rewrite Promises.unset_o. des_ifs.
       { inv e. right. rewrite MSG in GET. inv GET. esplits; ss.
         - instantiate (1 := ALocal.next_eid alc1). des_ifs; cycle 1.
