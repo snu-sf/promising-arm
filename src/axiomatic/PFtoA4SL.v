@@ -200,7 +200,8 @@ Proof.
           { rewrite List.app_length. s. lia. }
           rewrite List.nth_error_app2, Nat.sub_diag; ss.
           destruct l; ss. }
-    + admit. (* exbank *)
+    + destruct ex0; ss. econs. s.
+      admit. (* exbank, mostly post-view = ts *)
     + i. exploit PROMISES; eauto. i. des. esplits; cycle 1; eauto.
       inv N.
       * inv WRITE. exploit EX2.(LABELS); eauto; ss.
