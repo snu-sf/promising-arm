@@ -95,8 +95,11 @@ Proof.
     inv STEP0. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
     { econs; ss. apply sim_rmap_add; try apply L.
       inv VAL. ss. subst. econs; ss.
-      admit. (* sim post-view *)
-    }
+      ii. des. destruct eid. ss. subst.
+      rewrite EX2.(XVEXT); cycle 1.
+      { ss. rewrite List.app_length. ss. unfold ALocal.next_eid. clear. lia. }
+      destruct (ALocal.next_eid alc1 =? ALocal.next_eid alc1) eqn:Heq; ss.
+      rewrite Nat.eqb_neq in Heq. ss. }
     destruct L.(LC). ss. econs; ss.
     all: try rewrite List.app_length, Nat.add_1_r.
     + i. rewrite sim_local_coh_step. rewrite inverse_step.
@@ -136,7 +139,10 @@ Proof.
         { rewrite List.app_length. s. lia. }
         rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
         rewrite LABEL. s. rewrite <- join_r.
-        admit. (* sim post-view *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. unfold ALocal.next_eid. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; ss.
+        rewrite Nat.eqb_neq in Heq. ss.
     + i. rewrite sim_local_vwp_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VWP; eauto. i. rewrite <- join_l. ss.
@@ -153,7 +159,10 @@ Proof.
         { rewrite List.app_length. s. lia. }
         rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
         rewrite LABEL. s. rewrite <- join_r.
-        admit. (* sim post-view *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. unfold ALocal.next_eid. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; ss.
+        rewrite Nat.eqb_neq in Heq. ss.
     + i. rewrite sim_local_vrm_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VRM; eauto. i. rewrite <- join_l. ss.
@@ -162,7 +171,10 @@ Proof.
         { rewrite List.app_length. s. lia. }
         rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
         rewrite <- join_r.
-        admit. (* sim post-view *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. unfold ALocal.next_eid. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; ss.
+        rewrite Nat.eqb_neq in Heq. ss.
     + i. rewrite sim_local_vwm_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VWM; eauto.
@@ -236,14 +248,28 @@ Proof.
       econs; ss. unfold ifc. condtac; cycle 1.
       { ii. des. inv EID0. }
       ii. des. destruct eid as [tid1 eid1]. ss. subst.
-      admit. (* post-view <= ts *)
-    }
+      rewrite EX2.(XVEXT); cycle 1.
+      { ss. rewrite List.app_length. ss. unfold ALocal.next_eid. clear. lia. }
+      destruct (ALocal.next_eid alc1 =? ALocal.next_eid alc1) eqn:Heq; ss.
+      - rewrite fun_add_spec.
+        destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
+        exfalso. apply c. ss.
+      - rewrite Nat.eqb_neq in Heq. ss. }
     destruct L.(LC). ss. econs; ss.
     all: try rewrite List.app_length, Nat.add_1_r.
     + i. rewrite sim_local_coh_step. rewrite inverse_step.
       rewrite inverse_union. rewrite fun_add_spec. condtac.
       { ii. des.
-        - inv EID. admit. (* previous write's post-view <= ts *)
+        - inv EID. inv REL. des. inv H. inv H2.
+          apply Label.is_writing_inv in LABEL. des. subst.
+          inv H0. des. destruct x0. inv H; ss.
+          + inv H0. ss. subst.
+            rewrite EX2.(XVEXT); cycle 1.
+            { ss. rewrite List.app_length. ss. etrans; eauto. clear. lia. }
+            destruct (n0 =? ALocal.next_eid alc1) eqn:Heq.
+            { rewrite Nat.eqb_eq in Heq. subst. unfold ALocal.next_eid in N. lia. }
+            admit. (* previous write's post-view <= ts *)
+          + admit. (* po-write is co *)
         - inv EID. inv REL. des. inv H. inv H2.
           apply Label.is_writing_inv in LABEL. des. subst. inv H0; cycle 1.
           + inv H. exploit RF2; eauto. i. des.
@@ -253,7 +279,13 @@ Proof.
           + exploit EX2.(LABELS); eauto; ss.
             { rewrite List.app_length. s. lia. }
             rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
-            admit. (* post-view = ts *)
+            rewrite EX2.(XVEXT); cycle 1.
+            { ss. rewrite List.app_length. ss. clear. lia. }
+            destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+            { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+            rewrite fun_add_spec.
+            destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
+            exfalso. apply c. ss.
       }
       ii. des; [apply COH|]; eauto.
       inv EID. inv REL. inv H. inv H0. inv H2.
@@ -315,7 +347,13 @@ Proof.
         { rewrite List.app_length. s. lia. }
         rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
         rewrite <- join_r.
-        admit. (* post-view = ts *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+        { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+        rewrite fun_add_spec.
+        destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
+        exfalso. apply c. ss.
     + i. rewrite sim_local_vcap_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto. i. rewrite <- join_l. ss.
@@ -342,7 +380,13 @@ Proof.
         { rewrite List.app_length. s. lia. }
         rewrite List.nth_error_app2, Nat.sub_diag; ss. i. inv x0.
         rewrite LABEL. s. rewrite <- join_r.
-        admit. (* post-view = ts *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+        { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+        rewrite fun_add_spec.
+        destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
+        exfalso. apply c. ss.
     + i. rewrite fun_add_spec. condtac; s.
       { inversion e. subst. left. esplits; eauto.
         - destruct ts; ss. clear. lia.
@@ -352,7 +396,12 @@ Proof.
             { apply nth_error_last. apply Nat.eqb_eq. ss. }
             i. econs; eauto. inv VLOC. rewrite VAL0. apply Label.write_is_writing.
           + i. inv PO. inv PO0. ss. subst. clear -N N0. lia.
-        - admit. (* post-view = ts *)
+        - rewrite EX2.(XVEXT); cycle 1.
+          { ss. rewrite List.app_length. ss. clear. lia. }
+          destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+          { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+          rewrite fun_add_spec.
+          destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
         - ii. inv EID. inv REL.
           + (* sim addr *)
             rewrite <- join_l.
@@ -401,7 +450,13 @@ Proof.
       exploit PROMISES; eauto. i. des. esplits; cycle 1; eauto.
       inv N.
       * exfalso. apply c.
-        admit. (* post-view = ts *)
+        rewrite EX2.(XVEXT); cycle 1.
+        { ss. rewrite List.app_length. ss. clear. lia. }
+        destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+        { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+        rewrite fun_add_spec.
+        destruct (equiv_dec (ValA.val (sem_expr rmap1 eloc)) (ValA.val (sem_expr rmap1 eloc))) eqn:Heq1; ss.
+        exfalso. apply c0. ss.
       * clear -H. lia.
   - (* write failure *)
     inv STEP0. inv RES. inv ASTATE_STEP; inv ALOCAL_STEP; ss; inv EVENT; ss. splits.
