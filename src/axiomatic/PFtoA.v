@@ -117,6 +117,7 @@ Proof.
   intro tid. generalize (SIM tid). intro X. inv X; [by i|]. induction n.
   { (* init *)
     i. simplify.
+    generalize (SIM tid). intro X. inv X; simplify.
     exploit (lastn_one tr).
     { exploit sim_trace_last; eauto. }
     i. des.
@@ -139,6 +140,8 @@ Proof.
            | [H1: lastn ?a ?b = ?c, H2: lastn ?a ?b = ?d |- _] =>
              rewrite H1 in H2
            end.
+    exploit sim_trace_last; eauto. i. des. subst. simplify.
+    exploit sim_trace_length; eauto. s. intro LEN. guardH LEN.
     simplify. exploit sim_trace_lastn; eauto. instantiate (1 := 0).
     rewrite EU, AEU, WL, RL, COV, VEXT. i.
     exploit sim_trace_sim_th; eauto. intro TH.
@@ -164,7 +167,27 @@ Proof.
       + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
       + right. esplits; eauto. ii. inv H1. inv REL. inv H1. inv H7. ss. lia.
       + i. destruct view; ss. exploit Machine.promises_from_mem_inv; eauto. i. des.
-        admit. (* from memory, we have to get a write event. *)
+        hexploit sim_traces_ex; try exact SIM.
+        all: try rewrite lastn_all; ss.
+        all: eauto.
+        all: try by clear -LEN; unguardH LEN; des; s; lia.
+        intro EX.
+        exploit sim_trace_last; eauto. i. des. simplify.
+        exploit sim_trace_sim_th; eauto. intro L.
+        exploit L.(WPROP1); eauto.
+        { instantiate (3 := S view). unfold Memory.get_msg. eauto. }
+        generalize (TR tid). rewrite <- H0. intro X. inv X. des. simplify. s. destruct b.
+        inv STEP.  inv NOPROMISE. erewrite PROMISES; eauto. i. des.
+        { inv x1. }
+        exploit L.(WPROP2); eauto. i. des.
+        exploit L.(WPROP3); eauto. i. des. subst. rewrite x2 in x4. inv x4.
+        exploit EX.(LABELS_REV); eauto. i.
+        esplits; cycle 1.
+        * econs; eauto.
+        * rewrite EX.(XVEXT); ss.
+          { etrans; eauto. }
+          { apply List.nth_error_Some. congr. }
+        * clear. lia.
     - ii. ss. lia.
     - ii. ss. lia.
     - ii. ss. lia.
@@ -188,7 +211,7 @@ Proof.
   - rewrite RL, HDRL. ss.
   - rewrite COV, HDCOVL. ss.
   - rewrite VEXT, HDVEXTL. ss.
-Admitted.
+Qed.
 
 Lemma sim_traces_vext_valid
       p trs atrs ws rs covs vexts
