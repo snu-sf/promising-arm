@@ -248,10 +248,9 @@ Proof.
     destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts x2)); ss. inv e.
     generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
     + apply Bool.negb_true_iff, Bool.andb_false_iff in X0. des.
-      * admit. (* fwdbank similarity *)
-        (* H3 : Execution.rfi ex x2 (tid, length (ALocal.labels alc1)) *)
-        (* H4 : codom_rel (Execution.rmw ex) x2 *)
-        (* X0 : FwdItem.ex (Local.fwdbank lc1 (ValA.val vloc)) = false *)
+      * assert (eid = x2).
+        { admit. (* use internal *) }
+        subst. exploit EX0; eauto. congr.
       * unguardH H2. des.
         { destruct (equiv_dec arch riscv); ss. }
         { inv H2. destruct l0; ss. rewrite EID in EID0. inv EID0.
