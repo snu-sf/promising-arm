@@ -1641,6 +1641,57 @@ Module Valid.
     - rewrite <- H3, <- H1. eapply addr_is_po; eauto.
     - revert H0. unfold ifc. condtac; ss. eapply rmw_spec. eauto.
   Qed.
+
+  Lemma rfi_is_po
+        ex eid1 eid2
+        (RF2: Valid.rf2 ex)
+        (INTERNAL: acyclic ex.(Execution.internal))
+        (RFI: ex.(Execution.rfi) eid1 eid2):
+    Execution.po eid1 eid2.
+  Proof.
+    destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2].
+    inv RFI. inv H0. ss. subst.
+    exploit RF2; eauto. i. des.
+    generalize (Nat.lt_trichotomy eid1 eid2). i. des.
+    - econs; ss.
+    - subst. congr.
+    - exfalso. eapply INTERNAL. econs 2.
+      + econs 1. right. eauto.
+      + econs 1. left. left. left. econs; eauto.
+        econs; eauto. econs; unfold Label.is_accessing; eauto.
+        * instantiate (1 := loc).
+          destruct (equiv_dec loc loc); ss.
+          exfalso. apply c. ss.
+        * destruct (equiv_dec loc loc); ss.
+          exfalso. apply c. ss.
+  Qed.
+
+  Lemma po_loc_write_is_co
+        ex eid1 eid2 loc
+        (CO1: Valid.co1 ex)
+        (INTERNAL: acyclic ex.(Execution.internal))
+        (PO: Execution.po eid1 eid2)
+        (LABEL1: ex.(Execution.label_is) (Label.is_writing loc) eid1)
+        (LABEL2: ex.(Execution.label_is) (Label.is_writing loc) eid2):
+    ex.(Execution.co) eid1 eid2.
+  Proof.
+    destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2].
+    inv LABEL1. inv LABEL2. destruct l, l0; ss.
+    destruct (equiv_dec loc0 loc) eqn:Heq1; ss.
+    destruct (equiv_dec loc1 loc) eqn:Heq2; ss.
+    rewrite e, e0 in *.
+    exploit CO1; eauto.
+    { esplits; [exact EID|exact EID0]. }
+    i. des; eauto.
+    - inv x. inv PO. ss. lia.
+    - exfalso. eapply INTERNAL. econs 2.
+      + econs 1. left. left. left. econs; eauto.
+        econs; eauto. econs; unfold Label.is_accessing; eauto.
+        * instantiate (1 := loc).
+          destruct (equiv_dec loc loc); ss.
+        * destruct (equiv_dec loc loc); ss.
+      + econs 1. left. right. eauto.
+  Qed.
 End Valid.
 
 Coercion Valid.PRE: Valid.ex >-> Valid.pre_ex.

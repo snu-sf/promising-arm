@@ -41,6 +41,7 @@ Lemma sim_traces_sim_th'_step
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (INTERNAL: acyclic ex.(Execution.internal))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
@@ -86,6 +87,7 @@ Lemma sim_traces_sim_th'
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (INTERNAL: acyclic ex.(Execution.internal))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
@@ -222,6 +224,7 @@ Lemma sim_traces_vext_valid
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (INTERNAL: acyclic ex.(Execution.internal))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
@@ -322,7 +325,7 @@ Proof.
     apply List.nth_error_Some. congr.
 Qed.
 
-Lemma sim_traces_valid
+Lemma sim_traces_valid_internal
       p trs atrs ws rs covs vexts
       m ex
       (STEP: Machine.pf_exec p m)
@@ -345,7 +348,48 @@ Lemma sim_traces_valid
     forall eid1 eid2
       (INTERNAL: ex.(Execution.internal) eid1 eid2),
       (Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
-      (Time.le ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
+      (Time.le ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>>.
+Proof.
+  generalize STEP. intro X. inv X.
+  ii. exploit Valid.internal_rw; eauto. i. des.
+  inv EID2. destruct l; ss.
+  - right. des_union.
+    + exploit sim_traces_cov_po_loc; eauto. i. des.
+      exploit PO_LOC_READ; eauto.
+    + exploit sim_traces_cov_fr; eauto. i.
+      split; eauto using Nat.lt_le_incl.
+    + exploit sim_traces_cov_co; eauto. i.
+      split; eauto using Nat.lt_le_incl.
+    + exploit sim_traces_cov_rf; eauto. i.
+      split; eauto. rewrite x0. auto.
+  - left. des_union.
+    + exploit sim_traces_cov_po_loc; eauto. i. des.
+      exploit PO_LOC_WRITE; eauto.
+    + exploit sim_traces_cov_fr; eauto.
+    + exploit sim_traces_cov_co; eauto.
+    + exploit RF2; eauto. i. des. congr.
+Qed.
+
+Lemma sim_traces_valid_external_atomic
+      p trs atrs ws rs covs vexts
+      m ex
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
+      (PRE: Valid.pre_ex p ex)
+      (CO: ex.(Execution.co) = co_gen ws)
+      (RF: ex.(Execution.rf) = rf_gen ws rs)
+      (INTERNAL: acyclic ex.(Execution.internal))
+      (CO1: Valid.co1 ex)
+      (CO2: Valid.co2 ex)
+      (RF1: Valid.rf1 ex)
+      (RF2: Valid.rf2 ex)
+      (RF_WF: Valid.rf_wf ex)
+      (TR: IdMap.Forall2
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             trs m.(Machine.tpool))
+      (ATR: IdMap.Forall2
+              (fun _ atr aeu => exists l, atr = aeu :: l)
+              atrs (Valid.aeus PRE)):
   <<EXTERNAL:
     forall eid1 eid2
       (OB: ex.(Execution.ob) eid1 eid2)
@@ -356,23 +400,6 @@ Lemma sim_traces_valid
   <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>>.
 Proof.
   generalize STEP. intro X. inv X. splits.
-  - ii. exploit Valid.internal_rw; eauto. i. des.
-    inv EID2. destruct l; ss.
-    + right. des_union.
-      * exploit sim_traces_cov_po_loc; eauto. i. des.
-        exploit PO_LOC_READ; eauto.
-      * exploit sim_traces_cov_fr; eauto. i.
-        split; eauto using Nat.lt_le_incl.
-      * exploit sim_traces_cov_co; eauto. i.
-        split; eauto using Nat.lt_le_incl.
-      * exploit sim_traces_cov_rf; eauto. i.
-        split; eauto. rewrite x0. auto.
-    + left. des_union.
-      * exploit sim_traces_cov_po_loc; eauto. i. des.
-        exploit PO_LOC_WRITE; eauto.
-      * exploit sim_traces_cov_fr; eauto.
-      * exploit sim_traces_cov_co; eauto.
-      * exploit RF2; eauto. i. des. congr.
   - exploit sim_traces_vext_valid; eauto. i. des.
     inv LABEL2. destruct l; ss.
     + right. rewrite ob_ob' in OB. des_union.
@@ -463,7 +490,7 @@ Proof.
   generalize (sim_traces_rf_wf SIM). intro RF_WF.
   replace (co_gen ws) with (ex'.(Execution.co)) in CO1, CO2;[|subst; ss].
   replace (rf_gen ws rs) with (ex'.(Execution.rf)) in RF1, RF2, RF_WF; [|subst; ss].
-  exploit sim_traces_valid; eauto; try by (subst; ss). i. des.
+  hexploit sim_traces_valid_internal; eauto; try by (subst; ss). intro INTERNAL.
   assert (INTERNAL': forall eid1 eid2 (INTERNAL: ex'.(Execution.internal)⁺ eid1 eid2),
              Time.lt (v_gen covs eid1) (v_gen covs eid2) \/
              (Time.le (v_gen covs eid1) (v_gen covs eid2) /\
@@ -498,9 +525,10 @@ Proof.
       * inversion IHINTERNAL0_5. inversion IHINTERNAL0_0.
         rewrite EID in EID0. inversion EID0. rewrite H0 in *.
         destruct l0; ss; congr. }
+  generalize (internal_acyclic _ INTERNAL'). intro ACYCLIC.
+  exploit sim_traces_valid_external_atomic; eauto; try by (subst; ss). i. des.
   esplits; eauto.
-  - generalize (internal_acyclic _ INTERNAL'). intro ACYCLIC.
-    clear INTERNAL'. i. induction OB.
+  - clear INTERNAL'. i. induction OB.
     + inversion H. inversion H1.
       exploit EXTERNAL; eauto. i. des; eauto.
       { destruct l1.
@@ -509,7 +537,7 @@ Proof.
         - right. right. splits; eauto.
         - inv LABEL1.
         - inv LABEL1.
-}
+      }
     + des.
       * left. etrans; eauto.
       * left. eapply le_lt_trans; eauto.
