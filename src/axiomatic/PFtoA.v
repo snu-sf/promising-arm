@@ -117,25 +117,81 @@ Proof.
   intro tid. generalize (SIM tid). intro X. inv X; [by i|]. induction n.
   { (* init *)
     i. simplify.
+    generalize (SIM tid). intro X. inv X; simplify.
     exploit (lastn_one tr).
     { exploit sim_trace_last; eauto. }
     i. des.
     exploit (lastn_one atr).
     { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
     i. des.
-    (* exploit (lastn_one covl). *)
-    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
-    (* i. des. *)
-    (* exploit (lastn_one vextl). *)
-    (* { exploit sim_trace_last; eauto. i. des. subst. ss. lia. } *)
-    (* i. des. *)
-    rewrite EU in x0. symmetry in x0. inv x0.
-    rewrite AEU in x1. symmetry in x1. inv x1.
-    (* rewrite COV in x2. symmetry in x2. inv x2. *)
-    (* rewrite VEXT in x3. symmetry in x3. inv x3. *)
-    exploit sim_trace_lastn; eauto. rewrite AEU. i.
-    inv x0. ss. splits; i; try lia.
-    admit.
+    exploit (lastn_one wl).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    exploit (lastn_one rl).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    exploit (lastn_one covl).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    exploit (lastn_one vextl).
+    { exploit sim_trace_last; eauto. i. des. subst. ss. lia. }
+    i. des.
+    repeat match goal with
+           | [H1: lastn ?a ?b = ?c, H2: lastn ?a ?b = ?d |- _] =>
+             rewrite H1 in H2
+           end.
+    exploit sim_trace_last; eauto. i. des. subst. simplify.
+    exploit sim_trace_length; eauto. s. intro LEN. guardH LEN.
+    simplify. exploit sim_trace_lastn; eauto. instantiate (1 := 0).
+    rewrite EU, AEU, WL, RL, COV, VEXT. i.
+    exploit sim_trace_sim_th; eauto. intro TH.
+    inv x0.
+    unfold Machine.init_with_promises in FIND. ss. rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
+    (* TODO: probably we need to have a lemma for it.. *)
+    econs; ss.
+    - econs; ss. econs. ii. unfold RMap.init. rewrite ? IdMap.gempty. ss.
+    - econs; ss.
+      + ii. inv EID. inv REL. inv H1. inv H7. des. inv H7. ss. lia.
+      + ii. inv EID. inv REL. des_union.
+        * inv H1. des. inv H1. des. inv H1. des. inv H1. ss. lia.
+        * inv H1. des. inv H1. des. inv H1. des. inv H1. ss. lia.
+        * inv H6. des. inv H6. des. inv H6. ss. lia.
+        * inv H1. des. inv H1. ss. lia.
+      + ii. inv EID. inv REL. des_union.
+        * inv H6. des. inv H6. des. inv H6. des. inv H6. ss. lia.
+        * inv H6. des. inv H6. des. inv H6. des. inv H6. ss. lia.
+        * inv H1. des. inv H1. ss. lia.
+      + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
+      + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
+      + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
+      + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
+      + right. esplits; eauto. ii. inv H1. inv REL. inv H1. inv H7. ss. lia.
+      + i. destruct view; ss. exploit Machine.promises_from_mem_inv; eauto. i. des.
+        hexploit sim_traces_ex; try exact SIM.
+        all: try rewrite lastn_all; ss.
+        all: eauto.
+        all: try by clear -LEN; unguardH LEN; des; s; lia.
+        intro EX.
+        exploit sim_trace_last; eauto. i. des. simplify.
+        exploit sim_trace_sim_th; eauto. intro L.
+        exploit L.(WPROP1); eauto.
+        { instantiate (3 := S view). unfold Memory.get_msg. eauto. }
+        generalize (TR tid). rewrite <- H0. intro X. inv X. des. simplify. s. destruct b.
+        inv STEP.  inv NOPROMISE. erewrite PROMISES; eauto. i. des.
+        { inv x1. }
+        exploit L.(WPROP2); eauto. i. des.
+        exploit L.(WPROP3); eauto. i. des. subst. rewrite x2 in x4. inv x4.
+        exploit EX.(LABELS_REV); eauto. i.
+        esplits; cycle 1.
+        * econs; eauto.
+        * rewrite EX.(XVEXT); ss.
+          { etrans; eauto. }
+          { apply List.nth_error_Some. congr. }
+        * clear. lia.
+    - ii. ss. lia.
+    - ii. ss. lia.
+    - ii. ss. lia.
+    - ii. ss. lia.
   }
   i. simplify.
   exploit sim_trace_length; eauto. intro LEN. guardH LEN.
@@ -155,12 +211,13 @@ Proof.
   - rewrite RL, HDRL. ss.
   - rewrite COV, HDCOVL. ss.
   - rewrite VEXT, HDVEXTL. ss.
-Admitted.
+Qed.
 
 Lemma sim_traces_vext_valid
-      p mem trs atrs ws rs covs vexts
+      p trs atrs ws rs covs vexts
       m ex
-      (SIM: sim_traces p mem trs atrs ws rs covs vexts)
+      (STEP: Machine.pf_exec p m)
+      (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (NOPROMISE: Machine.no_promise m)
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
@@ -171,7 +228,7 @@ Lemma sim_traces_vext_valid
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) mem) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -197,7 +254,73 @@ Lemma sim_traces_vext_valid
       (COE: ex.(Execution.coe) eid eid2),
       False>>.
 Proof.
-Admitted.
+  splits; i.
+  - destruct eid1 as [tid1 eid1].
+    destruct eid2 as [tid2 eid2].
+    inversion FR.
+    + inv H. des. exploit RF2; eauto. i. des.
+      revert READ. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+      generalize (ATR tid1). generalize (SIM tid1). intros X Y; inv X; inv Y; simplify; ss.
+      i. des. subst.
+      exploit sim_trace_last; eauto. i. des. simplify.
+      exploit sim_trace_length; eauto. s. i. des.
+      hexploit sim_traces_sim_th'; eauto.
+      { s. instantiate (1 := length tr'). lia. }
+      all: try rewrite lastn_all; s; eauto; try lia.
+      intro TH'. eapply TH'.(PFtoA3.FR); eauto.
+      apply List.nth_error_Some. congr.
+    + inv H. inv H1. inv H. inv H1. destruct l; ss.
+      revert EID. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+      generalize (ATR tid1). generalize (SIM tid1). intros X Y; inv X; inv Y; simplify; ss.
+      i. des. subst.
+      exploit sim_trace_last; eauto. i. des. simplify.
+      exploit sim_trace_length; eauto. s. i. des.
+      hexploit sim_traces_sim_th'; eauto.
+      { s. instantiate (1 := length tr'). lia. }
+      all: try rewrite lastn_all; s; eauto; try lia.
+      intro TH'. eapply TH'.(PFtoA3.FR); eauto.
+      apply List.nth_error_Some. congr.
+  - destruct eid1 as [tid1 eid1].
+    destruct eid2 as [tid2 eid2].
+    inversion EID2. destruct l; ss.
+    revert EID. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+    generalize (ATR tid2). generalize (SIM tid2). intros X Y; inv X; inv Y; simplify; ss.
+    i. des. subst.
+    exploit sim_trace_last; eauto. i. des. simplify.
+    exploit sim_trace_length; eauto. s. i. des.
+    hexploit sim_traces_sim_th'; eauto.
+    { s. instantiate (1 := length tr'). lia. }
+    all: try rewrite lastn_all; s; eauto; try lia.
+    intro TH'. eapply TH'.(PFtoA3.OBW); eauto.
+    apply List.nth_error_Some. congr.
+  - destruct eid1 as [tid1 eid1].
+    destruct eid2 as [tid2 eid2].
+    inversion EID2. destruct l; ss.
+    revert EID. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+    generalize (ATR tid2). generalize (SIM tid2). intros X Y; inv X; inv Y; simplify; ss.
+    i. des. subst.
+    exploit sim_trace_last; eauto. i. des. simplify.
+    exploit sim_trace_length; eauto. s. i. des.
+    hexploit sim_traces_sim_th'; eauto.
+    { s. instantiate (1 := length tr'). lia. }
+    all: try rewrite lastn_all; s; eauto; try lia.
+    intro TH'. eapply TH'.(PFtoA3.OBR); eauto.
+    apply List.nth_error_Some. congr.
+  - destruct eid1 as [tid1 eid1].
+    destruct eid2 as [tid2 eid2].
+    exploit Valid.rmw_spec; eauto. i. des.
+    inversion LABEL2. des. destruct l; ss.
+    revert EID. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+    generalize (ATR tid2). generalize (SIM tid2). intros X Y; inv X; inv Y; simplify; ss.
+    i. des. subst.
+    exploit sim_trace_last; eauto. i. des. simplify.
+    exploit sim_trace_length; eauto. s. i. des.
+    hexploit sim_traces_sim_th'; eauto.
+    { s. instantiate (1 := length tr'). lia. }
+    all: try rewrite lastn_all; s; eauto; try lia.
+    intro TH'. eapply TH'.(PFtoA3.ATOMIC); eauto.
+    apply List.nth_error_Some. congr.
+Qed.
 
 Lemma sim_traces_valid
       p trs atrs ws rs covs vexts

@@ -69,6 +69,7 @@ Proof.
   destruct n.
   { generalize (lastn_length 1 tr). rewrite EU. destruct tr; ss. }
   exploit sim_trace_lastn; eauto. instantiate (1 := S n). intro SIMTR.
+  exploit sim_trace_memory; eauto. intro MEM1.
   hexploit sim_traces_ex; eauto. intro EX2.
   inversion SIMTR; subst; simplify; [congr|].
   repeat match goal with
@@ -80,18 +81,25 @@ Proof.
   ii.
   destruct (le_lt_dec (length (ALocal.labels (AExecUnit.local aeu1))) eid1); cycle 1.
   { eapply L; eauto. }
-  assert (LABEL1: Execution.label_is ex (fun label : Label.t => Label.is_read label) (tid, eid1)).
+  assert (exists loc,
+             <<LABEL1: Execution.label_is ex (fun label : Label.t => Label.is_reading loc label) (tid, eid1)>> /\
+             <<LABEL2: Execution.label_is ex (fun label : Label.t => Label.is_writing loc label) eid2>>).
   { inv FR.
-    - inv H. des. exploit RF2; eauto. i. des. econs; eauto.
-    - inv H. inv H1. inv H. ss.
+    - inv H. des.
+      exploit RF2; eauto. i. des.
+      exploit CO2; eauto. i. des.
+      rewrite WRITE in LABEL0. inv LABEL0.
+      esplits; econs; eauto using Label.read_is_reading, Label.write_is_writing.
+    - inv H. inv H1. inv H. inv H0. inv H2. inv H1. rewrite EID1 in EID0. inv EID0. rewrite EID2 in EID. inv EID.
+      destruct l0; ss. destruct l3; ss. inv LABEL0. ss.
+      destruct (equiv_dec loc0 loc1); ss. destruct (equiv_dec loc loc1); ss. inv e0. inv e1.
+      esplits; econs; eauto using Label.read_is_reading, Label.write_is_writing.
   }
-  assert (LABEL2: Execution.label_is ex (fun label : Label.t => Label.is_write label) eid2).
-  { inv FR.
-    - inv H. des. exploit CO2; eauto. i. des. econs; eauto.
-    - inv H. inv H1. ss.
-  }
+  i. des.
   inv LABEL1. destruct l0; ss.
   inv LABEL2. destruct l0; ss.
+  destruct (equiv_dec loc0 loc); ss. inv e0.
+  destruct (equiv_dec loc1 loc); ss. inv e0.
   destruct eid2 as [tid2 eid2].
   generalize (SIM tid2). intro SIMTR2. inv SIMTR2.
   { generalize (ATR tid2). rewrite <- H. intro X. inv X.
@@ -100,6 +108,7 @@ Proof.
   }
   rename REL0 into SIMTR2, a into tr2, b into atr2, c into wl2, d into rl2, e0 into covl2, f into vextl2.
   rename H0 into TR2, H into ATR2, H2 into WL2, H3 into RL2, H4 into COVL4, H5 into VEXTL5.
+  exploit sim_trace_last; eauto. i. des. subst.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
   destruct aeu1 as [ast1 alc1].
@@ -129,6 +138,22 @@ Proof.
   rewrite EX2.(XCOV) in *; s; cycle 1.
   { rewrite List.app_length. s. clear. lia. }
   rewrite X. i.
+  exploit sim_trace_sim_th; try exact SIMTR2; eauto. intro L1'.
+  exploit sim_trace_length; try exact SIMTR2; eauto. intro LEN. guardH LEN.
+  symmetry in ATR2. hexploit sim_traces_ex; try exact ATR2; eauto.
+  1: instantiate (3 := length atr'0).
+  all: try rewrite lastn_all; ss.
+  all: try by clear -LEN; unguardH LEN; des; lia.
+  intro EX2'.
+  revert EID0. unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec.
+  generalize (ATR tid2). rewrite ATR2. intros Y Z; inv Y; ss.
+  rewrite <- H in Z. inv Z. des. simplify.
+  exploit L1'.(WPROP2); eauto. i. des.
+  exploit L1'.(WPROP3); eauto. i. des. subst.
+  rewrite EX2'.(XVEXT) in *; eauto; cycle 1.
+  { apply List.nth_error_Some. congr. }
+  rewrite EX2'.(XCOV) in *; eauto; cycle 1.
+  { apply List.nth_error_Some. congr. }
+  rewrite x6 in *. rewrite x3 in x9. inv x9. rewrite H2 in x8. inv x8.
   eapply Memory.latest_lt; eauto.
-  all: admit. (* remaining work: finding w's message. *)
-Admitted.
+Qed.
