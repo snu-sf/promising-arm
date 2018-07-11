@@ -1321,7 +1321,8 @@ Module Valid.
         eid1 eid2
         (EX: pre_ex p exec)
         (CTRL: exec.(Execution.ctrl) eid1 eid2):
-    <<EID1: Execution.label_is exec (Label.is_access) eid1>>.
+    <<EID1: Execution.label_is exec (Label.is_access) eid1>> /\
+    <<EID2: Execution.label_is exec (Label.is_ctrl) eid2>>.
   Proof.
     rewrite EX.(Valid.CTRL) in CTRL. inv CTRL.
     destruct eid1 as [tid1 iid1].
@@ -1334,9 +1335,13 @@ Module Valid.
     { apply AExecUnit.wf_init. }
     s. i. des.
     inv WF. exploit CTRL_LABEL; eauto. intro X. inv X.
-    inv H. econs; eauto.
-    unfold Execution.label. s.
-    rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+    splits.
+    - inv H. econs; eauto.
+      unfold Execution.label. s.
+      rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
+    - inv H1. econs; eauto.
+      unfold Execution.label. s.
+      rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
   Qed.
 
   Lemma barrier_ob_po
@@ -1476,9 +1481,9 @@ Module Valid.
     all: try by exploit CO2; eauto; i; des; congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
     - exploit data_label; eauto. i. des. inv EID0. congr.
-    - exploit ctrl_label; eauto. i. des. inv x1. congr.
+    - exploit ctrl_label; eauto. i. des. inv EID0. congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
-    - exploit ctrl_label; eauto. i. des. inv x2. congr.
+    - exploit ctrl_label; eauto. i. des. inv EID2. congr.
     - exploit addr_label; eauto. i. des. inv EID2. congr.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
     - revert H0. unfold ifc. condtac; ss. i. exploit rmw_spec; eauto. i. des. inv LABEL1. congr.

@@ -470,6 +470,23 @@ Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
     forall eid
       (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
       (v_gen vexts) (tid, eid) = vext eid;
+
+  LABELS_REV:
+    forall eid label
+      (LABEL: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some label),
+      Execution.label (tid, eid) ex = Some label;
+  ADDR_REV:
+    forall eid1 eid2
+      (ADDR: aeu.(AExecUnit.local).(ALocal.addr) eid1 eid2),
+      ex.(Execution.addr) (tid, eid1) (tid, eid2);
+  DATA_REV:
+    forall eid1 eid2
+      (DATA: aeu.(AExecUnit.local).(ALocal.data) eid1 eid2),
+      ex.(Execution.data) (tid, eid1) (tid, eid2);
+  CTRL_REV:
+    forall eid1 eid2
+      (CTRL: aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2),
+      ex.(Execution.ctrl) (tid, eid1) (tid, eid2);
 }.
 
 Lemma sim_traces_sim_ex_step
@@ -530,6 +547,8 @@ Proof.
     condtac; ss. apply Nat.eqb_eq in X. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
     condtac; ss. apply Nat.eqb_eq in X. lia.
+  - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
+  - eapply ADDR_REV0; eauto. left. ss.
   - exploit ADDR0; eauto; tac; try lia.
     inv x; ss. inv H. lia.
   - exploit DATA0; eauto; tac; try lia.
@@ -542,14 +561,20 @@ Proof.
   - rewrite XVEXT0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst.
     condtac; ss. apply Nat.eqb_eq in X. lia.
+  - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
+  - eapply ADDR_REV0; eauto. left. ss.
+  - eapply DATA_REV0; eauto. left. ss.
   - rewrite XCOV0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst. ss.
   - rewrite XVEXT0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst. ss.
   - rewrite XVEXT0; eauto; tac; try lia.
+  - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - exploit CTRL0; eauto; tac; try lia.
     inv x; ss. inv H. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
+  - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
+  - eapply CTRL_REV0; eauto. left. ss.
 Qed.
 
 Lemma sim_traces_sim_ex_aux
@@ -612,6 +637,14 @@ Proof.
       rewrite <- H7 in H. inv H. ss.
     - unfold v_gen. s. rewrite <- H4. ss.
     - unfold v_gen. s. rewrite <- H5. ss.
+    - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
+      unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec, <- H8. ss.
+    - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
+      rewrite PRE.(Valid.ADDR). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
+    - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
+      rewrite PRE.(Valid.DATA). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
+    - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
+      rewrite PRE.(Valid.CTRL). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
   }
   i. simplify.
   exploit sim_trace_length; eauto. intro LEN. guardH LEN.

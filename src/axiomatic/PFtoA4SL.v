@@ -181,7 +181,9 @@ Proof.
         exploit EX2.(ADDR); eauto; ss.
         { rewrite List.app_length. s. clear. lia. }
         intro X. inv X.
-        { admit. (* well-formedness; addr cannot relate too big event *) }
+        { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+          destruct M.(AEU_WF). ss. exploit ADDR_LIMIT; eauto. clear. lia.
+        }
         inv H. eapply sim_rmap_expr; eauto. apply L.
     + i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -196,7 +198,9 @@ Proof.
         econs; cycle 1.
         { instantiate (1 := (_, _)). econs; ss. }
         left. econs. split; eauto. econs; ss.
-        admit. (* reverse of EX2.(LABELS) is required *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        i. econs; eauto.
       * right. esplits; eauto.
         i. specialize (FWDBANK0 eid).
         rewrite sim_local_fwd_none_step. rewrite inverse_step.
@@ -207,7 +211,9 @@ Proof.
           rewrite List.nth_error_app2, Nat.sub_diag; ss.
           destruct l; ss. }
     + destruct ex0; ss. econs. s. splits.
-      * admit. (* reverse of EX2.(LABELS) is required *)
+      * exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        i. econs; eauto. inv VLOC. rewrite VAL0. apply Label.read_is_reading.
       * econs.
         { ii. inv EID. admit. (* read message's ts <= ts I read *) }
         { admit. (* reverse of the above *) }
@@ -318,7 +324,9 @@ Proof.
         exploit EX2.(ADDR); eauto; ss.
         { rewrite List.app_length. s. clear. lia. }
         intro X. inv X.
-        { admit. (* well-formedness; addr cannot relate too big event *) }
+        { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+          destruct M.(AEU_WF). ss. exploit ADDR_LIMIT; eauto. clear. lia.
+        }
         inv H. eapply sim_rmap_expr; eauto. apply L.
     + i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -334,7 +342,9 @@ Proof.
         - destruct ts; ss. clear. lia.
         - instantiate (1 := (tid, length (ALocal.labels alc1))). econs.
           + econs; ss.
-          + admit. (* reverse of EX2.(LABELS) is required *)
+          + exploit EX2.(LABELS_REV); ss.
+            { apply nth_error_last. apply Nat.eqb_eq. ss. }
+            i. econs; eauto. inv VLOC. rewrite VAL0. apply Label.write_is_writing.
           + i. inv PO. inv PO0. ss. subst. clear -N N0. lia.
         - admit. (* post-view = ts *)
         - ii. inv EID. inv REL.
@@ -344,7 +354,9 @@ Proof.
             exploit EX2.(ADDR); eauto; ss.
             { rewrite List.app_length. s. clear. lia. }
             intro Y. inv Y.
-            { admit. (* well-formedness; addr cannot relate too big event *) }
+            { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+              destruct M.(AEU_WF). ss. exploit ADDR_LIMIT; eauto. clear. lia.
+            }
             inv H0. eapply sim_rmap_expr; eauto. apply L.
           + (* sim data *)
             rewrite <- join_r.
@@ -352,7 +364,9 @@ Proof.
             exploit EX2.(DATA); eauto; ss.
             { rewrite List.app_length. s. clear. lia. }
             intro Y. inv Y.
-            { admit. (* well-formedness; data cannot relate too big event *) }
+            { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+              destruct M.(AEU_WF). ss. exploit DATA_LIMIT; eauto. clear. lia.
+            }
             inv H0. eapply sim_rmap_expr; eauto. apply L.
         - admit. (* should be easy after chaning sim_local's definition *)
       }
@@ -362,7 +376,10 @@ Proof.
         econs; cycle 1.
         { instantiate (1 := (_, _)). econs; ss. }
         left. econs. split; eauto. econs; ss.
-        admit. (* reverse of EX2.(LABELS) is required *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        i. econs; eauto. ii. apply Label.is_writing_inv in H. des. inv H.
+        inv VLOC. congr.
       * right. esplits; eauto.
         i. specialize (FWDBANK0 eid).
         rewrite sim_local_fwd_none_step. rewrite inverse_step.
@@ -462,11 +479,10 @@ Proof.
         i. exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i.
-        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier Barrier.isb]) Label.is_ctrl (List.length alc1.(ALocal.labels))).
-        { admit. (* TODO: use well-formedness *) }
-        inv H.
-        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
-        destruct l; ss.
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        admit. (* TODO: use well-formedness *)
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(ADDR); eauto; ss.
@@ -474,11 +490,10 @@ Proof.
         i. exploit EX2.(ADDR); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i.
-        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier Barrier.isb]) Label.is_access (List.length alc1.(ALocal.labels))).
-        { admit. (* TODO: use well-formedness *) }
-        inv H.
-        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
-        destruct l; ss.
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.addr_label; eauto. i. des.
+        inv EID2. rewrite X in EID. inv EID. ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -494,7 +509,9 @@ Proof.
         econs; cycle 1.
         { instantiate (1 := (_, _)). econs; ss. }
         left. econs. split; eauto. econs; ss.
-        admit. (* reverse of EX2.(LABELS) is required *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. econs; eauto.
       * right. esplits; eauto.
         i. specialize (FWDBANK0 eid).
         rewrite List.app_length, Nat.add_1_r.
@@ -600,11 +617,10 @@ Proof.
         i. exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i.
-        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier (Barrier.dmb rr rw wr ww)]) Label.is_ctrl (List.length alc1.(ALocal.labels))).
-        { admit. (* TODO: use well-formedness *) }
-        inv H.
-        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
-        destruct l; ss.
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        inv x2. admit. (* TODO: use well-formedness *)
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(ADDR); eauto; ss.
@@ -612,11 +628,10 @@ Proof.
         i. exploit EX2.(ADDR); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i.
-        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.barrier (Barrier.dmb rr rw wr ww)]) Label.is_access (List.length alc1.(ALocal.labels))).
-        { admit. (* TODO: use well-formedness *) }
-        inv H.
-        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
-        destruct l; ss.
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.addr_label; eauto. i. des.
+        inv EID2. rewrite X in EID. inv EID. ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -632,7 +647,9 @@ Proof.
         econs; cycle 1.
         { instantiate (1 := (_, _)). econs; ss. }
         left. econs. split; eauto. econs; ss.
-        admit. (* reverse of EX2.(LABELS) is required *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. econs; eauto.
       * right. esplits; eauto.
         i. specialize (FWDBANK0 eid).
         rewrite List.app_length, Nat.add_1_r.
@@ -728,9 +745,8 @@ Proof.
         exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i. inv x0.
-        { rewrite <- join_l. exploit VCAP; eauto.
-          econs; ss.
-          admit. (* reverse of CTRL required *)
+        { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+          destruct M.(AEU_WF). ss. exploit CTRL_LIMIT; eauto. clear. lia.
         }
         inv H. destruct L.(ST). ss.
         exploit sim_rmap_expr; eauto. i. inv x0.
@@ -742,11 +758,10 @@ Proof.
         i. exploit EX2.(ADDR); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i.
-        assert (AExecUnit.label_is (alc1.(ALocal.labels) ++ [Label.ctrl]) Label.is_access (List.length alc1.(ALocal.labels))).
-        { admit. (* TODO: use well-formedness *) }
-        inv H.
-        rewrite List.nth_error_app2, Nat.sub_diag in EID; try lia.
-        destruct l; ss.
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.addr_label; eauto. i. des.
+        inv EID2. rewrite X in EID. inv EID. ss.
     + rewrite List.app_length, Nat.add_1_r.
       i. rewrite sim_local_vrel_step. rewrite inverse_step.
       rewrite ? inverse_union. ii. des.
@@ -762,7 +777,9 @@ Proof.
         econs; cycle 1.
         { instantiate (1 := (_, _)). econs; ss. }
         left. econs. split; eauto. econs; ss.
-        admit. (* reverse of EX2.(LABELS) is required *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. econs; eauto.
       * right. esplits; eauto.
         i. specialize (FWDBANK0 eid).
         rewrite List.app_length, Nat.add_1_r.

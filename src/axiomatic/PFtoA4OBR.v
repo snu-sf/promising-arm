@@ -135,7 +135,9 @@ Proof.
       exploit EX2.(ADDR); eauto; ss.
       { rewrite List.app_length. s. clear. lia. }
       intro Y. inv Y.
-      { admit. (* well-formedness; addr cannot relate too big event *) }
+      { exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+        destruct M.(AEU_WF). ss. exploit ADDR_LIMIT; eauto. clear. lia.
+      }
       inv H. admit. (* I don't know how to solve it.. *)
     + inv H1. des. inv H1.
       { inv H2. inv H3. destruct l0; ss. congr. }
