@@ -482,7 +482,7 @@ Proof.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
         intro X. exploit Valid.ctrl_label; eauto. i. des.
-        admit. (* TODO: use well-formedness *)
+        inv EID2. rewrite X in EID. inv EID. ss.
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(ADDR); eauto; ss.
@@ -620,7 +620,7 @@ Proof.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
         intro X. exploit Valid.ctrl_label; eauto. i. des.
-        inv x2. admit. (* TODO: use well-formedness *)
+        inv EID2. rewrite X in EID. inv EID. ss.
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(ADDR); eauto; ss.
