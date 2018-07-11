@@ -116,10 +116,67 @@ Proof.
   exploit EX2.(RMW); eauto; ss.
   { rewrite List.app_length. ss. }
   i. inv x1.
-  { admit. (* use well-formedness *) }
+  { exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+    destruct L1.(AEU_WF). ss. exploit RMW2; eauto. i. des.
+    assert (List.nth_error (ALocal.labels alc1) (length (ALocal.labels alc1)) <> None).
+    { ii. congr. }
+    rewrite List.nth_error_Some in H9. clear - H9. lia. }
   inv H1. rewrite <- H5 in H9. inv H9.
   assert (LOC: Exbank.loc eb = ValA.val vloc).
-  { admit. (* use fr and co *) }
+  { assert (SLW: sim_local_weak lc1 alc1).
+    { clear - TRACE. inv TRACE; ss.
+      unfold Machine.init_with_promises in FIND. ss.
+      rewrite IdMap.mapi_spec in FIND.
+      destruct (IdMap.find tid p); ss. inv FIND.
+      econs; ss. }
+    inv SLW; ss.
+    { rewrite TSX in LOCAL_EX. inv LOCAL_EX. }
+    rewrite TSX in LOCAL_EX. inv LOCAL_EX.
+    assert (EQ1: ValA.val vloc = loc2).
+    { exploit EX2.(XW); eauto.
+      { instantiate (1 := length alc1.(ALocal.labels)). ss.
+        rewrite List.app_length. ss. }
+      i. destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+      { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+      rewrite W2 in x1. inv x1. ss. }
+    exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+    rewrite ALOCAL_EX in H5. symmetry in H5. inv H5.
+    inv H.
+    - inv H1. des. rewrite RF in H. rewrite CO in H1.
+      destruct x as [tid'' eid'']. inv H. inv H1. ss.
+      simplify. rewrite W in W0. inv W0.
+      exploit L1.(RPROP1); eauto. i. des.
+      exploit EX2.(XR); eauto.
+      { instantiate (1 := eid1). ss.
+        rewrite List.app_length. ss.
+        exploit List.nth_error_Some. i. des.
+        exploit x7.
+        { ii. rewrite LABEL_EX in H. inv H. }
+        i. clear - x. lia. }
+      i. rewrite R in x7. rewrite x1 in x7. inv x7.
+      rewrite W1 in W3. inv W3. ss.
+    - inv H1. inv H. inv H5. inv H. inv H1. inv H5.
+      rewrite EID1 in EID3. inv EID3.
+      rewrite EID2 in EID0. inv EID0.
+      destruct l3; destruct l0; ss.
+      inv LABEL3. inv X0. inv Y0.
+      assert (loc = loc0).
+      { destruct (equiv_dec loc loc1); ss.
+        destruct (equiv_dec loc0 loc1); ss.
+        rewrite e, e0. ss. }
+      subst.
+      exploit List.nth_error_Some. i. des. exploit x1.
+      { ii. rewrite LABEL_EX in H. inv H. }
+      i. clear x1. clear x6.
+      exploit EX2.(LABELS); try eapply EID1; ss.
+      { rewrite List.app_length. ss. clear - x. lia. }
+      i. rewrite List.nth_error_app1 in x6; ss.
+      rewrite LABEL_EX in x6. inv x6.
+      unfold Execution.label in EID2. ss.
+      rewrite PRE.(Valid.LABELS) in EID2.
+      rewrite IdMap.map_spec in EID2.
+      generalize (ATR tid'). intro ATR'. inv ATR'; try congr. des. simplify.
+      rewrite <- H in EID2. ss. rewrite x4 in EID2. inv EID2. ss. }
   specialize (EX1 LOC). unfold Memory.exclusive in EX1.
   unfold Memory.no_msgs in EX1.
   destruct (cov eid') eqn:Hcov; ss.
@@ -138,10 +195,21 @@ Proof.
       { rewrite VIEW. ss. }
       exfalso. apply H12. unfold codom_rel.
       inv EID0. esplits; eauto. }
-  { (* move Y at bottom. rewrite EX2.(XVEXT) in Y. *)
-    admit.
-  }
+  { move Y at bottom. rewrite EX2.(XVEXT) in Y; cycle 1.
+    { ss. rewrite List.app_length. ss. }
+    destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+    { rewrite Nat.eqb_neq in Heq. ss. }
+    rewrite fun_add_spec in Y.
+    destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)) eqn:Heq1; cycle 1.
+    { exfalso. apply c. ss. }
+    unfold v_gen in Y. ss. rewrite <- H8 in Y. rewrite <- x2.
+    apply Nat.lt_le_incl. auto. }
   { ss. split.
-    - admit.
+    - exploit EX2.(XW); eauto.
+      { instantiate (1 := length alc1.(ALocal.labels)). ss.
+        rewrite List.app_length. ss. }
+      i. destruct (length (ALocal.labels alc1) =? ALocal.next_eid alc1) eqn:Heq; cycle 1.
+      { rewrite Nat.eqb_neq in Heq. unfold ALocal.next_eid in Heq. ss. }
+      rewrite W2 in x1. inv x1. ss.
     - inv H0. auto. }
-Admitted.
+Qed.
