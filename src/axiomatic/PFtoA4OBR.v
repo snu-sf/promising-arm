@@ -121,7 +121,7 @@ Proof.
                  if eid =? length (ALocal.labels alc1)
                  then Some (ValA.val vloc, fun_add (ValA.val vloc) ts (Local.coh lc1) (ValA.val vloc))
                  else r1 eid) (length (ALocal.labels alc1))).
-      { admit. (* should prove that r includes r2 *) }
+      { eapply EX2.(XR); eauto. s. rewrite List.app_length. s. clear. lia. }
       rewrite H in R. clear H.
       destruct (length (ALocal.labels alc1) =? length (ALocal.labels alc1)); ss.
       rewrite fun_add_spec in R.
@@ -231,7 +231,7 @@ Proof.
                  if eid =? length (ALocal.labels alc1)
                  then Some (ValA.val vloc, fun_add (ValA.val vloc) ts (Local.coh lc1) (ValA.val vloc))
                  else r1 eid) (length (ALocal.labels alc1))).
-      { admit. (* should prove that r includes r2 *) }
+      { eapply EX2.(XR); eauto. s. rewrite List.app_length. s. clear. lia. }
       rewrite H1 in R. clear H1.
       destruct (length (ALocal.labels alc1) =? length (ALocal.labels alc1)); ss.
       rewrite fun_add_spec in R.
@@ -248,7 +248,7 @@ Proof.
     destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts x2)); ss. inv e.
     generalize (L.(LC).(FWDBANK) (ValA.val vloc)). s. i. des.
     + apply Bool.negb_true_iff, Bool.andb_false_iff in X0. des.
-      * admit.
+      * admit. (* fwdbank similarity *)
         (* H3 : Execution.rfi ex x2 (tid, length (ALocal.labels alc1)) *)
         (* H4 : codom_rel (Execution.rmw ex) x2 *)
         (* X0 : FwdItem.ex (Local.fwdbank lc1 (ValA.val vloc)) = false *)
