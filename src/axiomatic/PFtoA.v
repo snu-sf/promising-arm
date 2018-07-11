@@ -52,14 +52,18 @@ Lemma sim_traces_sim_th'_step
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  forall tid tr atr covl vextl
-    n eu1 eu2 tr' aeu1 aeu2 atr' cov1 cov2 covl' vext1 vext2 vextl'
+  forall tid tr atr wl rl covl vextl
+    n eu1 eu2 tr' aeu1 aeu2 atr' w1 w2 wl' r1 r2 rl' cov1 cov2 covl' vext1 vext2 vextl'
     (FIND_TR: IdMap.find tid trs = Some tr)
     (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_WL: IdMap.find tid ws = Some wl)
+    (FIND_RL: IdMap.find tid rs = Some rl)
     (FIND_COVL: IdMap.find tid covs = Some covl)
     (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
     (EU: lastn (S n) tr = eu2 :: eu1 :: tr')
     (AEU: lastn (S n) atr = aeu2 :: aeu1 :: atr')
+    (WL: lastn (S n) wl = w2 :: w1 :: wl')
+    (RL: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
     (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
@@ -93,22 +97,26 @@ Lemma sim_traces_sim_th'
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  forall tid n tr atr covl vextl
-    eu tr' aeu atr' cov covl' vext vextl'
+  forall tid tr atr wl rl covl vextl
+    n eu tr' aeu atr' w wl' r rl' cov covl' vext vextl'
     (N: n < length tr)
     (FIND_TR: IdMap.find tid trs = Some tr)
     (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_WL: IdMap.find tid ws = Some wl)
+    (FIND_RL: IdMap.find tid rs = Some rl)
     (FIND_COVL: IdMap.find tid covs = Some covl)
     (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
     (EU: lastn (S n) tr = eu :: tr')
     (AEU: lastn (S n) atr = aeu :: atr')
+    (WL: lastn (S n) wl = w :: wl')
+    (RL: lastn (S n) rl = r :: rl')
     (COV: lastn (S n) covl = cov :: covl')
     (VEXT: lastn (S n) vextl = vext :: vextl'),
     sim_th' tid ex (v_gen vexts) eu aeu.
 Proof.
   intro tid. generalize (SIM tid). intro X. inv X; [by i|]. induction n.
   { (* init *)
-    i. simplify. rename c into wl, d into rl.
+    i. simplify.
     exploit (lastn_one tr).
     { exploit sim_trace_last; eauto. }
     i. des.
@@ -129,10 +137,12 @@ Proof.
     inv x0. ss. splits; i; try lia.
     admit.
   }
-  i. simplify. rename c into wl, d into rl.
+  i. simplify.
   exploit sim_trace_length; eauto. intro LEN. guardH LEN.
-  exploit lastn_S1; try exact EU; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact EU; [unguardH LEN; des; lia|].
   exploit lastn_S1; try exact AEU; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact WL; [unguardH LEN; des; lia|i]. 
+  exploit lastn_S1; try exact RL; [unguardH LEN; des; lia|i].
   exploit lastn_S1; try exact COV; [unguardH LEN; des; lia|i]. 
   exploit lastn_S1; try exact VEXT; [unguardH LEN; des; lia|i].
   subst. exploit sim_trace_lastn; eauto. instantiate (1 := n). i.
@@ -141,6 +151,8 @@ Proof.
   eapply sim_traces_sim_th'_step; eauto.
   - rewrite EU, HDTR. ss.
   - rewrite AEU, HDATR. ss.
+  - rewrite WL, HDWL. ss.
+  - rewrite RL, HDRL. ss.
   - rewrite COV, HDCOVL. ss.
   - rewrite VEXT, HDVEXTL. ss.
 Admitted.

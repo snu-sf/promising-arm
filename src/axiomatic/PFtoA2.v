@@ -436,7 +436,7 @@ Proof.
   inv SIM; ss. lia.
 Qed.
 
-Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
+Inductive sim_ex tid ex (ws rs:IdMap.t (list (nat -> option (Loc.t * Time.t)))) covs vexts aeu w r cov vext: Prop := {
   LABELS:
     forall eid label
       (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
@@ -470,6 +470,16 @@ Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
     forall eid
       (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels)),
       (v_gen vexts) (tid, eid) = vext eid;
+  XW:
+    forall eid w0 wl
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (W: IdMap.find tid ws = Some (w0::wl)),
+      w0 eid = w eid;
+  XR:
+    forall eid r0 rl
+      (EID: eid < List.length aeu.(AExecUnit.local).(ALocal.labels))
+      (R: IdMap.find tid rs = Some (r0::rl)),
+      r0 eid = r eid;
 
   LABELS_REV:
     forall eid label
@@ -501,16 +511,20 @@ Lemma sim_traces_sim_ex_step
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  forall tid atr covl vextl
-    n aeu1 aeu2 atr' cov1 cov2 covl' vext1 vext2 vextl'
+  forall tid atr wl rl covl vextl
+    n aeu1 aeu2 atr' w2 w1 wl' r2 r1 rl' cov1 cov2 covl' vext1 vext2 vextl'
     (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_WL: IdMap.find tid ws = Some wl)
+    (FIND_RL: IdMap.find tid rs = Some rl)
     (FIND_COVL: IdMap.find tid covs = Some covl)
     (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
     (AEU: lastn (S n) atr = aeu2 :: aeu1 :: atr')
+    (W: lastn (S n) wl = w2 :: w1 :: wl')
+    (R: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
-    (SIM_EX: sim_ex tid ex covs vexts aeu2 cov2 vext2),
-    sim_ex tid ex covs vexts aeu1 cov1 vext1.
+    (SIM_EX: sim_ex tid ex ws rs covs vexts aeu2 w2 r2 cov2 vext2),
+    sim_ex tid ex ws rs covs vexts aeu1 w1 r1 cov1 vext1.
 Proof.
   i. rename SIM_EX into L.
   generalize (SIM tid). intro X. inv X; simplify.
@@ -543,13 +557,16 @@ Proof.
            | [|- ALocal.data _ _ _] => try by exploit DATA0; eauto; tac; lia
            | [|- ALocal.ctrl _ _ _] => try by exploit CTRL0; eauto; tac; lia
            | [|- ALocal.rmw _ _ _] => try by exploit RMW0; eauto; tac; lia
-           | [|- v_gen _ _ = _] => try by rewrite XCOV0; eauto; tac; lia
+           | [|- v_gen _ _ = _] => try by erewrite XCOV0; eauto; tac; lia
+           | [|- _ _ = _ _] => try by erewrite XW0; eauto; tac; lia
            end.
   - exploit ADDR0; eauto; tac; try lia.
     inv x; ss. inv H. lia.
   - rewrite XCOV0; eauto; tac; try lia.
     condtac; ss. apply Nat.eqb_eq in X. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - erewrite XR0; eauto; tac; try lia.
     condtac; ss. apply Nat.eqb_eq in X. lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - eapply ADDR_REV0; eauto. left. ss.
@@ -565,6 +582,10 @@ Proof.
   - rewrite XVEXT0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst.
     condtac; ss. apply Nat.eqb_eq in X. lia.
+  - erewrite XW0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst.
+    condtac; ss. apply Nat.eqb_eq in X. lia.
+  - erewrite XR0; eauto; tac; try lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - eapply ADDR_REV0; eauto. left. ss.
   - eapply DATA_REV0; eauto. left. ss.
@@ -573,11 +594,15 @@ Proof.
     inv RES. destruct res1. ss. subst. ss.
   - rewrite XVEXT0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst. ss.
+  - erewrite XW0; eauto; tac; try lia.
+    inv RES. destruct res1. ss. subst. ss.
   - rewrite XVEXT0; eauto; tac; try lia.
+  - erewrite XR0; eauto; tac; try lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - exploit CTRL0; eauto; tac; try lia.
     inv x; ss. inv H. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
+  - erewrite XR0; eauto; tac; try lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - eapply CTRL_REV0; eauto. left. ss.
 Qed.
@@ -590,16 +615,20 @@ Lemma sim_traces_sim_ex_aux
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
-  forall tid atr covl vextl
-    n aeu atr' cov covl' vext vextl'
+  forall tid atr wl rl covl vextl
+    n aeu atr' w wl' r rl' cov covl' vext vextl'
     (N: n < length atr)
     (FIND_ATR: IdMap.find tid atrs = Some atr)
+    (FIND_WL: IdMap.find tid ws = Some wl)
+    (FIND_RL: IdMap.find tid rs = Some rl)
     (FIND_COVL: IdMap.find tid covs = Some covl)
     (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
     (AEU: lastn (S n) atr = aeu :: atr')
+    (W: lastn (S n) wl = w :: wl')
+    (R: lastn (S n) rl = r :: rl')
     (COV: lastn (S n) covl = cov :: covl')
     (VEXT: lastn (S n) vextl = vext :: vextl'),
-    sim_ex tid ex covs vexts aeu cov vext.
+    sim_ex tid ex ws rs covs vexts aeu w r cov vext.
 Proof.
   intros tid. generalize (SIM tid). intro X. inv X; [by i|].
   intros. remember (length atr - 1 - n) as n'.
@@ -642,6 +671,8 @@ Proof.
       rewrite <- H7 in H. inv H. ss.
     - unfold v_gen. s. rewrite <- H4. ss.
     - unfold v_gen. s. rewrite <- H5. ss.
+    - i. simplify. ss.
+    - i. simplify. ss.
     - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
       unfold Execution.label. s. rewrite PRE.(Valid.LABELS), IdMap.map_spec, <- H8. ss.
     - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
@@ -676,19 +707,23 @@ Qed.
 Lemma sim_traces_ex
       p mem trs atrs ws rs covs vexts
       ex
-      tid n atr aeu atr' covl cov covl' vextl vext vextl'
+      tid n atr aeu atr' wl w wl' rl r rl' covl cov covl' vextl vext vextl'
       (SIM: sim_traces p mem trs atrs ws rs covs vexts)
       (PRE: Valid.pre_ex p ex)
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE))
       (FIND_ATR: IdMap.find tid atrs = Some atr)
+      (FIND_WL: IdMap.find tid ws = Some wl)
+      (FIND_RL: IdMap.find tid rs = Some rl)
       (FIND_COVL: IdMap.find tid covs = Some covl)
       (FIND_VEXTL: IdMap.find tid vexts = Some vextl)
       (AEU: lastn (S n) atr = aeu :: atr')
+      (W: lastn (S n) wl = w :: wl')
+      (R: lastn (S n) rl = r :: rl')
       (COV: lastn (S n) covl = cov :: covl')
       (VEXT: lastn (S n) vextl = vext :: vextl'):
-  sim_ex tid ex covs vexts aeu cov vext.
+  sim_ex tid ex ws rs covs vexts aeu w r cov vext.
 Proof.
   generalize (SIM tid). intro X. inv X; simplify.
   exploit sim_trace_length; eauto. intro LEN. guardH LEN.
