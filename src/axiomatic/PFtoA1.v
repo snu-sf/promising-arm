@@ -520,6 +520,13 @@ Inductive sim_th
       List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
       __guard__ ((ts = Time.bot /\ val = Val.default) \/
                  Memory.get_msg ts mem = Some (Msg.mk loc val tid'));
+  COVPROP:
+    forall eid (COV: cov eid > 0),
+      AExecUnit.label_is aeu.(AExecUnit.local).(ALocal.labels) Label.is_access eid;
+  VEXTPROP:
+    forall eid (VEXT: vext eid > 0),
+      AExecUnit.label_is aeu.(AExecUnit.local).(ALocal.labels) Label.is_access eid;
+
   PO: forall iid1 iid2 label1 label2
      (PO: iid1 < iid2)
      (LABEL1: List.nth_error aeu.(AExecUnit.local).(ALocal.labels) iid1 = Some label1)
@@ -595,6 +602,8 @@ Proof.
       destruct eid; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND. s. i.
       destruct eid; ss.
+    - unfold Time.bot. i. lia.
+    - unfold Time.bot. i. lia.
     - i. destruct iid1; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
       econs; ss.
@@ -679,6 +688,18 @@ Proof.
       + exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         * rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
         * eapply nth_error_app_mon. eauto.
+    - unfold ALocal.next_eid in *. s. i. des_ifs.
+      { apply Nat.eqb_eq in Heq. subst. econs; eauto.
+        - rewrite List.nth_error_app2, Nat.sub_diag; [|refl]. ss.
+        - econs; ss.
+      }
+      apply AExecUnit.label_is_mon. eapply IH.(COVPROP); eauto.
+    - unfold ALocal.next_eid in *. s. i. des_ifs.
+      { apply Nat.eqb_eq in Heq. subst. econs; eauto.
+        - rewrite List.nth_error_app2, Nat.sub_diag; [|refl]. ss.
+        - econs; ss.
+      }
+      apply AExecUnit.label_is_mon. eapply IH.(VEXTPROP); eauto.
     - i. unfold ALocal.next_eid in *.
       apply nth_error_snoc_inv in LABEL1. apply nth_error_snoc_inv in LABEL2. des.
       + repeat condtac.
@@ -768,6 +789,18 @@ Proof.
       * rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
         inv WRITABLE. apply Nat.lt_le_incl. ss.
       * eapply nth_error_app_mon. eauto.
+    - unfold ALocal.next_eid in *. s. i. des_ifs.
+      { apply Nat.eqb_eq in Heq. subst. econs; eauto.
+        - rewrite List.nth_error_app2, Nat.sub_diag; [|refl]. ss.
+        - econs; ss.
+      }
+      apply AExecUnit.label_is_mon. eapply IH.(COVPROP); eauto.
+    - unfold ALocal.next_eid in *. s. i. des_ifs.
+      { apply Nat.eqb_eq in Heq. subst. econs; eauto.
+        - rewrite List.nth_error_app2, Nat.sub_diag; [|refl]. ss.
+        - econs; ss.
+      }
+      apply AExecUnit.label_is_mon. eapply IH.(VEXTPROP); eauto.
     - inv ASTATE_STEP; ss; eauto. subst.
       inv VLOC. inv VVAL. rewrite VAL0, VAL1 in *. unfold ALocal.next_eid in *.
       i. apply nth_error_snoc_inv in LABEL1. apply nth_error_snoc_inv in LABEL2. des.
@@ -813,6 +846,8 @@ Proof.
         apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
+      - i. apply AExecUnit.label_is_mon. eapply IH.(COVPROP); eauto.
+      - i. apply AExecUnit.label_is_mon. eapply IH.(VEXTPROP); eauto.
       - i. apply nth_error_snoc_inv in LABEL1. des; cycle 1.
         { subst. inv REL. inv X. }
         apply nth_error_snoc_inv in LABEL2. des; cycle 1.
@@ -832,6 +867,8 @@ Proof.
         apply nth_error_snoc_inv in GET. des; eauto. congr.
       - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
         eapply nth_error_app_mon. eauto.
+      - i. apply AExecUnit.label_is_mon. eapply IH.(COVPROP); eauto.
+      - i. apply AExecUnit.label_is_mon. eapply IH.(VEXTPROP); eauto.
       - i. apply nth_error_snoc_inv in LABEL1. des; cycle 1.
         { subst. inv REL. inv X. }
         apply nth_error_snoc_inv in LABEL2. des; cycle 1.
@@ -853,6 +890,8 @@ Proof.
       apply nth_error_snoc_inv in GET. des; eauto. congr.
     - i. exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
       eapply nth_error_app_mon. eauto.
+    - i. apply AExecUnit.label_is_mon. eapply IH.(COVPROP); eauto.
+    - i. apply AExecUnit.label_is_mon. eapply IH.(VEXTPROP); eauto.
     - i. apply nth_error_snoc_inv in LABEL1. des; cycle 1.
       { subst. inv REL. inv X. }
       apply nth_error_snoc_inv in LABEL2. des; cycle 1.

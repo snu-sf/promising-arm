@@ -191,6 +191,7 @@ Proof.
         rewrite ? seq_assoc. ss.
     + inv H. des. inv H2. inv H4. destruct l0; ss. rewrite EID in EID0. inv EID0.
       exploit Valid.po_label_pre; eauto. i. des.
+      destruct eid1 as [tid1 eid1]. inv H1. ss. subst.
       destruct label1; ss.
       * eapply Nat.le_lt_trans; [apply L.(LC).(VRM)|]; ss; cycle 1.
         { rewrite fun_add_spec. condtac; [|congr].
@@ -199,7 +200,7 @@ Proof.
           rewrite LABEL1. refl.
         }
         {  econs; eauto. unfold sim_local_vrm. econs. splits; eauto.
-           econs; ss. econs; eauto.
+           econs; ss. econs; eauto. econs; ss.
         }
       * eapply Nat.le_lt_trans; [apply L.(LC).(VWM)|]; ss; cycle 1.
         { rewrite fun_add_spec. condtac; [|congr].
@@ -208,11 +209,32 @@ Proof.
           rewrite LABEL1. refl.
         }
         {  econs; eauto. unfold sim_local_vwm. econs. splits; eauto.
-           econs; ss. econs; eauto.
+           econs; ss. econs; eauto. econs; ss.
         }
       * eapply Nat.le_lt_trans; try eapply x0.
-        admit. (* v_gen vexts eid1 = 0 *)
+        rewrite EX2.(XVEXT); ss; cycle 1.
+        { rewrite List.app_length. s. clear -N. lia. }
+        condtac.
+        { apply Nat.eqb_eq in X0. clear -N X0. lia. }
+        destruct (le_lt_dec (vext1 eid1) 0); ss.
+        exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+        exploit L1.(VEXTPROP); eauto. s. i. inv x3.
+        exploit LABELS_REV; eauto; ss.
+        { apply nth_error_app_mon. eauto. }
+        rewrite LABEL2. intro Y. inv Y. ss.
       * eapply Nat.le_lt_trans; try eapply x0.
-        admit. (* v_gen vexts eid1 = 0 *)
-    + admit. (* rmw's source's post-view < ts of write *)
+        rewrite EX2.(XVEXT); ss; cycle 1.
+        { rewrite List.app_length. s. clear -N. lia. }
+        condtac.
+        { apply Nat.eqb_eq in X0. clear -N X0. lia. }
+        destruct (le_lt_dec (vext1 eid1) 0); ss.
+        exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+        exploit L1.(VEXTPROP); eauto. s. i. inv x3.
+        exploit LABELS_REV; eauto; ss.
+        { apply nth_error_app_mon. eauto. }
+        rewrite LABEL2. intro Y. inv Y. ss.
+    + destruct (equiv_dec arch riscv); ss.
+      rewrite fun_add_spec. condtac; [|congr].
+      generalize L.(LC).(EXBANK). s.
+      admit. (* rmw's source's post-view < ts of write.  low priority (riscv-only) *)
 Admitted.
