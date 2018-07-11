@@ -236,8 +236,22 @@ Proof.
         exploit LABELS_REV; eauto; ss.
         { apply nth_error_app_mon. eauto. }
         rewrite LABEL2. intro Y. inv Y. ss.
-    + destruct (equiv_dec arch riscv); ss.
+    + destruct (equiv_dec arch riscv) eqn:Z; ss.
       rewrite fun_add_spec. condtac; [|congr].
-      generalize L.(LC).(EXBANK). s.
-      admit. (* rmw's source's post-view < ts of write.  low priority (riscv-only) *)
-Admitted.
+      exploit Valid.rmw_is_po; eauto. destruct eid1. intro Y. inv Y. ss. subst.
+      exploit EX2.(RMW); eauto; ss.
+      { s. rewrite List.app_length. s. clear. lia. }
+      intro Y. inv Y.
+      { exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
+        destruct L1.(AEU_WF). ss. exploit RMW_LIMIT; eauto. clear. lia. }
+      destruct ex0; ss. inv H. exploit EX; eauto. i. des. rewrite H2 in x. inv x.
+      inv x3. des. destruct a; ss. 
+      generalize L.(LC).(EXBANK). s. rewrite H2. intro Y. inv Y. des.
+      inv REL. apply Label.is_reading_inv in LABEL1. des. subst.
+      exploit EX2.(LABELS); eauto; ss.
+      { rewrite List.app_length. s. clear -N. lia. }
+      i. apply nth_error_snoc_inv in x3. des; ss. rewrite x4 in H5. inv H5.
+      inv WRITABLE. eapply Nat.le_lt_trans; [|apply EXT]. s.
+      rewrite <- join_r, <- join_r, <- join_r, <- join_r, <- join_r, <- join_r, <- join_l.
+      rewrite Z, <- H. s. apply REL1. ss.
+Qed.
