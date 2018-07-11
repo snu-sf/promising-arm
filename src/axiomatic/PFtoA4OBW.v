@@ -135,7 +135,7 @@ Proof.
         exploit VIEW; ss. i.
         exploit sim_traces_sim_ex_step; eauto. i.
         rewrite <- x4.(XVEXT); auto.
-      * rewrite <- join_l.
+      * rewrite <- join_r. rewrite <- join_l.
         destruct eid1 as [tid1 eid1]. exploit Valid.data_is_po; eauto. intro Y. inv Y. ss. subst.
         rewrite EX2.(XVEXT); s; cycle 1.
         { s. rewrite List.app_length. s. clear -N. lia. }
@@ -146,7 +146,14 @@ Proof.
         intro Y. inv Y.
         { exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
           destruct L1.(AEU_WF). ss. exploit DATA_LIMIT; eauto. clear. lia. }
-        inv H. admit. (* I don't know how to solve it.. *)
+        inv H.
+        move STATE0 at bottom. inv STATE0.
+        inv STATE1. ss. inv STMTS. destruct L.(ST). ss.
+        exploit sim_rmap_expr; eauto. instantiate (1 := eval). i.
+        inv x3. specialize (VIEW (tid, eid1)). ss.
+        exploit VIEW; ss. i.
+        exploit sim_traces_sim_ex_step; eauto. i.
+        rewrite <- x4.(XVEXT); auto.
     + inv H1. des. inv H1; cycle 1.
       { inv H2. des. inv H2. inv H5. destruct l0; ss. congr. }
       inv H2. eapply Nat.le_lt_trans.
