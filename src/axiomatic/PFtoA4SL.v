@@ -174,7 +174,10 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto. i. rewrite <- join_l. ss.
       * inv EID.
-        admit. (* no ctrl edge to read *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        inv EID2. rewrite X in EID. inv EID. ss.
       * (* sim addr *)
         inv EID. rewrite <- join_r.
         destruct eid as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro X. inv X. ss. subst.
@@ -317,7 +320,10 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto. i. rewrite <- join_l. ss.
       * inv EID.
-        admit. (* no ctrl edge to write. *)
+        exploit EX2.(LABELS_REV); ss.
+        { apply nth_error_last. apply Nat.eqb_eq. ss. }
+        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        inv EID2. rewrite X in EID. inv EID. ss.
       * (* sim addr *)
         inv EID. rewrite <- join_r.
         destruct eid as [tid1 eid1]. exploit Valid.addr_is_po; eauto. intro X. inv X. ss. subst.
