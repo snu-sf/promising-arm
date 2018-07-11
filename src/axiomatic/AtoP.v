@@ -528,7 +528,7 @@ Proof.
           inv WRITE. inv WRITE0. apply Label.is_writing_inv in LABEL1. des. subst.
           rewrite EID in LABEL0. inv LABEL0.
           exploit EX0; eauto. clear EX0. intro Y. inv Y. rewrite EID in EID0. inv EID0.
-          exploit Valid.write_ex_codom_rmw; eauto.
+          exploit EX.(Valid.write_ex_codom_rmw); eauto.
           intro Y. inv Y. left. right. econs. splits.
           { econs; eauto. econs; eauto. }
           econs. splits.

@@ -423,7 +423,17 @@ Proof.
               destruct M.(AEU_WF). ss. exploit DATA_LIMIT; eauto. clear. lia.
             }
             inv H0. eapply sim_rmap_expr; eauto. apply L.
-        - admit. (* should be easy after chaning sim_local's definition *)
+        - destruct ex0; econs; i; ss.
+          + exploit EX2.(LABELS_REV); ss.
+            { apply nth_error_last. apply Nat.eqb_eq. ss. }
+            i. eapply PRE.(Valid.write_ex_codom_rmw). econs; eauto.
+          + inv H.
+            exploit PRE.(Valid.rmw_is_po); eauto. i. inv x1. destruct x. ss. subst.
+            exploit EX2.(RMW); ss; eauto.
+            { rewrite List.app_length. s. clear. lia. }
+            i. inv x0; ss. 
+            exploit sim_trace_sim_th; try exact TRACE; eauto. intro M.
+            destruct M.(AEU_WF). ss. exploit RMW_LIMIT; eauto. clear. lia.
       }
       specialize (FWDBANK loc). des.
       * left. esplits; eauto.

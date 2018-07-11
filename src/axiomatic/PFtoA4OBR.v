@@ -276,5 +276,7 @@ Proof.
       * econs; eauto. unfold sim_local_vrp. right.
         rewrite ? seq_assoc. ss.
     + inv H. des. inv H2. inv H3. destruct l0; ss. congr.
-    + admit. (* riscv.. bug in promising semantics (low priority) *)
+    + destruct (equiv_dec arch riscv); ss. exploit Valid.rmw_spec; eauto. i. des.
+      exploit EX2.(LABELS_REV); eauto. i.
+      inv LABEL2. des. destruct l0; ss. rewrite x2 in EID0. inv EID0.
 Admitted.

@@ -184,7 +184,7 @@ Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:L
                     vext
                     (local.(Local.fwdbank) loc).(FwdItem.view).(View.ts)
                     (inverse (ex.(Execution.addr) ∪ ex.(Execution.data)) (eq eid))>> /\
-          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> ex.(Execution.label_is) (Label.is_ex) eid>>) \/
+          <<EX: (local.(Local.fwdbank) loc).(FwdItem.ex) <-> codom_rel ex.(Execution.rmw) eid>>) \/
       ((local.(Local.fwdbank) loc) = FwdItem.init /\
        forall eid, ~ (inverse (sim_local_fwd_none ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))) eid));
   EXBANK: opt_rel

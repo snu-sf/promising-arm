@@ -1025,9 +1025,25 @@ Module Valid.
     inv WF. apply ADDR0. ss.
   Qed.
 
+  Lemma rmw_is_po
+        p exec
+        (EX: pre_ex p exec):
+    exec.(Execution.rmw) ⊆ Execution.po.
+  Proof.
+    rewrite EX.(RMW).
+    ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
+    destruct (IdMap.find t EX.(aeus)) eqn:LOCAL; ss. inv RELS.
+    generalize (EX.(AEUS) t). rewrite LOCAL. intro X. inv X. des.
+    exploit AExecUnit.rtc_step_future; eauto.
+    { apply AExecUnit.wf_init. }
+    s. i. des. econs; ss.
+    inv WF. apply RMW0. ss.
+  Qed.
+
   Lemma write_ex_codom_rmw
-        p exec eid
-        (EX: ex p exec)
+        p exec
+        (EX: pre_ex p exec)
+        eid
         (WRITE: exec.(Execution.label_is) (fun l => Label.is_write l /\ Label.is_ex l) eid):
     codom_rel exec.(Execution.rmw) eid.
   Proof.

@@ -487,6 +487,10 @@ Inductive sim_ex tid ex covs vexts aeu cov vext: Prop := {
     forall eid1 eid2
       (CTRL: aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2),
       ex.(Execution.ctrl) (tid, eid1) (tid, eid2);
+  RMW_REV:
+    forall eid1 eid2
+      (RMW: aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2),
+      ex.(Execution.rmw) (tid, eid1) (tid, eid2);
 }.
 
 Lemma sim_traces_sim_ex_step
@@ -564,6 +568,7 @@ Proof.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - eapply ADDR_REV0; eauto. left. ss.
   - eapply DATA_REV0; eauto. left. ss.
+  - eapply RMW_REV0; eauto. left. ss.
   - rewrite XCOV0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst. ss.
   - rewrite XVEXT0; eauto; tac; try lia.
@@ -645,6 +650,8 @@ Proof.
       rewrite PRE.(Valid.DATA). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
     - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
       rewrite PRE.(Valid.CTRL). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
+    - i. generalize (ATR tid). rewrite <- H. intro X. inv X. des. simplify.
+      rewrite PRE.(Valid.RMW). econs; eauto.  rewrite IdMap.map_spec. s. rewrite <- H8. ss.
   }
   i. simplify.
   exploit sim_trace_length; eauto. intro LEN. guardH LEN.
