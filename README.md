@@ -1,7 +1,7 @@
 # Promising-ARM/RISC-V
 
 This is the supplementary material for POPL 2019 submission #23: "Promising-ARM/RISC-V: a simpler
-and faster operational memory model for ARMv8 and RISC-V"
+and faster operational memory model for ARMv8 and RISC-V".
 
 ## Build
 
@@ -64,11 +64,10 @@ The following theorems collectively prove Theorem 8.1 and the observation made i
   `src/axiomatic/AtoP.v`.
 
 
-We are formalising Theorem 8.2 (equivalence of Global-Promising and Promising), 8.3
-(Deadlock-freedom of Promising for RISC-V), 8.4 (equivalence of Global-Promising and
-Extended-Promising), and 8.5 (Deadlock-freedom of Extended-Promising for ARM).
-
-For Theorem 8.2, Lemma `interference_certify`, `promise_step_certify`, `state_step_certify` in
+(Work-in-progress) We are formalising Theorem 8.2 (equivalence of Global-Promising and Promising),
+8.3 (Deadlock-freedom of Promising for RISC-V), 8.4 (equivalence of Global-Promising and
+Extended-Promising), and 8.5 (Deadlock-freedom of Extended-Promising for ARM).  For Theorem 8.2,
+Lemma `interference_certify`, `promise_step_certify`, `state_step_certify` in
 `src/lcertify/Certify.v` will be the key lemmas.  We think it is straightforward to formalise
 Theorem 8.3.  We are planning to formalize Theorem 8.4 and 8.5, which seems technical and
 non-trivial but feasible.
