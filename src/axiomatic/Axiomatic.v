@@ -193,7 +193,7 @@ Module ALocal.
                  (if ex then Some (next_eid alocal1) else alocal1.(exbank)))
   | step_write
       ex ord vloc vval
-      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (ifc (arch == riscv) (eq (next_eid alocal1)))))
+      (EVENT: event = Event.write ex ord vloc vval (ValA.mk _ 0 (ifc (ex && (arch == riscv)) (eq (next_eid alocal1)))))
       (EX: ex -> exists n,
            alocal1.(exbank) = Some n /\
            opt_pred (fun l => Label.is_read l /\ Label.is_ex l) (List.nth_error alocal1.(labels) n))

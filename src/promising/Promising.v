@@ -569,7 +569,7 @@ Section Local.
       (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_ext)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
       (PROMISE: Promises.lookup ts lc1.(promises))
-      (RES: res = ValA.mk _ 0 (View.mk (ifc (arch == riscv) ts) view_ext.(View.annot)))
+      (RES: res = ValA.mk _ 0 (View.mk (ifc (ex && (arch == riscv)) ts) view_ext.(View.annot)))
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))

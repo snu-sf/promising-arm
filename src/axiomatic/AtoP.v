@@ -1287,6 +1287,9 @@ Theorem axiomatic_to_promising
   exists m,
     <<STEP: Machine.exec p m>> /\
     <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m>> /\
+    <<STATE: IdMap.Forall2
+               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               m.(Machine.tpool) EX.(Valid.aeus)>> /\
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
   (* Linearize events and construct memory. *)
@@ -1314,6 +1317,9 @@ Proof.
           <<STEP: rtc (Machine.step ExecUnit.state_step) m m0>> /\
           <<NOPROMISE: Machine.no_promise m0>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m0>> /\
+          <<STATE: IdMap.Forall2
+                     (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+                     m0.(Machine.tpool) EX.(Valid.aeus)>> /\
           <<MEM: sim_mem ex (Machine.mem m0)>>).
   { i. des. esplits; eauto. econs; eauto.
     etrans.
@@ -1332,8 +1338,16 @@ Proof.
   assert (OUT: forall tid st lc
                  (FIND1: IdMap.find tid p = None)
                  (FIND2: IdMap.find tid m.(Machine.tpool) = Some (st, lc)),
-             (EX.(Valid.is_terminal) -> State.is_terminal st) /\ lc.(Local.promises) = bot).
+             exists aeu,
+               <<AEU: IdMap.find tid EX.(Valid.aeus) = Some aeu>> /\
+               <<STATE: sim_state_weak st aeu.(AExecUnit.state)>> /\
+               <<PROMISE: lc.(Local.promises) = bot>>).
   { i. rewrite TPOOL, FIND1 in FIND2. ss. }
+  assert (INVALID: forall tid
+                     (FIND1: IdMap.find tid p = None)
+                     (FIND2: IdMap.find tid m.(Machine.tpool) = None),
+             IdMap.find tid EX.(Valid.aeus) = None).
+  { i. generalize (EX.(Valid.AEUS) tid). rewrite FIND1. intro X. inv X. ss. }
   assert (P: forall tid stmts
                (FIND1: IdMap.find tid p = Some stmts),
              IdMap.find tid p = Some stmts) by ss.
@@ -1341,13 +1355,19 @@ Proof.
   clear TPOOL.
   setoid_rewrite IdMap.elements_spec in IN at 1.
   setoid_rewrite IdMap.elements_spec in OUT at 1.
+  setoid_rewrite IdMap.elements_spec in INVALID at 1.
   setoid_rewrite IdMap.elements_spec in P at 1.
   generalize (IdMap.elements_3w p). intro NODUP. revert NODUP.
-  revert IN OUT P. generalize (IdMap.elements p). intro ps.
+  revert IN OUT INVALID P. generalize (IdMap.elements p). intro ps.
   revert m MEM0. induction ps; ss.
   { i. esplits; eauto.
-    - econs. i. eapply OUT; eauto.
     - econs. i. exploit OUT; eauto. i. des. eauto.
+    - econs. i. exploit OUT; eauto. i. des. splits; ss.
+      exploit H; eauto. intro X. inv X. inv STATE.
+      unfold State.is_terminal. congr.
+    - ii. destruct (IdMap.find id (Machine.tpool m)) as [[]|] eqn:T.
+      + exploit OUT; eauto. i. des. rewrite AEU. econs. ss.
+      + exploit INVALID; eauto. intro X. rewrite X. ss.
   }
   i.
 
@@ -1355,7 +1375,7 @@ Proof.
   exploit (IN tid); eauto.
   { destruct (equiv_dec tid tid); [|congr]. ss. }
   intro FIND.
-  cut (exists st2 lc2,
+  cut (exists st2 lc2 aeu,
           <<STEP: rtc (ExecUnit.state_step (A:=unit) tid)
                       (ExecUnit.mk
                          (State.init stmts)
@@ -1363,6 +1383,8 @@ Proof.
                          (Machine.mem m))
                       (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
           <<TERMINAL: EX.(Valid.is_terminal) -> State.is_terminal st2>> /\
+          <<AEU: IdMap.find tid EX.(Valid.aeus) = Some aeu>> /\
+          <<STATE: sim_state_weak st2 aeu.(AExecUnit.state)>> /\
           <<NOPROMISE: lc2.(Local.promises) = bot>>).
   { i. des. subst.
     exploit Machine.rtc_eu_step_step; try exact STEP; eauto. i.
@@ -1379,8 +1401,12 @@ Proof.
       - apply IN. destruct (equiv_dec tid0 tid); ss.
     }
     { i. revert FIND2. rewrite IdMap.add_spec. condtac.
-      - i. inv FIND2. inversion e. eauto.
+      - i. inv FIND2. inversion e. subst. eauto.
       - apply OUT. destruct (equiv_dec tid0 tid); ss.
+    }
+    { i. revert FIND2. rewrite IdMap.add_spec. condtac.
+      - i. inv FIND2.
+      - apply INVALID. destruct (equiv_dec tid0 tid); ss.
     }
     { i. generalize (P tid0 stmts0). destruct (equiv_dec tid0 tid); eauto.
       inv e. congr.
@@ -1391,7 +1417,7 @@ Proof.
   generalize (P tid stmts). destruct (equiv_dec tid tid); [|congr].
   intro FINDP. specialize (FINDP eq_refl).
   rewrite MEM0 in *.
-  clear NODUP IN OUT P IHps MEM0 FIND ps e m.
+  clear NODUP IN OUT INVALID P IHps MEM0 FIND ps e m.
 
   (* Execute a thread `tid`. *)
   generalize (EX.(Valid.AEUS) tid). rewrite FINDP.
@@ -1422,6 +1448,9 @@ Proof.
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
   - intro X. exploit X; eauto. i. inv STATE. congr.
+  - inv STATE. econs; ss.
+    inv RMAP. econs. ii. specialize (RMAP0 id). inv RMAP0; ss. econs.
+    inv REL1. econs. ss.
   - apply Promises.ext. i. rewrite Promises.lookup_bot.
     destruct (Promises.lookup i (Local.promises local2)) eqn:L; ss; cycle 1.
     apply LOCAL.(PROMISES) in L. des.
