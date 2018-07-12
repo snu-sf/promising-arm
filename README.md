@@ -14,7 +14,7 @@ This is the supplementary material for POPL 2019 submission #23: "Promising-ARM/
 
 - `make`: quickly build without checking the proofs.
 
-- `./build.sh`: build with checking all the proofs.  It will incrementally copy the development in the `.build` directory, and then build there.
+- `./build.sh`: build with checking all the proofs.  It will incrementally copy the development to `.build` subdirectory, and then build there.
 
 - Interactive Theorem Proving: use [ProofGeneral](https://proofgeneral.github.io/) or [CoqIDE](https://coq.inria.fr/download).
   Note that `make` creates `_CoqProject`, which is then used by ProofGeneral and CoqIDE. To use it:
