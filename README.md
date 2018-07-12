@@ -1,6 +1,6 @@
 # Promising-ARM/RISC-V
 
-Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for more information.
+This is the supplementary material for POPL 2019 submission #23: "Promising-ARM/RISC-V: a simpler and faster operational memory model for ARMv8 and RISC-V"
 
 ## Build
 
@@ -8,7 +8,6 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
 
 - Initialization
 
-        git clone https://github.com/snu-sf/promising-arm.git
         cd promising-arm
         git submodule init
         git submodule update
@@ -26,41 +25,32 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
 
 ### Model
 
-- `lib` and `src/lib` contains libraries not necessarily related to the relaxed-memory concurrency.
+- `lib` and `src/lib` contains libraries not necessarily related to relaxed-memory concurrency.
 
 - `src/lib/Lang.v`: Definition of assembly-like language and its interpretation
 
-- `src/promising/Promising.v`: Global-promising model (Section 8)
+- `src/promising/Promising.v`: Definition of Global-Promising-ARM/RISC-V (Definition 7.1)
 
-- `src/axiomatic/Axiomatic.v`: Definition of axiomatic semantics
+- `src/axiomatic/Axiomatic.v`: Definition of ARMv8-Axiomatic (Section 7)
 
-- `src/lcertify`: Thread-locally certifying promising machine (work in progress)
+- `src/lcertify`: Thread-local certification of Promising-ARM/RISC-V (Section 3.5, formalisation work in progress)
 
-- `src/certify`: Extended-promising model for ARMv8
+- `src/certify`: Certification with ARMv8 store exclusives (Section 6, formalisation work in progress)
 
 ### Results
 
-- `src/promising/PtoPF.v`: Equivalence between global-promising and promise-first machine
+- Theorem `promising_to_promising_pf` in `src/promising/PtoPF.v`:
+  The optimisation for exhaustive exploration is sound (Section 5.1).
 
-- `src/axiomatic/AtoP.v`: Proof for inclusion of axiomatic in global-promising (`axiomatic_to_promising`)
+- Theorem `promising_pf_to_axiomatic` in `src/axiomatic/PFtoA.v`:
+  Optimised Global-Promising-ARM/RISC-V refines ARMv8-Axiomatic (Theorem 7.3).
 
-- `src/axiomatic/PFtoA.v`: Proof for inclusion of promise-first machine in axiomatic (`promising_pf_to_axiomatic`)
     + `PFtoA1.v`: construction of axiomatic execution from promising execution
     + `PFtoA2.v`, `PFtoA3.v`: definitions and lemmas for main proof
     + `PFtoA4*.v`: proof for validity of constructed axiomatic execution
-        * `PFtoA4SL.v`: simulation between promising execution and axiomatic execution
-        * `PFtoA4OBR.v`, `PFtoA4OBW.v`: proof for "external" axiom
-        * `PFtoA4FR.v`: proof for "external" axiom, especially on `fr` relation
+        * `PFtoA4SL.v`: simulation between promising and axiomatic execution
+        * `PFtoA4OBR.v`, `PFtoA4OBW.v`, `PFtoA4FR.v`: proof for "external" axiom
         * `PFtoA4Atomic.v`: proof for "atomic" axiom
 
-- Equivalence between global-promising and promising
-    + work in progress
-
-- Dead-lock freedom for RISC-V
-    + work in progress
-
-- Equivalence between global-promising and extended-promising
-    + work in progress
-
-- Dead-lock freedom for ARMv8
-    + work in progress
+- Theorem `axiomatic_to_promising` in `src/axiomatic/AtoP.v`:
+  ARMv8-Axiomatic refines Global-Promising-ARM/RISC-V (Theorem 7.3).
