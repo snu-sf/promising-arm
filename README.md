@@ -33,9 +33,6 @@ Please visit the [project website](http://sf.snu.ac.kr/promise-concurrency/) for
 - `src/promising/Promising.v`: Global-promising model (Section 8)
 
 - `src/axiomatic/Axiomatic.v`: Definition of axiomatic semantics
-    + `Axiomatic.v`: definition of axiomatic semantics
-    + `AtoP.v`: proof for inclusion of axiomatic in promising
-    + `PFtoA*.v`: proof for inclusion of promising in axiomatic
 
 - `src/lcertify`: Thread-locally certifying promising machine (work in progress)
 
