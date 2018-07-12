@@ -14,7 +14,7 @@ This is the supplementary material for POPL 2019 submission #23: "Promising-ARM/
 
 - `make`: quickly build without checking the proofs.
 
-- `./build.sh`: build with checking all the proofs.  It will incrementally copy the development to `.build` subdirectory, and then build there.
+- `./build.sh`: build with checking all the proofs.  It will incrementally copy the development to `.build` sub-directory, and then build there.
 
 - Interactive Theorem Proving: use [ProofGeneral](https://proofgeneral.github.io/) or [CoqIDE](https://coq.inria.fr/download).
   Note that `make` creates `_CoqProject`, which is then used by ProofGeneral and CoqIDE. To use it:
@@ -40,7 +40,8 @@ This is the supplementary material for POPL 2019 submission #23: "Promising-ARM/
 ### Results
 
 - Theorem `promising_to_promising_pf` in `src/promising/PtoPF.v`:
-  The optimisation for exhaustive exploration is sound (Section 5.1).
+  The optimisation for exhaustive exploration is sound (Section 5.1),
+  or equivalently, Global-Promising-ARM/RISC-V refines Optimised Global-Promising-ARM/RISC-V.
 
 - Theorem `promising_pf_to_axiomatic` in `src/axiomatic/PFtoA.v`:
   Optimised Global-Promising-ARM/RISC-V refines ARMv8-Axiomatic (Theorem 7.3).
