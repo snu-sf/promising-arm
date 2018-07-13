@@ -452,10 +452,10 @@ Section Local.
 
   Inductive t := mk {
     coh: Loc.t -> Time.t;
-    vrp: View.t (A:=A);
-    vwp: View.t (A:=A);
-    vrm: View.t (A:=A);
-    vwm: View.t (A:=A);
+    vrn: View.t (A:=A);
+    vwn: View.t (A:=A);
+    vro: View.t (A:=A);
+    vwo: View.t (A:=A);
     vcap: View.t (A:=A);
     vrel: View.t (A:=A);
     fwdbank: Loc.t -> (FwdItem.t (A:=A));
@@ -474,10 +474,10 @@ Section Local.
       (LC2: lc2 =
             mk
               lc1.(coh)
-              lc1.(vrp)
-              lc1.(vwp)
-              lc1.(vrm)
-              lc1.(vwm)
+              lc1.(vrn)
+              lc1.(vwn)
+              lc1.(vro)
+              lc1.(vwo)
               lc1.(vcap)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -492,10 +492,10 @@ Section Local.
       (LC2: lc2 =
             mk
               lc1.(coh)
-              lc1.(vrp)
-              lc1.(vwp)
-              lc1.(vrm)
-              lc1.(vwm)
+              lc1.(vrn)
+              lc1.(vwn)
+              lc1.(vro)
+              lc1.(vwo)
               (join lc1.(vcap) ctrl)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -510,7 +510,7 @@ Section Local.
       view_ext1 view_msg view_ext2
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
-      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrp); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
+      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrn); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: le (lc1.(coh) loc) ts)
       (LATEST: Memory.latest loc ts view_ext1.(View.ts) mem1)
       (MSG: Memory.read loc ts mem1 = Some val)
@@ -520,10 +520,10 @@ Section Local.
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
-              (join lc1.(vrp) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
-              (join lc1.(vwp) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
-              (join lc1.(vrm) view_ext2)
-              lc1.(vwm)
+              (join lc1.(vrn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
+              (join lc1.(vwn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
+              (join lc1.(vro) view_ext2)
+              lc1.(vwo)
               (join lc1.(vcap) view)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -541,9 +541,9 @@ Section Local.
       (VAL: val = vval.(ValA.val))
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
-                                view_loc; view_val; lc1.(vcap); lc1.(vwp);
-                                ifc (OrdW.ge ord OrdW.release) lc1.(vrm);
-                                ifc (OrdW.ge ord OrdW.release) lc1.(vwm);
+                                view_loc; view_val; lc1.(vcap); lc1.(vwn);
+                                ifc (OrdW.ge ord OrdW.release) lc1.(vro);
+                                ifc (OrdW.ge ord OrdW.release) lc1.(vwo);
                                 ifc (ex && (arch == riscv))
                                     (match lc1.(exbank) with
                                      | Some exbank => exbank.(Exbank.view)
@@ -573,10 +573,10 @@ Section Local.
       (LC2: lc2 =
             mk
               (fun_add loc ts lc1.(coh))
-              lc1.(vrp)
-              lc1.(vwp)
-              lc1.(vrm)
-              (join lc1.(vwm) (View.mk ts bot))
+              lc1.(vrn)
+              lc1.(vwn)
+              lc1.(vro)
+              (join lc1.(vwo) (View.mk ts bot))
               (join lc1.(vcap) view_loc)
               (join lc1.(vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
               (fun_add loc (FwdItem.mk ts (join view_loc view_val) ex) lc1.(fwdbank))
@@ -592,10 +592,10 @@ Section Local.
       (LC2: lc2 =
             mk
               lc1.(coh)
-              lc1.(vrp)
-              lc1.(vwp)
-              lc1.(vrm)
-              lc1.(vwm)
+              lc1.(vrn)
+              lc1.(vwn)
+              lc1.(vro)
+              lc1.(vwo)
               lc1.(vcap)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -609,10 +609,10 @@ Section Local.
       (LC2: lc2 =
             mk
               lc1.(coh)
-              (join lc1.(vrp) lc1.(vcap))
-              lc1.(vwp)
-              lc1.(vrm)
-              lc1.(vwm)
+              (join lc1.(vrn) lc1.(vcap))
+              lc1.(vwn)
+              lc1.(vro)
+              lc1.(vwo)
               lc1.(vcap)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -626,10 +626,10 @@ Section Local.
       (LC2: lc2 =
             mk
               lc1.(coh)
-              (joins [lc1.(vrp); ifc rr lc1.(vrm); ifc wr lc1.(vwm)])
-              (joins [lc1.(vwp); ifc rw lc1.(vrm); ifc ww lc1.(vwm)])
-              lc1.(vrm)
-              lc1.(vwm)
+              (joins [lc1.(vrn); ifc rr lc1.(vro); ifc wr lc1.(vwo)])
+              (joins [lc1.(vwn); ifc rw lc1.(vro); ifc ww lc1.(vwo)])
+              lc1.(vro)
+              lc1.(vwo)
               lc1.(vcap)
               lc1.(vrel)
               lc1.(fwdbank)
@@ -672,10 +672,10 @@ Section Local.
   | wf_intro
       (COH: forall loc, lc.(coh) loc <= List.length mem)
       (COH_READ: forall loc, exists val, Memory.read loc (lc.(coh) loc) mem = Some val)
-      (VRP: lc.(vrp).(View.ts) <= List.length mem)
-      (VWP: lc.(vwp).(View.ts) <= List.length mem)
-      (VRM: lc.(vrm).(View.ts) <= List.length mem)
-      (VWM: lc.(vwm).(View.ts) <= List.length mem)
+      (VRN: lc.(vrn).(View.ts) <= List.length mem)
+      (VWN: lc.(vwn).(View.ts) <= List.length mem)
+      (VRO: lc.(vro).(View.ts) <= List.length mem)
+      (VWO: lc.(vwo).(View.ts) <= List.length mem)
       (VCAP: lc.(vcap).(View.ts) <= List.length mem)
       (VREL: lc.(vrel).(View.ts) <= List.length mem)
       (FWDBANK: forall loc,

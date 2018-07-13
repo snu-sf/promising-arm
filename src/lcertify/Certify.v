@@ -289,10 +289,10 @@ Hint Constructors sim_exbank.
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
 | sim_lc_intro
     (COH: forall loc, sim_time ts mem1 mem2 (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
-    (VRP: sim_view ts mem1 mem2 lc1.(Local.vrp) lc2.(Local.vrp))
-    (VWP: sim_view ts mem1 mem2 lc1.(Local.vwp) lc2.(Local.vwp))
-    (VRM: sim_view ts mem1 mem2 lc1.(Local.vrm) lc2.(Local.vrm))
-    (VWM: sim_view ts mem1 mem2 lc1.(Local.vwm) lc2.(Local.vwm))
+    (VRN: sim_view ts mem1 mem2 lc1.(Local.vrn) lc2.(Local.vrn))
+    (VWN: sim_view ts mem1 mem2 lc1.(Local.vwn) lc2.(Local.vwn))
+    (VRO: sim_view ts mem1 mem2 lc1.(Local.vro) lc2.(Local.vro))
+    (VWO: sim_view ts mem1 mem2 lc1.(Local.vwo) lc2.(Local.vwo))
     (VCAP: sim_view ts mem1 mem2 lc1.(Local.vcap) lc2.(Local.vcap))
     (VREL: sim_view ts mem1 mem2 lc1.(Local.vrel) lc2.(Local.vrel))
     (FWDBANK: forall loc, sim_fwdbank ts mem1 mem2 loc (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))

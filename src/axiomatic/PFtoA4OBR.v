@@ -241,9 +241,9 @@ Proof.
     + inv H1. des. inv H1.
       { inv H2. inv H3. destruct l0; ss. congr. }
       inv H2. des. inv H2.
-      rewrite L.(LC).(VRP); ss.
+      rewrite L.(LC).(VRN); ss.
       * rewrite <- join_l, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vrp. left. right.
+      * econs; eauto. unfold sim_local_vrn. left. right.
         rewrite ? seq_assoc in H1. econs; eauto.
   - (* aob *)
     unfold Execution.aob in H1. rewrite ? seq_assoc in *.
@@ -313,23 +313,23 @@ Proof.
     + rewrite H. refl.
   - (* bob *)
     unfold Execution.bob in H. rewrite ? seq_assoc in *. des_union.
-    + rewrite L.(LC).(VRP); ss.
+    + rewrite L.(LC).(VRN); ss.
       * rewrite <- join_l, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vrp. left. left. left.
+      * econs; eauto. unfold sim_local_vrn. left. left. left.
         rewrite ? seq_assoc. inv H1. des. inv H1. ss.
     + inv H1. des. inv H1. inv H3. destruct l0; ss. congr.
-    + rewrite L.(LC).(VRP); ss.
+    + rewrite L.(LC).(VRN); ss.
       * rewrite <- join_l, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vrp. left. left. right.
+      * econs; eauto. unfold sim_local_vrn. left. left. right.
         rewrite ? seq_assoc. inv H. des. inv H2. ss.
     + inv H1. des. inv H1. inv H3. destruct l0; ss. congr.
     + inv H. des. inv H2. inv H3. destruct l0; ss. rewrite EID in EID0. inv EID0. rewrite LABEL1.
       rewrite L.(LC).(VREL); ss.
       * rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
       * econs; ss. unfold sim_local_vrel. ss.
-    + rewrite L.(LC).(VRP); ss.
+    + rewrite L.(LC).(VRN); ss.
       * rewrite <- join_l, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vrp. right.
+      * econs; eauto. unfold sim_local_vrn. right.
         rewrite ? seq_assoc. ss.
     + inv H. des. inv H2. inv H3. destruct l0; ss. congr.
     + destruct (equiv_dec arch riscv); ss. exploit Valid.rmw_spec; eauto. i. des.

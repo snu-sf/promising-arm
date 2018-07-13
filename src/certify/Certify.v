@@ -158,10 +158,10 @@ Module AExecUnit.
       (LC2: lc2 =
             Local.mk
               (fun_add loc ts lc1.(Local.coh))
-              lc1.(Local.vrp)
-              lc1.(Local.vwp)
-              lc1.(Local.vrm)
-              (join lc1.(Local.vwm) (View.mk ts bot))
+              lc1.(Local.vrn)
+              lc1.(Local.vwn)
+              lc1.(Local.vro)
+              (join lc1.(Local.vwo) (View.mk ts bot))
               (join lc1.(Local.vcap) view_loc)
               (join lc1.(Local.vrel) (View.mk (ifc (OrdW.ge ord OrdW.release) ts) bot))
               (fun_add loc (Some (FwdItem.mk ts
@@ -195,10 +195,10 @@ Module AExecUnit.
   Definition init_lc (tid:Id.t) (lc:Local.t (A:=unit)) (mem:Memory.t): Local.t (A:=Taint.t) :=
     Local.mk
       lc.(Local.coh)
-      (init_view lc.(Local.vrp))
-      (init_view lc.(Local.vwp))
-      (init_view lc.(Local.vrm))
-      (init_view lc.(Local.vwm))
+      (init_view lc.(Local.vrn))
+      (init_view lc.(Local.vwn))
+      (init_view lc.(Local.vro))
+      (init_view lc.(Local.vwo))
       (View.mk lc.(Local.vcap).(View.ts)
                (match lc.(Local.exbank) with
                 | Some eb => eq (Taint.R 0 eb.(Exbank.loc) 0)

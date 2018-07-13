@@ -190,7 +190,7 @@ Proof.
     + destruct (equiv_dec loc0 loc); ss. inv e. econs; eauto. apply Label.write_is_writing.
 Qed.
 
-Definition sim_local_vrp ex :=
+Definition sim_local_vrn ex :=
   (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
    Execution.po ⨾
    ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rr)⦘ ⨾
@@ -208,9 +208,9 @@ Definition sim_local_vrp ex :=
   (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘ ⨾
    Execution.po).
 
-Lemma sim_local_vrp_step ex:
-  sim_local_vrp ex =
-  (sim_local_vrp ex ∪
+Lemma sim_local_vrn_step ex:
+  sim_local_vrn ex =
+  (sim_local_vrn ex ∪
    ((⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
      Execution.po ⨾
      ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rr)⦘) ∪
@@ -225,7 +225,7 @@ Lemma sim_local_vrp_step ex:
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
   Execution.po_adj.
 Proof.
-  unfold sim_local_vrp. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  unfold sim_local_vrn. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
   rewrite Execution.po_po_adj at 2 4 6 7.
   rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
@@ -240,14 +240,14 @@ Proof.
       eauto 10 using union_l, union_r.
 Qed.
 
-Lemma sim_local_vrp_spec
+Lemma sim_local_vrn_spec
       p ex eid1 eid2
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex Label.is_read eid2)
-      (VRP: sim_local_vrp ex eid1 eid2):
+      (VRN: sim_local_vrn ex eid1 eid2):
   <<OB: ex.(Execution.ob) eid1 eid2>>.
 Proof.
-  inv EID2. destruct l; inv LABEL. unfold sim_local_vrp in VRP.
+  inv EID2. destruct l; inv LABEL. unfold sim_local_vrn in VRN.
   repeat match goal with
          | [H: (_ ∪ _) _ _ |- _] => inv H
          end.
@@ -266,7 +266,7 @@ Proof.
     inv H. des. econs. splits; eauto.
 Qed.
 
-Definition sim_local_vwp ex :=
+Definition sim_local_vwn ex :=
   (⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
    Execution.po ⨾
    ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rw)⦘ ⨾
@@ -280,9 +280,9 @@ Definition sim_local_vwp ex :=
   (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘ ⨾
    Execution.po).
 
-Lemma sim_local_vwp_step ex:
-  sim_local_vwp ex =
-  (sim_local_vwp ex ∪
+Lemma sim_local_vwn_step ex:
+  sim_local_vwn ex =
+  (sim_local_vwn ex ∪
    ((⦗ex.(Execution.label_is) Label.is_read⦘ ⨾
      Execution.po ⨾
      ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_rw)⦘) ∪
@@ -294,7 +294,7 @@ Lemma sim_local_vwp_step ex:
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
   Execution.po_adj.
 Proof.
-  unfold sim_local_vwp. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  unfold sim_local_vwn. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
   rewrite Execution.po_po_adj at 2 4 5.
   rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
@@ -309,14 +309,14 @@ Proof.
       eauto 10 using union_l, union_r.
 Qed.
 
-Lemma sim_local_vwp_spec
+Lemma sim_local_vwn_spec
       p ex eid1 eid2
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex Label.is_write eid2)
-      (VWP: sim_local_vwp ex eid1 eid2):
+      (VWN: sim_local_vwn ex eid1 eid2):
   <<OB: ex.(Execution.ob) eid1 eid2>>.
 Proof.
-  inv EID2. destruct l; inv LABEL. unfold sim_local_vwp in VWP.
+  inv EID2. destruct l; inv LABEL. unfold sim_local_vwn in VWN.
   repeat match goal with
          | [H: (_ ∪ _) _ _ |- _] => inv H
          end.
@@ -332,30 +332,30 @@ Proof.
     inv H. des. econs. splits; eauto.
 Qed.
 
-Definition sim_local_vrm ex :=
+Definition sim_local_vro ex :=
   ⦗ex.(Execution.label_is) (Label.is_read)⦘ ⨾ Execution.po.
 
-Lemma sim_local_vrm_step ex:
-  sim_local_vrm ex =
-  (sim_local_vrm ex ∪ ⦗ex.(Execution.label_is) (Label.is_read)⦘) ⨾
+Lemma sim_local_vro_step ex:
+  sim_local_vro ex =
+  (sim_local_vro ex ∪ ⦗ex.(Execution.label_is) (Label.is_read)⦘) ⨾
   Execution.po_adj.
 Proof.
-  unfold sim_local_vrm. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  unfold sim_local_vro. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
   rewrite Execution.po_po_adj at 1.
   rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.
   refl.
 Qed.
 
-Definition sim_local_vwm ex :=
+Definition sim_local_vwo ex :=
   ⦗ex.(Execution.label_is) (Label.is_write)⦘ ⨾ Execution.po.
 
-Lemma sim_local_vwm_step ex:
-  sim_local_vwm ex =
-  (sim_local_vwm ex ∪ ⦗ex.(Execution.label_is) (Label.is_write)⦘) ⨾
+Lemma sim_local_vwo_step ex:
+  sim_local_vwo ex =
+  (sim_local_vwo ex ∪ ⦗ex.(Execution.label_is) (Label.is_write)⦘) ⨾
   Execution.po_adj.
 Proof.
-  unfold sim_local_vwm. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  unfold sim_local_vwo. rewrite ? (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
   rewrite Execution.po_po_adj at 1.
   rewrite (clos_refl_union Execution.po), union_seq, eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.

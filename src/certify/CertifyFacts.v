@@ -62,10 +62,10 @@ Section Eqts.
   Inductive eqts_lc (lc1: Local.t (A:=A)) (lc2: Local.t (A:=B)): Prop :=
   | eqts_lc_intro
       (COH: forall loc, lc1.(Local.coh) loc = lc2.(Local.coh) loc)
-      (VRP: eqts_view lc1.(Local.vrp) lc2.(Local.vrp))
-      (VWP: eqts_view lc1.(Local.vwp) lc2.(Local.vwp))
-      (VRM: eqts_view lc1.(Local.vrm) lc2.(Local.vrm))
-      (VWM: eqts_view lc1.(Local.vwm) lc2.(Local.vwm))
+      (VRN: eqts_view lc1.(Local.vrn) lc2.(Local.vrn))
+      (VWN: eqts_view lc1.(Local.vwn) lc2.(Local.vwn))
+      (VRO: eqts_view lc1.(Local.vro) lc2.(Local.vro))
+      (VWO: eqts_view lc1.(Local.vwo) lc2.(Local.vwo))
       (VCAP: eqts_view lc1.(Local.vcap) lc2.(Local.vcap))
       (VREL: eqts_view lc1.(Local.vrel) lc2.(Local.vrel))
       (FWDBANK: forall loc, opt_rel eqts_fwd (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
@@ -177,7 +177,7 @@ Section Eqts.
             end.
             f_equal; ss. symmetry.
             f_equal; [by apply VIEW|].
-            f_equal; [by apply VRP|].
+            f_equal; [by apply VRN|].
             f_equal. destruct (OrdR.ge ord OrdR.acquire); ss. apply VREL.
           }
           { rewrite VAL. eauto. }
@@ -221,9 +221,9 @@ Section Eqts.
               + inv VIEW. ss.
               + inv VIEW0. ss.
               + inv VCAP. ss.
-              + inv VWP. ss.
-              + inv VRM. destruct (OrdW.ge ord OrdW.release); ss.
-              + inv VWM. destruct (OrdW.ge ord OrdW.release); ss.
+              + inv VWN. ss.
+              + inv VRO. destruct (OrdW.ge ord OrdW.release); ss.
+              + inv VWO. destruct (OrdW.ge ord OrdW.release); ss.
               + rewrite ? View.ts_ifc. destruct ex0; ss. f_equal.
                 exploit EX; eauto. i. des. inv EXBANK; ss. des. rewrite TSX in H5. inv H5.
                 symmetry. apply REL1.
@@ -399,10 +399,10 @@ Inductive void_rmap (rmap:RMap.t (A:=View.t (A:=Taint.t))): Prop :=
 
 Inductive void_lc (tid:Id.t) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
 | void_lc_intro
-    (VRP: void_view lc.(Local.vrp))
-    (VWP: void_view lc.(Local.vwp))
-    (VRM: void_view lc.(Local.vrm))
-    (VWM: void_view lc.(Local.vwm))
+    (VRN: void_view lc.(Local.vrn))
+    (VWN: void_view lc.(Local.vwn))
+    (VRO: void_view lc.(Local.vro))
+    (VWO: void_view lc.(Local.vwo))
     (VCAP: void_view lc.(Local.vcap))
     (VREL: void_view lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), void_view fwd.(FwdItem.view))

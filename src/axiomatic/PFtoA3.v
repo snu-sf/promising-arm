@@ -151,22 +151,22 @@ Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:L
           vext
           (local.(Local.coh) loc)
           (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))));
-  VRP: sim_view
+  VRN: sim_view
          vext
-         local.(Local.vrp).(View.ts)
-         (inverse (sim_local_vrp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
-  VWP: sim_view
+         local.(Local.vrn).(View.ts)
+         (inverse (sim_local_vrn ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VWN: sim_view
          vext
-         local.(Local.vwp).(View.ts)
-         (inverse (sim_local_vwp ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
-  VRM: sim_view
+         local.(Local.vwn).(View.ts)
+         (inverse (sim_local_vwn ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VRO: sim_view
          vext
-         local.(Local.vrm).(View.ts)
-         (inverse (sim_local_vrm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
-  VWM: sim_view
+         local.(Local.vro).(View.ts)
+         (inverse (sim_local_vro ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+  VWO: sim_view
          vext
-         local.(Local.vwm).(View.ts)
-         (inverse (sim_local_vwm ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
+         local.(Local.vwo).(View.ts)
+         (inverse (sim_local_vwo ex) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VCAP: sim_view
           vext
           local.(Local.vcap).(View.ts)

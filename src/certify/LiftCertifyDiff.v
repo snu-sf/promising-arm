@@ -73,10 +73,10 @@ Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (lc1 lc2:Local.t (A:=Taint.t)) (mem1 mem2:Memory.t): Prop :=
 | sim_lc_intro
     (COH: forall loc, sim_time ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
-    (VRP: sim_low_view ts lc1.(Local.vrp) lc2.(Local.vrp))
-    (VWP: sim_low_view ts lc1.(Local.vwp) lc2.(Local.vwp))
-    (VRM: sim_view ts lc1.(Local.vrm) lc2.(Local.vrm))
-    (VWM: sim_view ts lc1.(Local.vwm) lc2.(Local.vwm))
+    (VRN: sim_low_view ts lc1.(Local.vrn) lc2.(Local.vrn))
+    (VWN: sim_low_view ts lc1.(Local.vwn) lc2.(Local.vwn))
+    (VRO: sim_view ts lc1.(Local.vro) lc2.(Local.vro))
+    (VWO: sim_view ts lc1.(Local.vwo) lc2.(Local.vwo))
     (VCAP: sim_low_view ts lc1.(Local.vcap) lc2.(Local.vcap))
     (VREL: sim_low_view ts lc1.(Local.vrel) lc2.(Local.vrel))
     (FWDBANK: forall loc,
@@ -276,7 +276,7 @@ Lemma sim_aeu_step
       (STEP: AExecUnit.step tid aeu2 aeu2')
       (WF1: ExecUnit.wf tid aeu1)
       (WF2: ExecUnit.wf tid aeu2)
-      (VWP: aeu2'.(ExecUnit.local).(Local.vwp).(View.ts) <= ts)
+      (VWN: aeu2'.(ExecUnit.local).(Local.vwn).(View.ts) <= ts)
       (VCAP: aeu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts):
   exists aeu1',
     <<STEP: rtc (AExecUnit.step tid) aeu1 aeu1'>> /\
@@ -396,7 +396,7 @@ Proof.
                  end.
         all: try apply sim_low_view_bot.
         all: apply sim_view_low_view; ss.
-        all: rewrite <- VWP.
+        all: rewrite <- VWN.
         * admit. (* due to generalized dmb? *)
         * admit. (* due to generalized dmb? *)
         * rewrite <- join_r, <- join_l. refl.
@@ -420,7 +420,7 @@ Proof.
   revert aeu1 SIM WF1 WF2. induction STEP.
   { i. esplits; eauto. }
   i. exploit sim_aeu_step; eauto.
-  { admit. (* vwp *) }
+  { admit. (* vwn *) }
   { admit. (* vcap *) }
   i. des.
   exploit AExecUnit.step_wf; eauto. i.
@@ -454,10 +454,10 @@ Inductive sound_rmap (sd:sound_data) (rmap:RMap.t (A:=View.t (A:=Taint.t))): Pro
 
 Inductive sound_lc (tid:Id.t) (is_first:Prop) (sd:sound_data) (lc:Local.t (A:=Taint.t)) (mem:Memory.t): Prop :=
 | sound_lc_intro
-    (VRP: sound_view sd lc.(Local.vrp))
-    (VWP: sound_view sd lc.(Local.vwp))
-    (VRM: sound_view sd lc.(Local.vrm))
-    (VWM: sound_view sd lc.(Local.vwm))
+    (VRN: sound_view sd lc.(Local.vrn))
+    (VWN: sound_view sd lc.(Local.vwn))
+    (VRO: sound_view sd lc.(Local.vro))
+    (VWO: sound_view sd lc.(Local.vwo))
     (VCAP: sound_view sd lc.(Local.vcap))
     (VREL: sound_view sd lc.(Local.vrel))
     (FWDBANK: forall l fwd (FWD: lc.(Local.fwdbank) l = Some fwd), sound_view sd fwd.(FwdItem.view))

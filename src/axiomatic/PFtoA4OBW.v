@@ -172,46 +172,46 @@ Proof.
   - (* bob *)
     unfold Execution.bob in H. rewrite ? seq_assoc in *. des_union.
     + inv H1. des. inv H1. inv H4. destruct l0; ss. congr.
-    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWN)|]; ss; cycle 1.
       * rewrite fun_add_spec. condtac; [|congr].
         inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
         rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vwp. left. left.
+      * econs; eauto. unfold sim_local_vwn. left. left.
         rewrite ? seq_assoc. inv H1. des. inv H1. ss.
     + inv H. des. inv H2. inv H4. destruct l0; ss. congr.
-    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWN)|]; ss; cycle 1.
       * rewrite fun_add_spec. condtac; [|congr].
         inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
         rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vwp. left. right.
+      * econs; eauto. unfold sim_local_vwn. left. right.
         rewrite ? seq_assoc. inv H1. des. inv H1. ss.
     + inv H. des. inv H2. inv H4. destruct l0; ss. congr.
-    + eapply Nat.le_lt_trans; [apply L.(LC).(VWP)|]; ss; cycle 1.
+    + eapply Nat.le_lt_trans; [apply L.(LC).(VWN)|]; ss; cycle 1.
       * rewrite fun_add_spec. condtac; [|congr].
         inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
         rewrite <- join_r, <- join_r, <- join_r, <- join_l. ss.
-      * econs; eauto. unfold sim_local_vwp. right.
+      * econs; eauto. unfold sim_local_vwn. right.
         rewrite ? seq_assoc. ss.
     + inv H. des. inv H2. inv H4. destruct l0; ss. rewrite EID in EID0. inv EID0.
       exploit Valid.po_label_pre; eauto. i. des.
       destruct eid1 as [tid1 eid1]. inv H1. ss. subst.
       destruct label1; ss.
-      * eapply Nat.le_lt_trans; [apply L.(LC).(VRM)|]; ss; cycle 1.
+      * eapply Nat.le_lt_trans; [apply L.(LC).(VRO)|]; ss; cycle 1.
         { rewrite fun_add_spec. condtac; [|congr].
           inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
           rewrite <- join_r, <- join_r, <- join_r, <- join_r, <- join_l.
           rewrite LABEL1. refl.
         }
-        {  econs; eauto. unfold sim_local_vrm. econs. splits; eauto.
+        {  econs; eauto. unfold sim_local_vro. econs. splits; eauto.
            econs; ss. econs; eauto. econs; ss.
         }
-      * eapply Nat.le_lt_trans; [apply L.(LC).(VWM)|]; ss; cycle 1.
+      * eapply Nat.le_lt_trans; [apply L.(LC).(VWO)|]; ss; cycle 1.
         { rewrite fun_add_spec. condtac; [|congr].
           inv WRITABLE. ss. eapply Nat.le_lt_trans; [|exact EXT].
           rewrite <- join_r, <- join_r, <- join_r, <- join_r, <- join_r, <- join_l.
           rewrite LABEL1. refl.
         }
-        {  econs; eauto. unfold sim_local_vwm. econs. splits; eauto.
+        {  econs; eauto. unfold sim_local_vwo. econs. splits; eauto.
            econs; ss. econs; eauto. econs; ss.
         }
       * eapply Nat.le_lt_trans; try eapply x0.

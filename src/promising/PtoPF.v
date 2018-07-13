@@ -47,10 +47,10 @@ Proof.
         instantiate (1 :=
                        Local.mk
                          lc0.(Local.coh)
-                         lc0.(Local.vrp)
-                         lc0.(Local.vwp)
-                         lc0.(Local.vrm)
-                         lc0.(Local.vwm)
+                         lc0.(Local.vrn)
+                         lc0.(Local.vwn)
+                         lc0.(Local.vro)
+                         lc0.(Local.vwo)
                          lc0.(Local.vcap)
                          lc0.(Local.vrel)
                          lc0.(Local.fwdbank)
