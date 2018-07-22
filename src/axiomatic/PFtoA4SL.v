@@ -220,7 +220,7 @@ Proof.
       * inv EID.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
-        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        intro X. exploit Valid.ctrl0_label; eauto. i. des.
         inv EID2. rewrite X in EID. inv EID. ss.
       * (* sim addr *)
         inv EID. rewrite <- join_r.
@@ -441,7 +441,7 @@ Proof.
       * inv EID.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
-        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        intro X. exploit Valid.ctrl0_label; eauto. i. des.
         inv EID2. rewrite X in EID. inv EID. ss.
       * (* sim addr *)
         inv EID. rewrite <- join_r.
@@ -625,7 +625,7 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto.
       * inv EID.
-        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit Valid.ctrl0_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i. exploit EX2.(CTRL); eauto; ss.
@@ -633,7 +633,7 @@ Proof.
         i.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
-        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        intro X. exploit Valid.ctrl0_label; eauto. i. des.
         inv EID2. rewrite X in EID. inv EID. ss.
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
@@ -763,7 +763,7 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * exploit VCAP; eauto.
       * inv EID.
-        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit Valid.ctrl0_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i. exploit EX2.(CTRL); eauto; ss.
@@ -771,7 +771,7 @@ Proof.
         i.
         exploit EX2.(LABELS_REV); ss.
         { apply nth_error_last. apply Nat.eqb_eq. ss. }
-        intro X. exploit Valid.ctrl_label; eauto. i. des.
+        intro X. exploit Valid.ctrl0_label; eauto. i. des.
         inv EID2. rewrite X in EID. inv EID. ss.
       * inv EID.
         exploit Valid.addr_is_po; eauto. i. inv x0. destruct eid. ss. subst.
@@ -893,7 +893,7 @@ Proof.
       rewrite ? inverse_union. ii. des.
       * rewrite <- join_l. inv EID. exploit VCAP; eauto.
       * inv EID.
-        exploit Valid.ctrl_is_po; eauto. i. inv x0. destruct eid. ss. subst.
+        exploit Valid.ctrl0_is_po; eauto. i. inv x0. destruct eid. ss. subst.
         exploit EX2.(CTRL); eauto; ss.
         { rewrite List.app_length. ss. clear. lia. }
         i. inv x0.

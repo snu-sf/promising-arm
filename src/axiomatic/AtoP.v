@@ -389,7 +389,7 @@ Lemma sim_eu_step
           Execution.label (tid, n) ex = Some label)
       (ADDR: tid_lift tid aeu2.(AExecUnit.local).(ALocal.addr) ⊆ ex.(Execution.addr))
       (DATA: tid_lift tid aeu2.(AExecUnit.local).(ALocal.data) ⊆ ex.(Execution.data))
-      (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl))
+      (CTRL: tid_lift tid aeu2.(AExecUnit.local).(ALocal.ctrl) ⊆ ex.(Execution.ctrl0))
       (RMW: tid_lift tid aeu2.(AExecUnit.local).(ALocal.rmw) ⊆ ex.(Execution.rmw)):
   exists eu2,
     <<STEP: ExecUnit.state_step tid eu1 eu2>> /\
@@ -831,8 +831,8 @@ Proof.
           { rewrite VIEW2. apply bot_spec. }
           rewrite VIEW2. inv EID.
           apply lt_n_Sm_le. eapply view_of_eid_ob_write; eauto.
-          - inv REL. des. left. left. right. right. econs. splits; eauto.
-            econs. splits; eauto. left. econs; ss. econs; eauto.
+          - left. left. right. right. econs. splits; eauto.
+            econs. econs; ss. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
         { generalize SIM_LOCAL.(VWN). intro X. inv X.

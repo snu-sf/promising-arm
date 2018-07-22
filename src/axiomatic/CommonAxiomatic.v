@@ -201,7 +201,7 @@ Definition sim_local_vrn ex :=
    ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘ ⨾
    Execution.po) ∪
 
-  (((ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po) ⨾
+  (((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
    ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
    Execution.po) ∪
 
@@ -219,7 +219,7 @@ Lemma sim_local_vrn_step ex:
      Execution.po ⨾
      ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘) ∪
 
-    (((ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po) ⨾
+    (((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
      ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘) ∪
 
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
@@ -261,7 +261,7 @@ Proof.
     rewrite <- ? seq_assoc. ss.
   - left. left. right. right.
     inv H0. des. rewrite seq_assoc. econs. splits; eauto.
-    right. rewrite seq_assoc. econs. splits; eauto. econs; ss. econs; eauto.
+    right. econs. splits; eauto. econs; ss. econs; eauto.
   - right. left. left. right.
     inv H. des. econs. splits; eauto.
 Qed.
@@ -363,14 +363,16 @@ Proof.
 Qed.
 
 Definition sim_local_vcap ex :=
-  (ex.(Execution.ctrl) ∪ ex.(Execution.addr)) ⨾ Execution.po.
+  ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po).
 
 Lemma sim_local_vcap_step ex:
   sim_local_vcap ex =
-  (sim_local_vcap ex ∪ (ex.(Execution.ctrl) ∪ ex.(Execution.addr))) ⨾
+  (sim_local_vcap ex ∪ (ex.(Execution.ctrl0) ∪ ex.(Execution.addr))) ⨾
   Execution.po_adj.
 Proof.
-  unfold sim_local_vcap. rewrite (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  unfold sim_local_vcap, Execution.ctrl.
+  rewrite (union_seq' Execution.po_adj), ? seq_assoc, ? union_assoc.
+  rewrite <- union_seq.
   rewrite Execution.po_po_adj at 1.
   rewrite (clos_refl_union Execution.po), (union_seq _ eq), eq_seq.
   rewrite ? (seq_union' (Execution.po ⨾ Execution.po_adj) Execution.po_adj), ? seq_assoc, ? union_assoc.

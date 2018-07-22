@@ -455,7 +455,7 @@ Inductive sim_ex tid ex (ws rs:IdMap.t (list (nat -> option (Loc.t * Time.t)))) 
   CTRL:
     forall eid1 eid2
       (EID2: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-      (CTRL: ex.(Execution.ctrl) (tid, eid1) (tid, eid2)),
+      (CTRL: ex.(Execution.ctrl0) (tid, eid1) (tid, eid2)),
       aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2;
   RMW:
     forall eid1 eid2
@@ -496,7 +496,7 @@ Inductive sim_ex tid ex (ws rs:IdMap.t (list (nat -> option (Loc.t * Time.t)))) 
   CTRL_REV:
     forall eid1 eid2
       (CTRL: aeu.(AExecUnit.local).(ALocal.ctrl) eid1 eid2),
-      ex.(Execution.ctrl) (tid, eid1) (tid, eid2);
+      ex.(Execution.ctrl0) (tid, eid1) (tid, eid2);
   RMW_REV:
     forall eid1 eid2
       (RMW: aeu.(AExecUnit.local).(ALocal.rmw) eid1 eid2),
@@ -735,4 +735,4 @@ Proof.
     all: ss.
     all: try apply lastn_all; ss; try by unguardH LEN; des; lia.
   - eapply sim_traces_sim_ex_aux; eauto.
-Qed.    
+Qed.

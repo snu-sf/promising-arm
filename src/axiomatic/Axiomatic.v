@@ -638,7 +638,7 @@ Module Execution.
     labels: IdMap.t (list Label.t);
     addr: relation eidT;
     data: relation eidT;
-    ctrl: relation eidT;
+    ctrl0: relation eidT;
     rmw: relation eidT;
     co: relation eidT;
     rf: relation eidT;
@@ -820,6 +820,7 @@ Module Execution.
   .
   Hint Constructors e.
 
+  Definition ctrl (ex: t): relation eidT := ex.(ctrl0) ⨾ po.
   Definition po_loc (ex:t): relation eidT := po ∩ ex.(label_rel) label_loc.
   Definition fr (ex:t): relation eidT :=
     (ex.(rf)⁻¹ ⨾ ex.(co)) ∪
@@ -837,7 +838,7 @@ Module Execution.
   Definition dob (ex:t): relation eidT :=
     ((ex.(addr) ∪ ex.(data)) ⨾ ex.(rfi)^?) ∪
 
-    ((ex.(ctrl) ∪ ex.(addr)) ⨾ po ⨾
+    ((ex.(ctrl) ∪ (ex.(addr) ⨾ po)) ⨾
      (⦗ex.(label_is) Label.is_write⦘ ∪
       (⦗ex.(label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾ po ⨾ ⦗ex.(label_is) Label.is_read⦘))).
 
@@ -922,7 +923,7 @@ Module Valid.
     LABELS: ex.(Execution.labels) = IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.labels)) aeus;
     ADDR: ex.(Execution.addr) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.addr)) aeus);
     DATA: ex.(Execution.data) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.data)) aeus);
-    CTRL: ex.(Execution.ctrl) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.ctrl)) aeus);
+    CTRL: ex.(Execution.ctrl0) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.ctrl)) aeus);
     RMW: ex.(Execution.rmw) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.rmw)) aeus);
   }.
   Hint Constructors pre_ex.
@@ -995,10 +996,10 @@ Module Valid.
     inv WF. apply DATA0. ss.
   Qed.
 
-  Lemma ctrl_is_po
+  Lemma ctrl0_is_po
         p exec
         (EX: pre_ex p exec):
-    exec.(Execution.ctrl) ⊆ Execution.po.
+    exec.(Execution.ctrl0) ⊆ Execution.po.
   Proof.
     rewrite EX.(CTRL).
     ii. inv H. inv REL. destruct x, y. ss. subst. rewrite IdMap.map_spec in RELS.
@@ -1008,6 +1009,15 @@ Module Valid.
     { apply AExecUnit.wf_init. }
     s. i. des. econs; ss.
     inv WF. apply CTRL0. ss.
+  Qed.
+
+  Lemma ctrl_is_po
+        p exec
+        (EX: pre_ex p exec):
+    exec.(Execution.ctrl) ⊆ Execution.po.
+  Proof.
+    ii. inv H. des. etrans; eauto.
+    eapply ctrl0_is_po; eauto.
   Qed.
 
   Lemma addr_is_po
@@ -1332,11 +1342,11 @@ Module Valid.
       rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
   Qed.
 
-  Lemma ctrl_label
+  Lemma ctrl0_label
         p exec
         eid1 eid2
         (EX: pre_ex p exec)
-        (CTRL: exec.(Execution.ctrl) eid1 eid2):
+        (CTRL: exec.(Execution.ctrl0) eid1 eid2):
     <<EID1: Execution.label_is exec (Label.is_access) eid1>> /\
     <<EID2: Execution.label_is exec (Label.is_ctrl) eid2>>.
   Proof.
@@ -1360,6 +1370,16 @@ Module Valid.
       rewrite EX.(LABELS), IdMap.map_spec, LOCAL. ss.
   Qed.
 
+  Lemma ctrl_label
+        p exec
+        eid1 eid2
+        (EX: pre_ex p exec)
+        (CTRL: exec.(Execution.ctrl) eid1 eid2):
+    <<EID1: Execution.label_is exec (Label.is_access) eid1>>.
+  Proof.
+    inv CTRL. des. exploit ctrl0_label; eauto. i. des. auto.
+  Qed.
+
   Lemma barrier_ob_po
         p exec
         eid1 eid2
@@ -1379,9 +1399,9 @@ Module Valid.
     - exploit CO2; eauto. i. des. congr.
     - eapply addr_label in H1; eauto. des. inv EID1. destruct l; ss; congr.
     - eapply data_label in H1; eauto. des. inv EID1. destruct l; ss; congr.
-    - etrans; eauto. eapply ctrl_is_po; eauto.
+    - eapply ctrl_is_po; eauto.
     - etrans; eauto. eapply addr_is_po; eauto.
-    - etrans; eauto. etrans; eauto. eapply ctrl_is_po; eauto.
+    - etrans; eauto. eapply ctrl_is_po; eauto.
     - etrans; eauto. etrans; eauto. eapply addr_is_po; eauto.
     - exploit RF2; eauto. i. des. congr.
     - exploit RF2; eauto. i. des. congr.
@@ -1439,9 +1459,9 @@ Module Valid.
     - exploit CO2; eauto. i. des. congr.
     - eapply addr_label in H1; eauto. des. inv EID1. destruct l; ss; congr.
     - eapply data_label in H1; eauto. des. inv EID1. destruct l; ss; congr.
-    - etrans; eauto. eapply ctrl_is_po; eauto.
+    - eapply ctrl_is_po; eauto.
     - etrans; eauto. eapply addr_is_po; eauto.
-    - etrans; eauto. etrans; eauto. eapply ctrl_is_po; eauto.
+    - etrans; eauto. eapply ctrl_is_po; eauto.
     - etrans; eauto. etrans; eauto. eapply addr_is_po; eauto.
     - exploit RF2; eauto. i. des. congr.
     - exploit RF2; eauto. i. des. congr.
@@ -1497,9 +1517,9 @@ Module Valid.
     all: try by exploit CO2; eauto; i; des; congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
     - exploit data_label; eauto. i. des. inv EID0. congr.
-    - exploit ctrl_label; eauto. i. des. inv EID0. congr.
+    - exploit ctrl_label; eauto. i. des. inv x0. congr.
     - exploit addr_label; eauto. i. des. inv EID0. congr.
-    - exploit ctrl_label; eauto. i. des. inv EID2. congr.
+    - exploit ctrl_label; eauto. i. des. inv x1. congr.
     - exploit addr_label; eauto. i. des. inv EID2. congr.
     - exploit po_label_pre; try exact EID; eauto. i. des. congr.
     - revert H0. unfold ifc. condtac; ss. i. exploit rmw_spec; eauto. i. des. inv LABEL1. congr.
@@ -1635,10 +1655,10 @@ Module Valid.
       generalize (Nat.lt_trichotomy e1 e2). i. des; try congr.
       + left. econs; eauto.
       + right. econs; eauto.
-    - etrans; eauto. eapply ctrl_is_po; eauto.
+    - eapply ctrl_is_po; eauto.
     - etrans; eauto. eapply addr_is_po; eauto.
-    - rewrite <- H3, <- H1. eapply ctrl_is_po; eauto.
-    - rewrite <- H3, <- H1. eapply addr_is_po; eauto.
+    - rewrite <- H2. eapply ctrl_is_po; eauto.
+    - rewrite <- H2, <- H0. eapply addr_is_po; eauto.
     - revert H0. unfold ifc. condtac; ss. eapply rmw_spec. eauto.
   Qed.
 

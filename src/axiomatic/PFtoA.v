@@ -165,7 +165,9 @@ Proof.
         * inv H1. des. inv H1. ss. lia.
       + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
       + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
-      + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
+      + ii. inv EID. inv REL.
+        * inv H1. des. inv H1. ss. lia.
+        * inv H1. des. inv H1. ss. lia.
       + ii. inv EID. inv REL. inv H1. inv H7. ss. lia.
       + right. esplits; eauto. ii. inv H1. inv REL. inv H1. inv H7. ss. lia.
       + i. destruct view; ss. exploit Machine.promises_from_mem_inv; eauto. i. des.
@@ -473,11 +475,11 @@ Lemma promising_pf_valid
 Proof.
   exploit promising_pf_sim_traces; eauto. i. des.
   destruct PRE, ex. ss.
-  remember (Execution.mk labels addr data ctrl rmw (co_gen ws) (rf_gen ws rs)) as ex'.
+  remember (Execution.mk labels addr data ctrl0 rmw (co_gen ws) (rf_gen ws rs)) as ex'.
   replace labels with ex'.(Execution.labels) in LABELS; [|subst; ss].
   replace addr with ex'.(Execution.addr) in ADDR; [|subst; ss].
   replace data with ex'.(Execution.data) in DATA; [|subst; ss].
-  replace ctrl with ex'.(Execution.ctrl) in CTRL; [|subst; ss].
+  replace ctrl0 with ex'.(Execution.ctrl0) in CTRL; [|subst; ss].
   replace rmw with ex'.(Execution.rmw) in RMW; [|subst; ss].
   remember (@Valid.mk_pre_ex p ex' aeus AEUS LABELS ADDR DATA CTRL RMW) as PRE'.
   replace aeus with PRE'.(Valid.aeus) in ATR; [|subst; ss].
