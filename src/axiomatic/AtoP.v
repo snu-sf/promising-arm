@@ -237,7 +237,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         sim_view
           ex ob
           (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))))
-          (local.(Local.coh) loc);
+          (local.(Local.coh) loc).(View.ts);
   VRN: sim_view
          ex ob
          (inverse (sim_local_vrn ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
@@ -576,7 +576,8 @@ Proof.
       econs 2; ss. econs; eauto.
       * (* internal *)
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))). intro X. inv X.
-        { rewrite VIEW1. apply bot_spec. }
+        { ii. rewrite VIEW1 in TS2. inv TS2. }
+        ii. 
         rewrite VIEW1. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
         inv H1. des. inv H.
