@@ -192,6 +192,19 @@ Module Memory.
     eapply lt_le_trans; eauto.
   Qed.
 
+  Lemma latest_join
+        loc ts ts1 ts2 mem
+        (LATEST1: latest loc ts ts1 mem)
+        (LATEST2: latest loc ts ts2 mem):
+    latest loc ts (join ts1 ts2) mem.
+  Proof.
+    destruct (le_dec ts1 ts2).
+    - eapply latest_mon2; try exact LATEST2.
+      rewrite max_r; auto.
+    - eapply latest_mon2; try exact LATEST1.
+      rewrite max_l; auto. lia.
+  Qed.
+
   Lemma latest_ts_read
         loc to mem from
         (LATEST: latest_ts loc to mem = from):
@@ -808,7 +821,7 @@ Section Local.
       apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
   Qed.
 
-  (* Lemma fwd_read_view_le *)
+  (* Lemma fwd_read_view_coh_le *)
   (*       tid mem lc *)
   (*       (WF: wf tid mem lc) *)
   (*       loc ord ts *)
@@ -816,21 +829,35 @@ Section Local.
   (*   ((lc.(Local.fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts) <= ts. *)
   (* Proof. *)
   (*   inv WF. exploit FWDBANK; eauto. i. des. *)
-  (*   unfold FwdItem.read_view. condtac; ss. etrans; eauto. etrans; eauto.  *)
+  (*   unfold FwdItem.read_view. condtac; ss. etrans; eauto. etrans; eauto. *)
   (* Qed. *)
 
-  (* Lemma read_spec *)
-  (*       tid mem ex ord vloc res ts lc1 lc2 *)
-  (*       (WF: Local.wf tid mem lc1) *)
-  (*       (READ: Local.read ex ord vloc res ts lc1 mem lc2): *)
-  (*   <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\ *)
-  (*   <<TS: ts = lc2.(Local.coh) vloc.(ValA.val)>>. *)
-  (* Proof. *)
-  (*   inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits; ss. *)
-  (*   ii. eapply LATEST; eauto. *)
-  (*   exploit Local.fwd_read_view_le; eauto. instantiate (1 := ord). i. *)
-  (*   unfold join, Time.join in *. lia. *)
-  (* Qed. *)
+  Lemma fwd_read_view_latest
+        tid mem lc loc ts ord
+        (WF: wf tid mem lc)
+        (COH: Memory.latest loc ts (lc.(coh) loc).(View.ts) mem):
+    Memory.latest loc ts ((lc.(fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts) mem.
+  Proof.
+    unfold FwdItem.read_view. condtac; ss; cycle 1.
+    { ii. lia. }
+    eapply Memory.latest_mon2; try exact COH.
+    inv WF. specialize (FWDBANK loc). des. lia.
+  Qed.
+
+  Lemma read_spec
+        tid mem ex ord vloc res ts lc1 lc2
+        (WF: Local.wf tid mem lc1)
+        (READ: Local.read ex ord vloc res ts lc1 mem lc2):
+    <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\
+    <<COH: Memory.latest vloc.(ValA.val) ts (lc2.(Local.coh) vloc.(ValA.val)).(View.ts) mem>>.
+  Proof.
+    inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits.
+    - apply Memory.latest_join; auto.
+      eapply fwd_read_view_latest; eauto.
+    - unfold join, View._join. ss.
+      do 2 (apply Memory.latest_join; auto).
+      eapply fwd_read_view_latest; eauto.
+  Qed.
 End Local.
 End Local.
 
