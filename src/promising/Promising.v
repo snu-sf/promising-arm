@@ -82,6 +82,18 @@ Module Memory.
   Definition latest (loc:Loc.t) (from to:Time.t) (mem:t): Prop :=
     Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc) mem.
 
+  Fixpoint latest_ts (loc:Loc.t) (to:Time.t) (mem:t): Time.t :=
+    match to with
+    | O => O
+    | S to =>
+      match List.nth_error mem to with
+      | Some (Msg.mk loc0 _ _) =>
+        if (Loc.eq_dec loc0 loc) then S to else latest_ts loc to mem
+      | _ => latest_ts loc to mem
+      end
+    end
+  .
+
   Definition exclusive (tid:Id.t) (loc:Loc.t) (from to:Time.t) (mem:t): Prop :=
     Memory.no_msgs from to (fun msg => msg.(Msg.loc) = loc /\ msg.(Msg.tid) <> tid) mem.
 
@@ -158,6 +170,78 @@ Module Memory.
     destruct ts3; ss.
     destruct (le_lt_dec (S ts3) ts2); ss.
     exfalso. eapply LATEST; eauto. 
+  Qed.
+
+  Lemma latest_mon1
+        loc ts1 ts2 ts3 mem
+        (LATEST: latest loc ts1 ts3 mem)
+        (LT: ts1 <= ts2):
+    latest loc ts2 ts3 mem.
+  Proof.
+    ii. eapply LATEST; try eapply MSG; eauto.
+    eapply le_lt_trans; eauto.
+  Qed.
+
+  Lemma latest_mon2
+        loc ts1 ts2 ts3 mem
+        (LATEST: latest loc ts1 ts3 mem)
+        (LT: ts2 <= ts3):
+    latest loc ts1 ts2 mem.
+  Proof.
+    ii. eapply LATEST; try eapply MSG; eauto.
+    eapply lt_le_trans; eauto.
+  Qed.
+
+  Lemma latest_ts_read
+        loc to mem from
+        (LATEST: latest_ts loc to mem = from):
+    exists val, read loc from mem = Some val.
+  Proof.
+    revert from LATEST. induction to; i.
+    - ss. subst. esplits. ss.
+    - ss. destruct (nth_error mem to) eqn:NTH.
+      + destruct t0. des_ifs.
+        * esplits. unfold read. ss. rewrite NTH.
+          ss. des_ifs. exfalso. apply c. refl.
+        * apply IHto. refl.
+      + apply IHto. auto.
+  Qed.
+
+  Lemma latest_ts_latest
+        loc from to mem
+        (LATEST: latest_ts loc to mem = from):
+    latest loc from to mem.
+  Proof.
+    revert from LATEST.
+    induction to; ii; try lia.
+    ss. destruct (nth_error mem to) eqn:NTH.
+    - destruct t0. revert LATEST. condtac.
+      + i. subst. lia.
+      + i. eapply IHto; eauto.
+        destruct (le_lt_dec (S ts) to); auto.
+        apply lt_le_S in l. exploit le_antisym; eauto. i.
+        inv x0. destruct msg. ss. rewrite NTH in MSG. inv MSG.
+        contradiction.
+    - eapply IHto; eauto.
+      destruct (le_lt_dec (S ts) to); auto.
+      apply lt_le_S in l. exploit le_antisym; eauto. i.
+      inv x0. rewrite NTH in MSG. inv MSG.
+  Qed.
+
+  Lemma latest_latest_ts
+        loc from to mem val
+        (LATEST: latest loc from to mem)
+        (READ: read loc from mem = Some val):
+    latest_ts loc to mem <= from.
+  Proof.
+    revert from val READ LATEST.
+    induction to; ii; ss; try lia.
+    destruct (nth_error mem to) eqn:NTH.
+    - destruct t0. condtac.
+      + destruct (le_lt_dec (S to) from); auto.
+        exfalso. eapply LATEST; eauto.
+      + eapply IHto; eauto. eapply latest_mon2; eauto.
+    - eapply IHto; eauto. eapply latest_mon2; eauto.
   Qed.
 End Memory.
 

@@ -237,7 +237,7 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
         sim_view
           ex ob
           (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))))
-          (local.(Local.coh) loc).(View.ts);
+          (Memory.latest_ts loc (local.(Local.coh) loc).(View.ts) (mem_of_ex ex ob));
   VRN: sim_view
          ex ob
          (inverse (sim_local_vrn ex) (eq (tid, List.length (alocal.(ALocal.labels)))))
@@ -576,8 +576,9 @@ Proof.
       econs 2; ss. econs; eauto.
       * (* internal *)
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))). intro X. inv X.
-        { ii. rewrite VIEW1 in TS2. inv TS2. }
-        ii. 
+        { eapply Memory.latest_mon1. eapply Memory.latest_ts_latest; eauto.
+          unfold bot. unfold Time.bot. clear. lia. }
+        eapply Memory.latest_mon1. eapply Memory.latest_ts_latest; eauto.
         rewrite VIEW1. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
         inv H1. des. inv H.
@@ -665,33 +666,34 @@ Proof.
       }
       econs; ss.
       * (* sim_local coh *)
-        i. rewrite List.app_length, Nat.add_1_r.
-        rewrite sim_local_coh_step. rewrite inverse_step.
-        rewrite inverse_union, fun_add_spec. condtac; cycle 1.
-        { eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto. }
-        inversion e. subst.
-        destruct n.
-        { econs 1. ss. }
-        exploit MSG; [lia|]. i. des.
-        exploit EX.(Valid.RF1); eauto. i. des.
-        { contradict NORF. econs. eauto. }
-        exploit EX.(Valid.RF_WF); [exact RF|exact RF0|]. i. subst.
-        destruct eid0. ss. destruct (t == tid).
-        { inversion e0. subst. exploit rfi_sim_local_fwd.
-          4: { econs; eauto. }
-          all: eauto.
-          { econs; eauto. apply Label.write_is_writing. }
-          { econs; eauto. apply Label.read_is_reading. }
-          i. inv x0. econs 2; try exact VIEW1; ss.
-          left. econs; eauto. econs. splits.
-          - econs; eauto.
-          - econs. splits; eauto.
-        }
-        { econs 2; try exact VIEW1; ss.
-          right. econs; eauto. econs. splits.
-          - econs; eauto. econs; eauto. apply Label.write_is_writing.
-          - econs 2. econs; eauto.
-        }
+        admit.
+        (* i. rewrite List.app_length, Nat.add_1_r. *)
+        (* rewrite sim_local_coh_step. rewrite inverse_step. *)
+        (* rewrite inverse_union, fun_add_spec. condtac; cycle 1. *)
+        (* { eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto. } *)
+        (* inversion e. subst. *)
+        (* destruct n. *)
+        (* { econs 1. ss. } *)
+        (* exploit MSG; [lia|]. i. des. *)
+        (* exploit EX.(Valid.RF1); eauto. i. des. *)
+        (* { contradict NORF. econs. eauto. } *)
+        (* exploit EX.(Valid.RF_WF); [exact RF|exact RF0|]. i. subst. *)
+        (* destruct eid0. ss. destruct (t == tid). *)
+        (* { inversion e0. subst. exploit rfi_sim_local_fwd. *)
+        (*   4: { econs; eauto. } *)
+        (*   all: eauto. *)
+        (*   { econs; eauto. apply Label.write_is_writing. } *)
+        (*   { econs; eauto. apply Label.read_is_reading. } *)
+        (*   i. inv x0. econs 2; try exact VIEW1; ss. *)
+        (*   left. econs; eauto. econs. splits. *)
+        (*   - econs; eauto. *)
+        (*   - econs. splits; eauto. *)
+        (* } *)
+        (* { econs 2; try exact VIEW1; ss. *)
+        (*   right. econs; eauto. econs. splits. *)
+        (*   - econs; eauto. econs; eauto. apply Label.write_is_writing. *)
+        (*   - econs 2. econs; eauto. *)
+        (* } *)
       * (* sim_local vrn *)
         rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_vrn_step. rewrite inverse_step.
@@ -763,7 +765,8 @@ Proof.
           rewrite VIEW1 in H0. inv H0. refl.
         }
         { econs 2; eauto. refl. }
-      * i. rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
+      * (* sim_local promises *)
+        i. rewrite SIM_LOCAL.(PROMISES), List.app_length. s. econs; i; des.
         { inv N.
           - inv WRITE. destruct l; ss. congr.
           - esplits; cycle 1; eauto. lia.
