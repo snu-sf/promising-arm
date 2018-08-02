@@ -256,6 +256,21 @@ Module Memory.
       + eapply IHto; eauto. eapply latest_mon2; eauto.
     - eapply IHto; eauto. eapply latest_mon2; eauto.
   Qed.
+
+  Lemma latest_ts_read_lt
+        loc from to mem v val
+        (LATEST: latest_ts loc to mem = from)
+        (READ: read loc v mem = Some val)
+        (LT: from < v):
+    to < v.
+  Proof.
+    generalize (latest_ts_latest mem LATEST). i.
+    destruct (le_dec v to); try lia.
+    destruct v; try by inv LT.
+    unfold read in *. ss.
+    destruct (nth_error mem v) eqn:NTH; ss. des_ifs.
+    exfalso. eapply H; eauto.
+  Qed.
 End Memory.
 
 Module View.

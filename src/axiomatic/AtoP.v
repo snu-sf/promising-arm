@@ -811,9 +811,10 @@ Proof.
       econs; try refl.
       * (* internal *)
         rewrite <- VAL.
+        eapply Memory.latest_ts_read_lt; eauto.
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))).
         intro X. inv X.
-        { rewrite VIEW2. unfold bot, Time.bot. lia. }
+        { rewrite VIEW2. clear. unfold bot, Time.bot. lia. }
         eapply Time.le_lt_trans; eauto. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
         inv H1. des. inv H.
@@ -976,7 +977,9 @@ Proof.
       * i. rewrite List.app_length, Nat.add_1_r.
         rewrite sim_local_coh_step. rewrite inverse_step.
         rewrite inverse_union, fun_add_spec. condtac; ss.
-        { inversion e. subst. econs 2; eauto; [|refl]. right. econs; eauto.
+        { unfold Memory.get_msg in MSG. ss. rewrite MSG.
+          inversion e. subst. condtac; ss.
+          econs 2; eauto; [|refl]. right. econs; eauto.
           econs. splits; eauto. econs; eauto. econs; eauto.
           rewrite VAL. apply Label.write_is_writing.
         }
@@ -1267,14 +1270,15 @@ Lemma sim_eu_rtc_step
       (OB: Permutation ob (Execution.eids ex))
       (LINEARIZED: linearized ex.(Execution.ob) ob)
       (SIM: sim_eu tid ex ob aeu1 eu1)
-      (WF: AExecUnit.wf aeu1)
+      (WF_EU: ExecUnit.wf tid eu1)
+      (WF_AEU: AExecUnit.wf aeu1)
       (STEP: rtc AExecUnit.step aeu1 aeu2)
       (LOCAL: IdMap.find tid EX.(Valid.aeus) = Some aeu2):
   exists eu2,
     <<SIM: sim_eu tid ex ob aeu2 eu2>> /\
     <<STEP: rtc (ExecUnit.state_step tid) eu1 eu2>>.
 Proof.
-  revert eu1 SIM. induction STEP.
+  revert eu1 WF_EU SIM. induction STEP.
   { esplits; eauto. }
   i.
   exploit AExecUnit.step_future; eauto. i. des.
@@ -1302,7 +1306,8 @@ Proof.
     - eapply tid_lift_incl; eauto. inv LE0; ss.
   }
   i. des.
-  exploit IHSTEP; eauto. i. des.
+  specialize (ExecUnit.state_step_wf STEP0 WF_EU). i.
+  exploit IHSTEP; try exact SIM0; eauto. i. des.
   esplits; eauto.
 Qed.
 
@@ -1469,6 +1474,16 @@ Proof.
           unfold Memory.get_msg in MSG. ss. apply Machine.promises_from_mem_spec. eauto.
         }
   }
+  { clear. econs; ss.
+    - econs. i. unfold RMap.find, RMap.init.
+      rewrite IdMap.gempty. ss. apply bot_spec.
+    - econs; ss; i; try by apply bot_spec.
+      + destruct ts; ss.
+        rewrite Machine.promises_from_mem_spec in IN. des.
+        apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
+      + destruct ts; ss.
+        unfold Memory.get_msg in MSG. ss. destruct msg. ss. subst.
+        apply Machine.promises_from_mem_lookup in MSG. auto. }
   { apply AExecUnit.wf_init. }
   i. des. destruct eu2 as [state2 local2 mem2]. inv SIM. ss. subst.
   esplits; eauto.
