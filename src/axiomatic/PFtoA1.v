@@ -45,14 +45,22 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
     (W: w2 = match e with
              | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                         then Some (vloc.(ValA.val), (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)))
+                          then Some (vloc.(ValA.val),
+                                     Memory.latest_ts
+                                       vloc.(ValA.val)
+                                       (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)).(View.ts)
+                                       mem)
                          else w1 eid)
              | _ => w1
              end)
     (R: r2 = match e with
                | Event.read _ _ vloc _ =>
                  (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                            then Some (vloc.(ValA.val), (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)))
+                            then Some (vloc.(ValA.val),
+                                       Memory.latest_ts
+                                         vloc.(ValA.val)
+                                         (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)).(View.ts)
+                                         mem)
                             else r1 eid)
                | _ => r1
                end)
@@ -60,7 +68,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                  | Event.read _ _ vloc _
                  | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                    (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                              then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
+                              then (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)).(View.ts)
                               else cov1 eid)
                  | _ => cov1
                  end)
@@ -71,7 +79,7 @@ Inductive sim_trace (p: program) (mem: Memory.t) (tid: Id.t):
                                 else vext1 eid)
                    | Event.write _ _ vloc _ (ValA.mk _ 0 _) =>
                      (fun eid => if Nat.eqb eid (ALocal.next_eid aeu1.(AExecUnit.local))
-                                then eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)
+                                then (eu2.(ExecUnit.local).(Local.coh) vloc.(ValA.val)).(View.ts)
                                 else vext1 eid)
                    | _ => vext1
                    end)
