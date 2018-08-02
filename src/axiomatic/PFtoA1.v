@@ -411,7 +411,7 @@ Inductive sim_th
       Time.lt Time.bot ts /\
       cov eid = ts /\
       vext eid = ts /\
-      le ts (eu.(ExecUnit.local).(Local.coh) loc) /\
+      le ts (eu.(ExecUnit.local).(Local.coh) loc).(View.ts) /\
       exists ex ord val,
         List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.write ex ord loc val) /\
         Memory.get_msg ts mem = Some (Msg.mk loc val tid);
@@ -427,8 +427,8 @@ Inductive sim_th
                  Memory.get_msg ts mem = Some (Msg.mk loc val tid'));
   RPROP2:
     forall eid loc ts (GET: r eid = Some (loc, ts)),
-    cov eid = ts /\
-    le ts (eu.(ExecUnit.local).(Local.coh) loc) /\
+    Memory.latest_ts loc (cov eid) mem = ts /\
+    le ts (eu.(ExecUnit.local).(Local.coh) loc).(View.ts) /\
     exists ex ord val tid',
       List.nth_error aeu.(AExecUnit.local).(ALocal.labels) eid = Some (Label.read ex ord loc val) /\
       __guard__ ((ts = Time.bot /\ val = Val.default) \/
@@ -520,15 +520,14 @@ Proof.
     - i. destruct iid1; ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
       econs; ss.
-      + econs. i. unfold RMap.find. rewrite IdMap.gempty. ss.
-        unfold bot. unfold Time.bot. lia.
-      + econs; ss; i; try by (unfold bot; unfold Time.bot; lia).
-        * unfold bot. unfold fun_bot. unfold bot. unfold Time.bot. lia.
-        * eexists. unfold bot. unfold fun_bot. unfold Memory.read. ss.
+      + econs. i. unfold RMap.find. rewrite IdMap.gempty. ss. apply bot_spec.
+      + econs; ss; i; try by apply bot_spec.
+        (* * unfold bot. unfold fun_bot. unfold bot. unfold Time.bot. lia. *)
+        (* * eexists. unfold bot. unfold fun_bot. unfold Memory.read. ss. *)
         * destruct ts; ss.
-          exploit Machine.promises_from_mem_inv; eauto. i. des.
+          rewrite Machine.promises_from_mem_spec in IN. des.
           apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
-        * destruct ts; try by inv MSG.
+        * destruct ts; ss.
           unfold Memory.get_msg in *. ss. destruct msg.
           exploit Machine.promises_from_mem_lookup; eauto. ss. subst. ss.
     - rewrite IdMap.mapi_spec, STMT in FIND. inv FIND.
@@ -558,11 +557,13 @@ Proof.
     inv LOCAL; ss. inv EVENT. econs; ss; try by apply IH.
   }
   { (* read *)
-    inv LOCAL; ss. inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT.
+    inv LOCAL; ss. clear EU_WF AEU_WF. generalize IH.(EU_WF). i. inv H.
+    specialize (Local.read_spec LOCAL STEP). i. des.
+    inv STEP. inv STATE0. inv ASTATE_STEP. ss. inv EVENT.
     exploit sim_trace_sim_state_weak; eauto. s. intro Y. inv Y. ss. inv STMTS.
     exploit sim_rmap_weak_expr; eauto. intro Y. inv Y.
 
-    econs; ss; clear EU_WF AEU_WF.
+    econs; ss.
     - i. exploit IH.(WPROP1); eauto. s. i. des; [left|right]; esplits; eauto.
       eapply nth_error_app_mon. eauto.
     - i. exploit IH.(WPROP2); eauto.
@@ -574,7 +575,8 @@ Proof.
         apply List.nth_error_Some in H. lia.
       }
       esplits; eauto.
-      + rewrite fun_add_spec. des_ifs; eauto. inv e. etrans; eauto.
+      + rewrite fun_add_spec. des_ifs; eauto. inv e.
+        unfold join. unfold View._join. ss. etrans; eauto. apply join_l.
       + eapply nth_error_app_mon. eauto.
     - eapply IH.(WPROP4).
     - i. apply nth_error_snoc_inv in GET. des.
@@ -582,11 +584,14 @@ Proof.
         des_ifs. apply Nat.eqb_eq in Heq. subst. unfold ALocal.next_eid in *. lia.
       + des_ifs; cycle 1.
         { apply Nat.eqb_neq in Heq. unfold ALocal.next_eid in *. congr. }
-        rewrite fun_add_spec. condtac; [|congr].
+        rewrite fun_add_spec in *. condtac; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
+        exploit Memory.latest_latest_ts; try exact COH; eauto. i.
         exploit read_get_msg; eauto. i. des.
-        { esplits; eauto. left. eauto. }
-        esplits; eauto. right. eauto.
+        { esplits; eauto. left. split; eauto. subst. inv x0. auto. }
+        esplits; eauto. right.
+        (* FwdItem.ts <= lc1.coh *)
+        (* Thus, latest_ts = ts *)
     - i. des_ifs.
       + apply Nat.eqb_eq in Heq. subst. rewrite fun_add_spec. des_ifs; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
