@@ -145,11 +145,11 @@ Proof.
       * etrans; [|eapply join_r]; eauto.
 Qed.
 
-Inductive sim_local (tid:Id.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
+Inductive sim_local (tid:Id.t) (mem: Memory.t) (ex: Execution.t) (vext: eidT -> Time.t) (local:Local.t (A:=unit)) (alocal:ALocal.t): Prop := mk_sim_local {
   COH: forall loc,
         sim_view
           vext
-          (local.(Local.coh) loc)
+          (Memory.latest_ts loc (local.(Local.coh) loc).(View.ts) mem)
           (inverse (sim_local_coh ex loc) (eq (tid, List.length (alocal.(ALocal.labels)))));
   VRN: sim_view
          vext
@@ -244,10 +244,10 @@ Definition sim_atomic
     False.
 
 Inductive sim_th'
-          (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
+          (tid:Id.t) (mem:Memory.t) (ex:Execution.t) (vext: eidT -> Time.t)
           (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop := {
   ST: sim_state tid vext eu.(ExecUnit.state) aeu.(AExecUnit.state);
-  LC: sim_local tid ex vext eu.(ExecUnit.local) aeu.(AExecUnit.local);
+  LC: sim_local tid mem ex vext eu.(ExecUnit.local) aeu.(AExecUnit.local);
   OBW: sim_ob_write tid ex vext eu aeu;
   OBR: sim_ob_read tid ex vext eu aeu;
   FR: sim_fr tid ex vext eu aeu;
