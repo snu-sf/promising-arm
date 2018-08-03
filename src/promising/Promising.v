@@ -117,6 +117,15 @@ Module Memory.
     apply List.nth_error_Some. congr.
   Qed.
 
+  Lemma get_msg_read ts mem loc val tid
+        (GET: get_msg ts mem = Some (Msg.mk loc val tid)):
+    read loc ts mem = Some val.
+  Proof.
+    destruct ts; ss.
+    unfold get_msg, read in *. ss.
+    rewrite GET. ss. des_ifs. exfalso. apply c. ss.
+  Qed.
+
   Lemma get_msg_snoc_inv
         ts mem msg m
         (GET: get_msg ts (mem ++ [msg]) = Some m):
@@ -205,19 +214,33 @@ Module Memory.
       rewrite max_l; auto. lia.
   Qed.
 
-  Lemma latest_ts_read
-        loc to mem from
-        (LATEST: latest_ts loc to mem = from):
-    exists val, read loc from mem = Some val.
+  Lemma latest_ts_spec
+        loc to mem:
+    <<LE: latest_ts loc to mem <= to>> /\
+    <<READ: exists val, read loc (latest_ts loc to mem) mem = Some val>>.
   Proof.
-    revert from LATEST. induction to; i.
-    - ss. subst. esplits. ss.
+    induction to; i.
+    - ss. esplits; ss.
     - ss. destruct (nth_error mem to) eqn:NTH.
       + destruct t0. des_ifs.
-        * esplits. unfold read. ss. rewrite NTH.
+        * esplits; eauto. unfold read. ss. rewrite NTH.
           ss. des_ifs. exfalso. apply c. refl.
-        * apply IHto. refl.
-      + apply IHto. auto.
+        * des. split; auto. esplits. eauto.
+      + des. split; auto. esplits. eauto.
+  Qed.
+
+  Lemma latest_ts_mon
+        loc to1 to2 mem
+        (LE: to1 <= to2):
+    latest_ts loc to1 mem <= latest_ts loc to2 mem.
+  Proof.
+    revert to1 LE. induction to2.
+    - i. specialize (latest_ts_spec loc to1 mem). i. des.
+      inv LE. inv LE0. auto.
+    - i. inv LE; auto. rewrite IHto2; auto.
+      clear. unfold latest_ts at 2. des_ifs.
+      specialize (latest_ts_spec loc to2 mem). i. des.
+      rewrite LE. auto.
   Qed.
 
   Lemma latest_ts_latest
@@ -270,6 +293,21 @@ Module Memory.
     unfold read in *. ss.
     destruct (nth_error mem v) eqn:NTH; ss. des_ifs.
     exfalso. eapply H; eauto.
+  Qed.
+
+  Lemma latest_ts_read_le
+        loc to mem v val
+        (READ: read loc v mem = Some val)
+        (LE: v <= to):
+    v <= latest_ts loc to mem.
+  Proof.
+    revert v val LE READ. induction to; ss; i.
+    des_ifs.
+    - inv LE; eauto.
+      unfold read in READ. ss. rewrite Heq in READ.
+      des_ifs.
+    - inv LE; eauto.
+      unfold read in READ. ss. rewrite Heq in READ. inv READ.
   Qed.
 End Memory.
 

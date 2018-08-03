@@ -585,8 +585,7 @@ Proof.
     { esplits. econs; eauto.
       - (* internal *)
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))). intro X. inv X.
-        { eapply Memory.latest_mon1. eapply Memory.latest_ts_latest; eauto.
-          unfold bot. unfold Time.bot. clear. lia. }
+        { eapply Memory.latest_mon1. eapply Memory.latest_ts_latest; eauto. apply bot_spec. }
         eapply Memory.latest_mon1. eapply Memory.latest_ts_latest; eauto.
         rewrite VIEW1. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
@@ -643,7 +642,7 @@ Proof.
             - econs; eauto. apply Label.write_is_writing.
           }
           inv SIM_EXT1.
-          { rewrite VIEW2 in TS2. unfold bot, Time.bot in TS2. lia. }
+          { rewrite VIEW2 in TS2. inv TS2. }
           unfold ALocal.next_eid in VIEW_OF_EID. rewrite VIEW_OF_EID in VIEW0. inv VIEW0.
           unfold le in VIEW2. lia.
         }
@@ -666,7 +665,7 @@ Proof.
           - econs; eauto. apply Label.write_is_writing.
         }
         inv SIM_EXT1.
-        { rewrite VIEW3 in TS2. unfold bot, Time.bot in TS2. lia. }
+        { rewrite VIEW3 in TS2. inv TS2. }
         unfold ALocal.next_eid in VIEW_OF_EID. rewrite VIEW_OF_EID in VIEW0. inv VIEW0.
         unfold le in VIEW3. lia.
     }
@@ -814,7 +813,7 @@ Proof.
         eapply Memory.latest_ts_read_lt; eauto.
         generalize (SIM_LOCAL.(COH) (ValA.val (sem_expr armap1 eloc))).
         intro X. inv X.
-        { rewrite VIEW2. clear. unfold bot, Time.bot. lia. }
+        { rewrite VIEW2. clear. unfold bot. unfold Time.bot. lia. }
         eapply Time.le_lt_trans; eauto. inv EID. inv REL. inv H. inv H0.
         inv H2. apply Label.is_writing_inv in LABEL0. des. subst.
         inv H1. des. inv H.
