@@ -61,9 +61,9 @@ Lemma sim_traces_sim_th'_sl
     (RL: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
-    (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
+    (SIM_TH': sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu1 aeu1),
     sim_state tid (v_gen vexts) eu2.(ExecUnit.state) aeu2.(AExecUnit.state) /\
-    sim_local tid ex (v_gen vexts) eu2.(ExecUnit.local) aeu2.(AExecUnit.local).
+    sim_local tid m.(Machine.mem) ex (v_gen vexts) eu2.(ExecUnit.local) aeu2.(AExecUnit.local).
 Proof.
   i. rename SIM_TH' into L.
   generalize (SIM tid). intro X. inv X; simplify.
@@ -108,7 +108,8 @@ Proof.
     + i. rewrite sim_local_coh_step. rewrite inverse_step.
       rewrite inverse_union. rewrite fun_add_spec. condtac.
       { ii. des.
-        - inv EID. etrans; eauto. rewrite <- e. apply COH0; eauto.
+        - inv EID. etrans; try eapply COH0; eauto. rewrite e.
+          apply Memory.latest_ts_mon. unfold join. ss. apply join_l.
         - inv EID. inv REL. des. inv H. inv H2.
           apply Label.is_writing_inv in LABEL. des. subst. inv H0; cycle 1.
           + inv H. exploit RF2; eauto. i. des.
