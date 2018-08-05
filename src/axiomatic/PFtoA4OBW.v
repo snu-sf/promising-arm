@@ -61,7 +61,7 @@ Lemma sim_traces_sim_th'_ob_write
     (RL: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
-    (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
+    (SIM_TH': sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu1 aeu1),
     sim_ob_write tid ex (v_gen vexts) eu2 aeu2.
 Proof.
   i. rename SIM_TH' into L.
@@ -214,7 +214,8 @@ Proof.
         {  econs; eauto. unfold sim_local_vwo. econs. splits; eauto.
            econs; ss. econs; eauto. econs; ss.
         }
-      * eapply Nat.le_lt_trans; try eapply x0.
+      * eapply Nat.le_lt_trans; cycle 1.
+        { eapply Nat.lt_le_trans; try eapply x0. apply Memory.latest_ts_spec. }
         rewrite EX2.(XVEXT); ss; cycle 1.
         { rewrite List.app_length. s. clear -N. lia. }
         condtac.
@@ -225,7 +226,8 @@ Proof.
         exploit LABELS_REV; eauto; ss.
         { apply nth_error_app_mon. eauto. }
         rewrite LABEL2. intro Y. inv Y. ss.
-      * eapply Nat.le_lt_trans; try eapply x0.
+      * eapply Nat.le_lt_trans; cycle 1.
+        { eapply Nat.lt_le_trans; try eapply x0. apply Memory.latest_ts_spec. }
         rewrite EX2.(XVEXT); ss; cycle 1.
         { rewrite List.app_length. s. clear -N. lia. }
         condtac.

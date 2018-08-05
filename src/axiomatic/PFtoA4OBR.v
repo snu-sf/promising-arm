@@ -111,7 +111,7 @@ Proof.
   inv STEP0. ss. subst. inv LOCAL0; inv EVENT.
   exploit sim_trace_sim_th; try exact TRACE; eauto. intro SIM_TH.
   destruct SIM_TH.(EU_WF).
-  specialize (Local.read_spec LOCAL0 STEP0). i. des.
+  specialize (Local.read_spec LOCAL0 STEP0). intro READ_SPEC. guardH READ_SPEC.
   clear STATE2 LOCAL0. inv STEP0. ss.
   exploit EX2.(LABELS); eauto; ss.
   { rewrite List.app_length. s. clear. lia. }
@@ -124,21 +124,16 @@ Proof.
       erewrite EX2.(XR) in R; eauto; cycle 1.
       { s. rewrite List.app_length. s. clear. lia. }
       destruct (length (ALocal.labels alc1) =? length (ALocal.labels alc1)); ss.
-      rewrite fun_add_spec in R.
+      move READ_SPEC at bottom. rewrite fun_add_spec in *.
       destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)); cycle 1.
       { exfalso. apply c. ss. }
-      inv R.
+      generalize SIM_TH.(MEM). s. i. subst.
+      unguardH READ_SPEC. des. rewrite <- COH0 in R. inv R.
       generalize (SIM tid1). intro SIM1. inv SIM1; simplify.
       exploit sim_trace_last; try exact REL0. i. des. simplify.
       exploit sim_trace_sim_th; try exact REL0; eauto. intro L1.
       exploit L1.(WPROP3); eauto. i. des.
-      unfold v_gen. ss. rewrite <- H7.
-      exploit Memory.latest_latest_ts; try exact COH; eauto. i.
-      rewrite fun_add_spec in x8. revert x8. condtac; ss. i.
-      unfold FwdItem.read_view in *. revert x4. condtac.
-      - i.
-      exploit sim_trace_sim_th; try exact TRACE; eauto. intro L2.
-      destruct L2.(EU_WF). destruct LOCAL0. ss.
+      unfold v_gen. ss. rewrite <- H7. auto.
     }
     subst.
     rewrite <- join_r. unfold FwdItem.read_view. condtac; ss.
@@ -220,13 +215,8 @@ Proof.
               destruct (equiv_dec (ValA.val (sem_expr rmap eloc)) (ValA.val (sem_expr rmap eloc))); ss.
               exfalso. apply c. ss. }
           subst. rewrite <- join_r. exploit VIEW; eauto. i.
-          rewrite H0. unfold FwdItem.read_view. rewrite <- TS.
-          destruct L'.(EU_WF). destruct LOCAL0. ss.
-          specialize (FWDBANK (ValA.val (sem_expr rmap eloc))). des.
-          rewrite H0 in FWDBANK. rewrite fun_add_spec in FWDBANK.
-          des_ifs; etrans; eauto; ss; try by (etrans; eauto).
-          + exfalso. apply c. ss.
-          + exfalso. apply c. ss.
+          rewrite x. rewrite H0 in *. eapply Local.fwd_view_le; eauto.
+          apply SIM_TH.(EU_WF).
       }
       inv H; cycle 1.
       { exploit Valid.data_label; eauto. i. des. inv EID2. destruct l0; ss. congr. }
@@ -257,23 +247,19 @@ Proof.
     assert (v_gen vexts x2 = ts).
     { inv H3. destruct x2 as [tid1 eid1]. inv H1. ss.
       generalize H. intro Y. rewrite RF in Y. inv Y. ss.
-      assert (r (length (ALocal.labels alc1)) =
-              (fun eid : nat =>
-                 if eid =? length (ALocal.labels alc1)
-                 then Some (ValA.val vloc, fun_add (ValA.val vloc) ts (Local.coh lc1) (ValA.val vloc))
-                 else r1 eid) (length (ALocal.labels alc1))).
-      { eapply EX2.(XR); eauto. s. rewrite List.app_length. s. clear. lia. }
-      rewrite H1 in R. clear H1.
+      erewrite EX2.(XR) in R; eauto; cycle 1.
+      { s. rewrite List.app_length. s. clear. lia. }
       destruct (length (ALocal.labels alc1) =? length (ALocal.labels alc1)); ss.
-      rewrite fun_add_spec in R.
+      move READ_SPEC at bottom. rewrite fun_add_spec in *.
       destruct (equiv_dec (ValA.val vloc) (ValA.val vloc)); cycle 1.
       { exfalso. apply c. ss. }
-      inv R.
+      generalize SIM_TH.(MEM). s. i. subst.
+      unguardH READ_SPEC. des. rewrite <- COH0 in R. inv R.
       generalize (SIM tid). intro SIM1. inv SIM1; simplify.
       exploit sim_trace_last; try exact REL0. i. des. simplify.
       exploit sim_trace_sim_th; try exact REL0; eauto. intro L1.
       exploit L1.(WPROP3); eauto. i. des.
-      unfold v_gen. ss. rewrite -> FIND_VEXTL. ss. }
+      unfold v_gen. ss. rewrite FIND_VEXTL. auto. }
     subst.
     rewrite <- join_r. unfold FwdItem.read_view. condtac; ss.
     destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val vloc))) (v_gen vexts x2)); ss. inv e.

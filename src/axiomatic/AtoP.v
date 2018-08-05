@@ -689,10 +689,8 @@ Proof.
         { eapply sim_view_le; [|exact (SIM_LOCAL.(COH) loc)]. eauto. }
         inversion e. subst. inv WF.
         generalize (Local.read_spec LOCAL READ_STEP). i. des. ss.
-        exploit Memory.latest_latest_ts; eauto.
-        rewrite fun_add_spec. condtac; ss. i.
-        eapply sim_view_le2; try eapply x0.
-        destruct n.
+        revert COH1. rewrite fun_add_spec. condtac; ss. i.
+        rewrite <- COH1. destruct n.
         { econs 1. ss. }
         exploit MSG; [lia|]. i. des.
         exploit EX.(Valid.RF1); eauto. i. des.
@@ -704,7 +702,7 @@ Proof.
           all: eauto.
           { econs; eauto. apply Label.write_is_writing. }
           { econs; eauto. apply Label.read_is_reading. }
-          i. inv x1. econs 2; try exact VIEW1; ss.
+          i. inv x0. econs 2; try exact VIEW1; ss.
           left. econs; eauto. econs. splits.
           - econs; eauto.
           - econs. splits; eauto.
@@ -1477,6 +1475,7 @@ Proof.
     - econs. i. unfold RMap.find, RMap.init.
       rewrite IdMap.gempty. ss. apply bot_spec.
     - econs; ss; i; try by apply bot_spec.
+      + esplits; ss.
       + destruct ts; ss.
         rewrite Machine.promises_from_mem_spec in IN. des.
         apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.

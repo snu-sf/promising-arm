@@ -265,12 +265,11 @@ Module Memory.
   Qed.
 
   Lemma latest_latest_ts
-        loc from to mem val
-        (LATEST: latest loc from to mem)
-        (READ: read loc from mem = Some val):
+        loc from to mem
+        (LATEST: latest loc from to mem):
     latest_ts loc to mem <= from.
   Proof.
-    revert from val READ LATEST.
+    revert from LATEST.
     induction to; ii; ss; try lia.
     destruct (nth_error mem to) eqn:NTH.
     - destruct t0. condtac.
@@ -830,7 +829,8 @@ Section Local.
       (VREL: lc.(vrel).(View.ts) <= List.length mem)
       (FWDBANK: forall loc,
           (lc.(fwdbank) loc).(FwdItem.ts) <= (lc.(coh) loc).(View.ts) /\
-          (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= (lc.(fwdbank) loc).(FwdItem.ts))
+          (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <= (lc.(fwdbank) loc).(FwdItem.ts) /\
+          (exists val, Memory.read loc (lc.(fwdbank) loc).(FwdItem.ts) mem = Some val))
       (* (EXBANK: forall eb, lc.(exbank) = Some eb -> *)
       (*                eb.(Exbank.ts) <= (lc.(coh) eb.(Exbank.loc)).(View.ts) /\ *)
       (*                exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val) *)
@@ -846,6 +846,7 @@ Section Local.
   Lemma init_wf tid: wf tid Memory.empty init.
   Proof.
     econs; ss; i; try by apply bot_spec.
+    - esplits; ss.
     - destruct ts; ss.
     - destruct ts; ss. destruct ts; ss.
   Qed.
@@ -885,6 +886,25 @@ Section Local.
   (*   unfold FwdItem.read_view. condtac; ss. etrans; eauto. etrans; eauto. *)
   (* Qed. *)
 
+  Lemma fwd_view_le
+        tid mem lc loc ts ord
+        (WF: wf tid mem lc)
+        (COH: Memory.latest loc ts (lc.(coh) loc).(View.ts) mem):
+    (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <=
+    ((lc.(fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts).
+  Proof.
+    unfold FwdItem.read_view. condtac; ss.
+    inv WF. exploit FWDBANK. i. des.
+    eapply Memory.latest_mon2 in COH; try exact x.
+    etrans; cycle 1.
+    { eapply Memory.latest_latest_ts; eauto. }
+    rewrite x0.
+    destruct (FwdItem.ts (fwdbank lc loc)); ss.
+    unfold Memory.read in x1. ss.
+    destruct (nth_error mem t0); ss. destruct t1. ss.
+    des_ifs; ss.
+  Qed.
+
   Lemma fwd_read_view_latest
         tid mem lc loc ts ord
         (WF: wf tid mem lc)
@@ -902,14 +922,24 @@ Section Local.
         (WF: Local.wf tid mem lc1)
         (READ: Local.read ex ord vloc res ts lc1 mem lc2):
     <<LATEST: Memory.latest vloc.(ValA.val) ts res.(ValA.annot).(View.ts) mem>> /\
-    <<COH: Memory.latest vloc.(ValA.val) ts (lc2.(Local.coh) vloc.(ValA.val)).(View.ts) mem>>.
+    <<COH: ts = Memory.latest_ts vloc.(ValA.val) (lc2.(Local.coh) vloc.(ValA.val)).(View.ts) mem>>.
   Proof.
     inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits.
     - apply Memory.latest_join; auto.
       eapply fwd_read_view_latest; eauto.
-    - unfold join, View._join. ss.
-      do 2 (apply Memory.latest_join; auto).
-      eapply fwd_read_view_latest; eauto.
+    - unfold join. ss. apply le_antisym.
+      + unfold FwdItem.read_view. des_ifs.
+        * rewrite Bool.andb_true_iff in Heq. des.
+          destruct (equiv_dec (FwdItem.ts (fwdbank lc1 (ValA.val vloc))) ts); ss.
+          inv e0. inv WF. exploit FWDBANK. i. des.
+          eapply Memory.latest_ts_read_le; eauto.
+          rewrite x. apply join_l.
+        * eapply Memory.latest_ts_read_le; eauto.
+          ss. repeat rewrite <- join_r. auto.
+      + hexploit fwd_read_view_latest; eauto. i.
+        hexploit Memory.latest_join; [exact LATEST|exact H1|i].
+        hexploit Memory.latest_join; [exact COH|exact H2|i].
+        exploit Memory.latest_latest_ts; try eapply H3; eauto.
   Qed.
 End Local.
 End Local.
@@ -1069,6 +1099,8 @@ Section ExecUnit.
           inversion e. subst. rewrite <- TS0, <- TS1 in *. splits; viewtac; eauto using get_msg_wf, expr_wf.
           { etrans; [|apply Nat.lt_le_incl; eauto]. rewrite <- join_l. ss. }
           { etrans; [|apply Nat.lt_le_incl; eauto]. rewrite <- join_r, <- join_l. ss. }
+          { revert MSG. unfold Memory.read, Memory.get_msg.
+            destruct ts; ss. i. rewrite MSG. ss. eexists. des_ifs. }
         (* * destruct ex0; ss. i. exploit EXBANK; eauto. i. des. rewrite fun_add_spec. splits; eauto. *)
         (*   condtac; ss. inversion e. rewrite H3 in *. etrans; eauto. clear -COH0. lia. *)
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
@@ -1119,6 +1151,8 @@ Section ExecUnit.
       (* + i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto. *)
       (* + i. exploit EXBANK; eauto. i. des. esplits; eauto. *)
       (*   eapply Memory.read_mon. eauto. *)
+      + i. specialize (FWDBANK loc0). des. esplits; auto.
+        apply Memory.read_mon; eauto.
       + i. revert IN. rewrite Promises.set_o. condtac.
         * inversion e. i. inv IN. lia.
         * i. exploit PROMISES; eauto. lia.
@@ -1275,6 +1309,8 @@ Module Machine.
         (* * i. specialize (COH_READ loc0). des. esplits. apply Memory.read_mon. eauto. *)
         (* * i. exploit EXBANK; eauto. i. des. esplits; eauto. *)
         (*   eapply Memory.read_mon. eauto. *)
+        * i. specialize (FWDBANK loc0). des. esplits; eauto.
+          apply Memory.read_mon; eauto.
         * i. exploit PROMISES; eauto. lia.
         * i. apply Memory.get_msg_snoc_inv in MSG. des.
           { eapply PROMISES0; eauto. }
