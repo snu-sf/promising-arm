@@ -481,19 +481,6 @@ Proof.
   eapply sim_state_weak_init.
 Qed.
 
-(* TODO: move to Memory.v *)
-Lemma read_get_msg
-      loc ts mem val
-      (READ: Memory.read loc ts mem = Some val):
-  (ts = Time.bot /\ val = Val.default) \/
-  (exists tid, Memory.get_msg ts mem = Some (Msg.mk loc val tid)).
-Proof.
-  revert READ. unfold Memory.read, Memory.get_msg. destruct ts; ss.
-  - i. inv READ. left. eauto.
-  - destruct (List.nth_error mem ts); ss. des_ifs. i. inv READ. inv e.
-    destruct t. s. right. eauto.
-Qed.
-
 Lemma sim_trace_sim_th
       p mem tid
       tr eu tr'
@@ -593,13 +580,13 @@ Proof.
         rewrite fun_add_spec in *. condtac; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
         move READ_SPEC at bottom. desH READ_SPEC. rewrite <- COH0.
-        exploit read_get_msg; eauto. i. des; esplits; eauto.
+        exploit Memory.read_get_msg; eauto. i. des; esplits; eauto.
     - i. des_ifs.
       + apply Nat.eqb_eq in Heq. subst.
         rewrite fun_add_spec in *. des_ifs; [|congr].
         inv VLOC. inv VAL. ss. subst. rewrite VAL1 in *.
         move READ_SPEC at bottom. desH READ_SPEC. rewrite <- COH0.
-        exploit read_get_msg; eauto. i. des; esplits; eauto.
+        exploit Memory.read_get_msg; eauto. i. des; esplits; eauto.
         all: try by rewrite COH0 at 1; eapply Memory.latest_ts_spec.
         all: try by rewrite List.nth_error_app2, Nat.sub_diag; [|refl]; ss.
       + exploit IH.(RPROP2); eauto. s. i. des. esplits; eauto.
@@ -704,8 +691,7 @@ Proof.
     - i. unfold ALocal.next_eid in *.
       specialize (Memory.latest_ts_spec (ValA.val vloc0) ts mem). i. des.
       exploit Memory.latest_ts_read_le; [|refl|i; exploit le_antisym; try eapply LE; eauto; i].
-      { destruct ts; ss. unfold Memory.get_msg, Memory.read in *. ss.
-        rewrite MSG. des_ifs. }
+      { eapply Memory.get_msg_read; eauto. }
       des_ifs.
       + apply Nat.eqb_eq in Heq. apply Nat.eqb_eq in Heq0. subst. ss.
       + clear Heq0. rewrite fun_add_spec in *. des_ifs; [|congr].

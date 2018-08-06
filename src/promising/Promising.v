@@ -126,6 +126,18 @@ Module Memory.
     rewrite GET. ss. des_ifs. exfalso. apply c. ss.
   Qed.
 
+  Lemma read_get_msg
+        loc ts mem val
+        (READ: read loc ts mem = Some val):
+    (ts = Time.bot /\ val = Val.default) \/
+    (exists tid, get_msg ts mem = Some (Msg.mk loc val tid)).
+  Proof.
+    revert READ. unfold read, get_msg. destruct ts; ss.
+    - i. inv READ. left. eauto.
+    - destruct (List.nth_error mem ts); ss. des_ifs. i. inv READ. inv e.
+      destruct t0. s. right. eauto.
+  Qed.
+
   Lemma get_msg_snoc_inv
         ts mem msg m
         (GET: get_msg ts (mem ++ [msg]) = Some m):
