@@ -62,7 +62,7 @@ Lemma sim_traces_sim_th'_atomic
     (RL: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
-    (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
+    (SIM_TH': sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu1 aeu1),
     sim_atomic tid ex (v_gen vexts) eu2 aeu2.
 Proof.
   i. rename SIM_TH' into L.
