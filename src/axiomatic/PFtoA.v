@@ -32,7 +32,7 @@ Require Import PromisingArch.axiomatic.PFtoA4SL.
 
 Set Implicit Arguments.
 
-          
+
 Lemma sim_traces_sim_th'_step
       p trs atrs ws rs covs vexts
       m ex
@@ -67,8 +67,8 @@ Lemma sim_traces_sim_th'_step
     (RL: lastn (S n) rl = r2 :: r1 :: rl')
     (COV: lastn (S n) covl = cov2 :: cov1 :: covl')
     (VEXT: lastn (S n) vextl = vext2 :: vext1 :: vextl')
-    (SIM_TH': sim_th' tid ex (v_gen vexts) eu1 aeu1),
-    sim_th' tid ex (v_gen vexts) eu2 aeu2.
+    (SIM_TH': sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu1 aeu1),
+    sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu2 aeu2.
 Proof.
   i. econs.
   - eapply sim_traces_sim_th'_sl; eauto.
@@ -114,7 +114,7 @@ Lemma sim_traces_sim_th'
     (RL: lastn (S n) rl = r :: rl')
     (COV: lastn (S n) covl = cov :: covl')
     (VEXT: lastn (S n) vextl = vext :: vextl'),
-    sim_th' tid ex (v_gen vexts) eu aeu.
+    sim_th' tid m.(Machine.mem) ex (v_gen vexts) eu aeu.
 Proof.
   intro tid. generalize (SIM tid). intro X. inv X; [by i|]. induction n.
   { (* init *)
