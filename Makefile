@@ -1,5 +1,5 @@
 COQMODULE    := PromisingArch
-COQDIRS      := lib promising axiomatic #lcertify
+COQDIRS      := lib promising axiomatic lcertify
 COQTHEORIES  := lib/sflib/*.v lib/paco/src/*.v lib/hahn/*.v $(foreach dir, $(COQDIRS), src/$(dir)/*.v)
 
 .PHONY: all theories clean
