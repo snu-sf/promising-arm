@@ -288,7 +288,7 @@ Hint Constructors sim_exbank.
 
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
 | sim_lc_intro
-    (COH: forall loc, sim_time ts mem1 mem2 (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
+    (COH: forall loc, sim_view ts mem1 mem2 (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
     (VRN: sim_view ts mem1 mem2 lc1.(Local.vrn) lc2.(Local.vrn))
     (VWN: sim_view ts mem1 mem2 lc1.(Local.vwn) lc2.(Local.vwn))
     (VRO: sim_view ts mem1 mem2 lc1.(Local.vro) lc2.(Local.vro))
@@ -540,7 +540,9 @@ Proof.
         exploit sim_fwd_view1; eauto.
         { exploit sim_mem_length; eauto. i. des. ss. }
         { exploit sim_mem_length; eauto. i. des. ss. }
-        { rewrite <- COH. apply WF2. }
+        { admit.
+          (* rewrite <- COH. apply WF2.  *)
+        }
         intro FWDVIEW.
         eexists (ExecUnit.mk _ _ _). esplits.
         - econs 1. econs. econs; ss.
@@ -548,7 +550,9 @@ Proof.
           + rewrite ELOC in *.
             econs 2; eauto. instantiate (2 := ts0). econs; ss.
             * exploit COH0; eauto. intro X. inv X. rewrite TS; ss.
-              rewrite COH. ss.
+              admit.
+              admit.
+              (* rewrite COH. ss. *)
             * admit. (* Memory.latest *)
             * admit. (* Memory.read *)
         - econs; ss.
@@ -645,14 +649,19 @@ Proof.
                 all: try by apply LOCAL.
                 all: admit.
               - exploit sim_time_eq.
-                { inv LOCAL. eapply COH0. }
+                { inv LOCAL.
+                  admit.
+                  (* eapply COH0. *)
+                }
                 { etrans; [by apply Time.lt_le_incl; eauto|]. eauto. }
-                i. congr.
+                admit.
+                (* i. congr. *)
               - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
                 destruct a, eb. inv REL. ss. subst.
                 esplits; eauto. s. ii. subst.
-                inv WF2. ss. inv LOCAL. exploit EXBANK; eauto. s. i. des.
+                inv WF2. ss. inv LOCAL.
                 admit.
+                (* exploit EXBANK; eauto. s. i. des. *)
                 (* destruct (le_lt_dec ts2 ts). *)
                 (* { inv TS. specialize (TS3 l). subst. *)
                 (*   eapply EX0; eauto. rewrite <- MSG0. inv MEM. *)
