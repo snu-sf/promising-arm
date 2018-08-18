@@ -549,9 +549,10 @@ Proof.
           + econs; ss.
           + rewrite ELOC in *.
             econs 2; eauto. instantiate (2 := ts0). econs; ss.
-            * exploit COH0; eauto. intro X. inv X. rewrite TS; ss.
-              { admit. (* use COH *) }
-              { admit. (* ? *) }
+            * exploit COH0; eauto. intro X. inv X.
+              ii. destruct (le_lt_dec (S ts1) ts).
+              { exploit COH; eauto. admit. admit. }
+              { eapply ITF0; eauto. eapply Memory.latest_mon1; eauto. }
             * admit. (* Memory.latest *)
             * admit. (* Memory.read *)
         - econs; ss.
@@ -742,6 +743,63 @@ Proof.
   - rewrite PROMISES2; ss. lia.
 Qed.
 
+(* TODO: move *)
+Lemma certify_step_vcap
+      tid eu eu'
+      (STEP: certify_step tid eu eu')
+      (WF1: ExecUnit.wf tid eu):
+  le eu.(ExecUnit.local).(Local.vcap) eu'.(ExecUnit.local).(Local.vcap).
+Proof.
+  destruct eu as [st lc mem].
+  destruct eu' as [st' lc' mem'].
+  ss. inv STEP.
+  { inv STEP0. inv STEP. ss. subst. inv LOCAL; try inv STEP; ss; try refl.
+    all: try by apply join_l.
+    inv LC. s. apply join_l.
+  }
+  { inv STEP0. ss. inv PROMISE. inv FULFILL. ss. apply join_l. }
+Qed.
+
+(* TODO: move *)
+Lemma certify_step_vcap_promise
+      tid ts eu eu'
+      (STEP: certify_step tid eu eu')
+      (WF1: ExecUnit.wf tid eu)
+      (VCAP: ts <= eu.(ExecUnit.local).(Local.vcap).(View.ts))
+      (PROMISES: Promises.lookup ts eu.(ExecUnit.local).(Local.promises)):
+  Promises.lookup ts eu'.(ExecUnit.local).(Local.promises).
+Proof.
+  destruct eu as [st lc mem].
+  destruct eu' as [st' lc' mem'].
+  ss. inv STEP.
+  { inv STEP0. inv STEP. ss. subst. inv LOCAL; try inv STEP; ss.
+    - rewrite Promises.unset_o. condtac; ss. inversion e. subst.
+      inv WRITABLE. ss. clear -VCAP EXT. unfold join, Time.join in *. lia.
+    - inv LC. ss.
+  }
+  { inv STEP0. ss. inv PROMISE. inv FULFILL. ss.
+    rewrite Promises.unset_o, Promises.set_o. condtac; ss. inversion e. subst.
+      inv WRITABLE. ss. clear -VCAP EXT. unfold join, Time.join in *. lia.
+  }
+Qed.
+
+(* TODO: move *)
+Lemma rtc_certify_step_vcap_promise
+      tid ts eu eu'
+      (STEP: rtc (certify_step tid) eu eu')
+      (WF1: ExecUnit.wf tid eu)
+      (VCAP: ts <= eu.(ExecUnit.local).(Local.vcap).(View.ts))
+      (PROMISES: Promises.lookup ts eu.(ExecUnit.local).(Local.promises)):
+  Promises.lookup ts eu'.(ExecUnit.local).(Local.promises).
+Proof.
+  revert WF1 VCAP PROMISES. induction STEP; ss. i.
+  exploit certify_step_wf; eauto. i.
+  exploit certify_step_vcap; eauto. i.
+  exploit certify_step_vcap_promise; eauto. i.
+  eapply IHSTEP; eauto.
+  rewrite VCAP. apply x2.
+Qed.
+
 Lemma sim_eu_rtc_step
       tid ts eu1 eu2 eu2'
       (SIM: sim_eu tid ts eu1 eu2)
@@ -765,8 +823,14 @@ Proof.
     exploit IHSTEP; eauto. i. des.
     esplits; [|by eauto]. econs; eauto.
   - esplits; eauto. eapply sim_eu_promises; eauto. i.
+    exploit certify_step_wf; eauto. i.
     assert (PROMISES': forall tsp (TSP: tsp <= ts), Promises.lookup tsp y.(ExecUnit.local).(Local.promises) = false).
-    { admit. }
+    { i. destruct (Promises.lookup tsp0 (Local.promises (ExecUnit.local y))) eqn:X; ss.
+      destruct tsp0; ss.
+      exploit rtc_certify_step_vcap_promise; try exact X; eauto.
+      - lia.
+      - rewrite PROMISES. ss.
+    }
     destruct x as [st1 lc1 mem1].
     destruct y as [st2 lc2 mem2].
     ss. inv H.
@@ -776,9 +840,11 @@ Proof.
       all: try inv STEP0; ss; eauto.
       all: try inv LC; ss; eauto.
       generalize (PROMISES' tsp TSP). rewrite Promises.unset_o. condtac; ss. inversion e. subst.
-      inv WRITABLE. ss. admit. (* easy *)
-    + inv STEP0. ss. admit. (* quite the same *)
-Admitted.
+      inv WRITABLE. ss. clear -l TSP EXT. unfold join, Time.join in *. lia.
+    + inv STEP0. ss. inv STATE. inv PROMISE. inv FULFILL. ss.
+      generalize (PROMISES' tsp TSP). rewrite Promises.unset_o, Promises.set_o. condtac; ss. inversion e. subst.
+      inv WRITABLE. ss. clear -l TSP EXT. unfold join, Time.join in *. lia.
+Qed.
 
 Lemma state_step_certify
       tid eu1 eu2
