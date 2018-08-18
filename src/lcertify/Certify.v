@@ -876,7 +876,48 @@ Proof.
       econs; ss.
       + rewrite List.app_length. s. lia.
       + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-    - admit. (* sim_lc; easy *)
+    - { inv WF. inv LOCAL. ss. econs; ss.
+        - econs; ss.
+          + rewrite COH, app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - econs; ss.
+          + rewrite app_length. lia.
+          + admit.
+        - i. specialize (FWDBANK loc0). des. econs; eauto.
+          + econs; ss.
+            * admit.
+            * admit.
+            * admit.
+          + econs; ss.
+            * admit.
+            * admit.
+            * admit.
+          + apply Memory.read_mon. ss.
+        - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. i. des.
+          econs. econs; ss.
+          + admit.
+          + exploit ExecUnit.read_wf; eauto. lia.
+          + admit.
+        - i. rewrite Promises.set_o. condtac; ss.
+          inversion e. subst. lia.
+        - i. destruct (Promises.lookup tsp (Local.promises lc1)) eqn:X; ss.
+          exploit PROMISES0; eauto. lia.
+      }
     - econs; ss. rewrite app_nil_r. ss.
   }
 
@@ -905,7 +946,10 @@ Proof.
   all: try lia.
   - rewrite COH. lia.
   - exploit FWDBANK; eauto. i. des. esplits; eauto.
-    + admit. (* Memory.latest_ts mon; Sung-Hwan will do it. *)
+    + admit. (* Memory.latest_ts mon; Help me, Sung-Hwan! *)
+    + apply Memory.read_mon. eauto.
+  - exploit EXBANK; eauto. i. des. esplits; eauto.
+    + rewrite x. admit. (* Memory.latest_ts mon; Help me, Sung-Hwan! *)
     + apply Memory.read_mon. eauto.
   - exploit PROMISES; eauto. lia.
   - apply Memory.get_msg_app_inv in MSG. des.
@@ -956,7 +1000,7 @@ Proof.
       econs; ss.
       + rewrite List.app_length. s. lia.
       + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-    - admit. (* sim_lc; easy *)
+    - admit. (* sim_lc *)
     - econs; ss. rewrite app_nil_r. ss.
   }
 
