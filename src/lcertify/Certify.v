@@ -885,8 +885,61 @@ Proof.
   i. des. econs; eauto.
 Admitted.
 
+(* TODO: move *)
+Lemma rmap_wf_interference
+      (rmap: RMap.t (A:=View.t (A:=unit))) mem mem_interference
+      (WF: ExecUnit.rmap_wf mem rmap):
+  ExecUnit.rmap_wf (mem ++ mem_interference) rmap.
+Proof.
+  inv WF. econs. i. rewrite RMAP, app_length. lia.
+Qed.
+
+Lemma local_wf_interference
+      tid (lc: Local.t (A:=unit)) mem mem_interference
+      (INTERFERENCE: Forall (fun msg => msg.(Msg.tid) <> tid) mem_interference)
+      (WF: Local.wf tid mem lc):
+  Local.wf tid (mem ++ mem_interference) lc.
+Proof.
+  inv WF. econs; i.
+  all: try rewrite app_length.
+  all: try lia.
+  - rewrite COH. lia.
+  - exploit FWDBANK; eauto. i. des. esplits; eauto.
+    + admit. (* Memory.latest_ts mon; Sung-Hwan will do it. *)
+    + apply Memory.read_mon. eauto.
+  - exploit PROMISES; eauto. lia.
+  - apply Memory.get_msg_app_inv in MSG. des.
+    + eapply PROMISES0; eauto.
+    + apply nth_error_In in MSG0. eapply Forall_forall in INTERFERENCE; eauto.
+      subst. destruct (nequiv_dec (Msg.tid msg) (Msg.tid msg)); ss. congr.
+Admitted.
+
+Lemma step_certify
+      tid eu1 eu2
+      (CERTIFY: certify tid eu2)
+      (STEP: ExecUnit.step tid eu1 eu2)
+      (WF: ExecUnit.wf tid eu1):
+  certify tid eu1.
+Proof.
+  inv STEP.
+  - eapply state_step_certify; eauto.
+  - eapply promise_step_certify; eauto.
+Qed.
+
+Lemma eu_wf_interference
+      tid st (lc:Local.t (A:=unit)) mem mem_interference
+      (INTERFERENCE: Forall (fun msg => msg.(Msg.tid) <> tid) mem_interference)
+      (WF: ExecUnit.wf tid (ExecUnit.mk st lc mem)):
+  ExecUnit.wf tid (ExecUnit.mk st lc (mem ++ mem_interference)).
+Proof.
+  inv WF. ss. econs; ss.
+  - apply rmap_wf_interference. ss.
+  - apply local_wf_interference; ss. 
+Qed.
+
 Lemma interference_certify
       tid st lc mem mem_interference
+      (INTERFERENCE: Forall (fun msg => msg.(Msg.tid) <> tid) mem_interference)
       (CERTIFY: certify tid (ExecUnit.mk st lc (mem ++ mem_interference)))
       (WF: ExecUnit.wf tid (ExecUnit.mk st lc mem)):
   certify tid (ExecUnit.mk st lc mem).
@@ -908,6 +961,6 @@ Proof.
   }
 
   inv CERTIFY. exploit sim_eu_rtc_step; eauto.
-  { admit. (* wf preserved *) }
+  { apply eu_wf_interference; ss. }
   i. des. econs; eauto.
 Admitted.

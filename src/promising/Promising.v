@@ -138,19 +138,29 @@ Module Memory.
       destruct t0. s. right. eauto.
   Qed.
 
+  Lemma get_msg_app_inv
+        ts mem1 mem2 m
+        (GET: get_msg ts (mem1 ++ mem2) = Some m):
+    (ts <= length mem1 /\ get_msg ts mem1 = Some m) \/
+    (ts > length mem1 /\ List.nth_error mem2 (ts - (S (length mem1))) = Some m).
+  Proof.
+    unfold get_msg in *. destruct ts; ss.
+    destruct (lt_dec ts (length mem1)).
+    - rewrite nth_error_app1 in GET; eauto.
+    - rewrite nth_error_app2 in GET; [|lia]. right. splits; ss. lia.
+  Qed.
+
   Lemma get_msg_snoc_inv
         ts mem msg m
         (GET: get_msg ts (mem ++ [msg]) = Some m):
     (ts <= length mem /\ get_msg ts mem = Some m) \/
     (ts = S (length mem) /\ msg = m).
   Proof.
-    unfold get_msg in *. destruct ts; ss.
-    destruct (lt_dec ts (length mem)).
-    - rewrite nth_error_app1 in GET; eauto.
-    - rewrite nth_error_app2 in GET; [|lia].
-      destruct (ts - length mem) eqn:SUB; ss; cycle 1.
-      { destruct n0; ss. }
-      assert (ts = length mem) by lia. inv GET. eauto.
+    exploit get_msg_app_inv; eauto. i. des; [left|right]; ss.
+    destruct ts; ss.
+    destruct (ts - length mem) eqn:SUB; ss.
+    - assert (ts = length mem) by lia. inv x1. ss.
+    - destruct n; ss.
   Qed.
 
   Lemma get_latest
