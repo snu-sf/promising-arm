@@ -540,8 +540,8 @@ Proof.
         exploit sim_fwd_view1; eauto.
         { exploit sim_mem_length; eauto. i. des. ss. }
         { exploit sim_mem_length; eauto. i. des. ss. }
-        { admit.
-          (* rewrite <- COH. apply WF2.  *)
+        { inv WF2. ss. inv LOCAL. exploit FWDBANK0; eauto. i. des.
+          rewrite x. apply Memory.latest_latest_ts. eauto.
         }
         intro FWDVIEW.
         eexists (ExecUnit.mk _ _ _). esplits.
@@ -550,9 +550,8 @@ Proof.
           + rewrite ELOC in *.
             econs 2; eauto. instantiate (2 := ts0). econs; ss.
             * exploit COH0; eauto. intro X. inv X. rewrite TS; ss.
-              admit.
-              admit.
-              (* rewrite COH. ss. *)
+              { admit. (* use COH *) }
+              { admit. (* ? *) }
             * admit. (* Memory.latest *)
             * admit. (* Memory.read *)
         - econs; ss.
