@@ -855,6 +855,40 @@ Proof.
   inv CERTIFY. econs; [|by eauto]. econs; eauto.
 Qed.
 
+(* TODO: move *)
+Lemma sim_view_app2
+      ts mem1 mem2 mem2' v1 v2
+      (SIM: sim_view ts mem1 mem2 v1 v2):
+  sim_view ts mem1 (mem2 ++ mem2') v1 v2.
+Proof.
+  inv SIM. econs; ss.
+  - rewrite app_length. lia.
+  - i. apply ITF. ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+Qed.
+Lemma sim_view_refl
+      ts mem v
+      (VIEW: v.(View.ts) <= length mem):
+  sim_view ts mem mem v v.
+Proof.
+  econs; ss.
+Qed.
+Lemma sim_time_app2
+      ts mem1 mem2 mem2' t1 t2
+      (SIM: sim_time ts mem1 mem2 t1 t2):
+  sim_time ts mem1 (mem2 ++ mem2') t1 t2.
+Proof.
+  inv SIM. econs; ss.
+  - rewrite app_length. lia.
+  - i. apply ITF. ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+Qed.
+Lemma sim_time_refl
+      ts mem t
+      (TIME: t <= length mem):
+  sim_time ts mem mem t t.
+Proof.
+  econs; ss.
+Qed.
+
 Lemma promise_step_certify
       tid eu1 eu2
       (CERTIFY: certify tid eu2)
@@ -876,69 +910,30 @@ Proof.
       econs; ss.
       + rewrite List.app_length. s. lia.
       + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-    - (* TODO: sim_lc; too clumsy code.. *)
+    - (* sim_lc *)
       { inv WF. inv LOCAL. ss. econs; ss.
-        - econs; ss.
-          + rewrite COH, app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
-        - econs; ss.
-          + rewrite app_length. lia.
-          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
-            generalize (COH loc0). lia.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
         - i. specialize (FWDBANK loc0). des. econs; eauto.
-          + econs; ss.
-            * rewrite FWDBANK.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH. ss.
-            * rewrite FWDBANK.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH, app_length. clear. lia.
-            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-          + econs; ss.
-            * rewrite FWDBANK0, FWDBANK.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH. ss.
-            * rewrite FWDBANK0, FWDBANK.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH, app_length. clear. lia.
-            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+          + apply sim_time_app2. apply sim_time_refl.
+            rewrite FWDBANK, <- COH. apply Memory.latest_ts_spec.
+          + apply sim_view_app2. apply sim_view_refl.
+            rewrite FWDBANK0, FWDBANK, <- COH. apply Memory.latest_ts_spec.
           + apply Memory.read_mon. ss.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. i. des.
           econs. econs; ss.
           + econs; ss.
-            * etrans; eauto.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH. ss.
-            * etrans; eauto.
-              etrans; [by apply Memory.latest_ts_spec|].
-              rewrite COH, app_length. clear. lia.
+            * rewrite x, <- COH. apply Memory.latest_ts_spec.
+            * rewrite x, app_length, <- Time.le_add_r, <- COH. apply Memory.latest_ts_spec.
             * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
           + exploit ExecUnit.read_wf; eauto. lia.
-          + econs; ss.
-            * etrans; eauto.
-            * etrans; eauto. etrans; eauto. rewrite app_length. clear. lia.
-            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+          + apply sim_view_app2. apply sim_view_refl.
+            rewrite x0. apply COH.
         - i. rewrite Promises.set_o. condtac; ss.
           inversion e. subst. lia.
         - i. destruct (Promises.lookup tsp (Local.promises lc1)) eqn:X; ss.
@@ -1026,11 +1021,37 @@ Proof.
       econs; ss.
       + rewrite List.app_length. s. lia.
       + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-    - admit. (* sim_lc *)
+    - (* sim_lc *)
+      { inv WF. inv LOCAL. ss. econs; ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. apply sim_view_app2. apply sim_view_refl. ss.
+        - i. specialize (FWDBANK loc). des. econs; eauto.
+          + apply sim_time_app2. apply sim_time_refl.
+            rewrite FWDBANK, <- COH. apply Memory.latest_ts_spec.
+          + apply sim_view_app2. apply sim_view_refl.
+            rewrite FWDBANK0, FWDBANK, <- COH. apply Memory.latest_ts_spec.
+          + apply Memory.read_mon. ss.
+        - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. i. des.
+          econs. econs; ss.
+          + econs; ss.
+            * rewrite x, <- COH. apply Memory.latest_ts_spec.
+            * rewrite x, app_length, <- Time.le_add_r, <- COH. apply Memory.latest_ts_spec.
+            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+          + exploit ExecUnit.read_wf; eauto. lia.
+          + apply sim_view_app2. apply sim_view_refl.
+            rewrite x0. apply COH.
+        - i. destruct (Promises.lookup tsp (Local.promises lc)) eqn:X; ss.
+          exploit PROMISES0; eauto. lia.
+      }
     - econs; ss. rewrite app_nil_r. ss.
   }
 
   inv CERTIFY. exploit sim_eu_rtc_step; eauto.
   { apply eu_wf_interference; ss. }
   i. des. econs; eauto.
-Admitted.
+Qed.
