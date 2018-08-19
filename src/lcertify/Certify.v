@@ -946,17 +946,17 @@ Proof.
   all: try lia.
   - rewrite COH. lia.
   - exploit FWDBANK; eauto. i. des. esplits; eauto.
-    + admit. (* Memory.latest_ts mon; Help me, Sung-Hwan! *)
+    + rewrite x, Memory.latest_ts_append. ss.
     + apply Memory.read_mon. eauto.
   - exploit EXBANK; eauto. i. des. esplits; eauto.
-    + rewrite x. admit. (* Memory.latest_ts mon; Help me, Sung-Hwan! *)
+    + rewrite x, Memory.latest_ts_append. ss.
     + apply Memory.read_mon. eauto.
   - exploit PROMISES; eauto. lia.
   - apply Memory.get_msg_app_inv in MSG. des.
     + eapply PROMISES0; eauto.
     + apply nth_error_In in MSG0. eapply Forall_forall in INTERFERENCE; eauto.
       subst. destruct (nequiv_dec (Msg.tid msg) (Msg.tid msg)); ss. congr.
-Admitted.
+Qed.
 
 Lemma step_certify
       tid eu1 eu2
