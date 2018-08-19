@@ -872,6 +872,7 @@ Section Local.
           (exists val, Memory.read loc (lc.(fwdbank) loc).(FwdItem.ts) mem = Some val))
       (EXBANK: forall eb, lc.(exbank) = Some eb ->
                      eb.(Exbank.ts) <= Memory.latest_ts eb.(Exbank.loc) (lc.(coh) eb.(Exbank.loc)).(View.ts) mem /\
+                     eb.(Exbank.view).(View.ts) <= (lc.(coh) eb.(Exbank.loc)).(View.ts) /\
                      exists val, Memory.read eb.(Exbank.loc) eb.(Exbank.ts) mem = Some val)
       (PROMISES: forall ts (IN: Promises.lookup ts lc.(promises)), ts <= List.length mem)
       (PROMISES: forall ts msg
@@ -1113,11 +1114,13 @@ Section ExecUnit.
         (*   } *)
         * i. rewrite fun_add_spec in *. destruct ex0.
           { inv H1. ss. condtac; [|congr]. esplits; eauto.
-            desH READ_SPEC. rewrite COH1 at 1. ss.
+            - desH READ_SPEC. rewrite COH1 at 1. ss.
+            - s. apply join_r.
           }
           { exploit EXBANK; eauto. i. des. esplits; eauto.
-            rewrite x0. apply Memory.latest_ts_mon.
-            condtac; ss. inversion e. apply join_l.
+            - rewrite x0. apply Memory.latest_ts_mon.
+              condtac; ss. inversion e. apply join_l.
+            - rewrite x1. condtac; ss. inversion e. rewrite H3. apply join_l.
           }
         * i. eapply PROMISES0; eauto. eapply Time.le_lt_trans; [|by eauto].
           rewrite fun_add_spec. condtac; ss. inversion e. rewrite H2. apply join_l.
@@ -1140,9 +1143,11 @@ Section ExecUnit.
             destruct ts; ss. i. rewrite MSG. ss. eexists. des_ifs. }
         (* * destruct ex0; ss. i. exploit EXBANK; eauto. i. des. rewrite fun_add_spec. splits; eauto. *)
         (*   condtac; ss. inversion e. rewrite H3 in *. etrans; eauto. clear -COH0. lia. *)
-        * destruct ex0; ss. i. exploit EXBANK; eauto. i. des.
-          esplits; eauto. rewrite x, fun_add_spec. condtac; ss. inversion e. rewrite H3.
-          apply Memory.latest_ts_mon. apply Nat.le_lteq. left. ss.
+        * destruct ex0; ss. i. exploit EXBANK; eauto. i. des. esplits; eauto.
+          { rewrite x, fun_add_spec. condtac; ss. inversion e. rewrite H3.
+            apply Memory.latest_ts_mon. apply Nat.le_lteq. left. ss.
+          }
+          { rewrite x0, fun_add_spec. condtac; ss. inversion e. rewrite H3. clear -COH0. lia. }
         * i. revert IN. rewrite Promises.unset_o. condtac; ss. eauto.
         * i. rewrite Promises.unset_o. rewrite fun_add_spec in TS2. condtac.
           { inversion e. subst. rewrite MSG in MSG0. destruct msg. inv MSG0. ss.

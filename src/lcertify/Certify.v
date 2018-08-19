@@ -876,43 +876,69 @@ Proof.
       econs; ss.
       + rewrite List.app_length. s. lia.
       + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-    - { inv WF. inv LOCAL. ss. econs; ss.
+    - (* TODO: sim_lc; too clumsy code.. *)
+      { inv WF. inv LOCAL. ss. econs; ss.
         - econs; ss.
           + rewrite COH, app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - econs; ss.
           + rewrite app_length. lia.
-          + admit.
+          + ii. eapply LAT; eauto. rewrite nth_error_app1; ss.
+            generalize (COH loc0). lia.
         - i. specialize (FWDBANK loc0). des. econs; eauto.
           + econs; ss.
-            * admit.
-            * admit.
-            * admit.
+            * rewrite FWDBANK.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH. ss.
+            * rewrite FWDBANK.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH, app_length. clear. lia.
+            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
           + econs; ss.
-            * admit.
-            * admit.
-            * admit.
+            * rewrite FWDBANK0, FWDBANK.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH. ss.
+            * rewrite FWDBANK0, FWDBANK.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH, app_length. clear. lia.
+            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
           + apply Memory.read_mon. ss.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. i. des.
           econs. econs; ss.
-          + admit.
+          + econs; ss.
+            * etrans; eauto.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH. ss.
+            * etrans; eauto.
+              etrans; [by apply Memory.latest_ts_spec|].
+              rewrite COH, app_length. clear. lia.
+            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
           + exploit ExecUnit.read_wf; eauto. lia.
-          + admit.
+          + econs; ss.
+            * etrans; eauto.
+            * etrans; eauto. etrans; eauto. rewrite app_length. clear. lia.
+            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
         - i. rewrite Promises.set_o. condtac; ss.
           inversion e. subst. lia.
         - i. destruct (Promises.lookup tsp (Local.promises lc1)) eqn:X; ss.
@@ -924,7 +950,7 @@ Proof.
   inv CERTIFY. exploit sim_eu_rtc_step; eauto.
   { eapply ExecUnit.promise_step_wf; eauto. }
   i. des. econs; eauto.
-Admitted.
+Qed.
 
 (* TODO: move *)
 Lemma rmap_wf_interference
