@@ -1393,6 +1393,16 @@ Module Machine.
     - eapply step_promise_step_wf; eauto.
   Qed.
 
+  Lemma rtc_step_step_wf
+        m1 m2
+        (STEP: rtc (step ExecUnit.step) m1 m2)
+        (WF: wf m1):
+    wf m2.
+  Proof.
+    revert WF. induction STEP; ss. i. apply IHSTEP.
+    eapply step_step_wf; eauto.
+  Qed.
+
   Lemma step_mon
         (eustep1 eustep2: _ -> _ -> _ -> Prop)
         (EUSTEP: forall tid m1 m2, eustep1 tid m1 m2 -> eustep2 tid m1 m2):
