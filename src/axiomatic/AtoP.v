@@ -1475,7 +1475,7 @@ Proof.
     - econs. i. unfold RMap.find, RMap.init.
       rewrite IdMap.gempty. ss. apply bot_spec.
     - econs; ss; i; try by apply bot_spec.
-      + esplits; ss.
+      + econs; esplits; ss.
       + destruct ts; ss.
         rewrite Machine.promises_from_mem_spec in IN. des.
         apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.

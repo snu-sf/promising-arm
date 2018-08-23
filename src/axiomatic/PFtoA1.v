@@ -516,7 +516,7 @@ Proof.
       + econs; ss; i; try by apply bot_spec.
         (* * unfold bot. unfold fun_bot. unfold bot. unfold Time.bot. lia. *)
         (* * eexists. unfold bot. unfold fun_bot. unfold Memory.read. ss. *)
-        * esplits; ss.
+        * econs; esplits; ss.
         * destruct ts; ss.
           rewrite Machine.promises_from_mem_spec in IN. des.
           apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
