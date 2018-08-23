@@ -795,8 +795,6 @@ Lemma sim_view_app2
   sim_view ts mem1 (mem2 ++ mem2') v1 v2.
 Proof.
   inv SIM. econs; ss.
-  - rewrite app_length. lia.
-  - i. apply ITF. ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
 Qed.
 Lemma sim_view_refl
       ts mem v
@@ -811,8 +809,6 @@ Lemma sim_time_app2
   sim_time ts mem1 (mem2 ++ mem2') t1 t2.
 Proof.
   inv SIM. econs; ss.
-  - rewrite app_length. lia.
-  - i. apply ITF. ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
 Qed.
 Lemma sim_time_refl
       ts mem t
@@ -839,34 +835,15 @@ Proof.
     inv STEP. inv LOCAL. ss. subst. inv MEM2. subst. econs; ss.
     - econs; ss. econs. ii.
       destruct (IdMap.find id (State.rmap st2)) eqn:FIND; ss. econs.
-      inv WF. ss. inv STATE. exploit RMAP; eauto. unfold RMap.find. rewrite FIND. i.
-      econs; ss.
-      + rewrite List.app_length. s. lia.
-      + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+      inv WF. ss.
     - (* sim_lc *)
       { inv WF. inv LOCAL. ss. econs; ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. specialize (FWDBANK loc0). des. econs; eauto.
-          + apply sim_time_app2. apply sim_time_refl.
-            rewrite FWDBANK, <- COH. apply Memory.latest_ts_spec.
-          + apply sim_view_app2. apply sim_view_refl.
-            rewrite FWDBANK0, FWDBANK, <- COH. apply Memory.latest_ts_spec.
-          + apply Memory.read_mon. ss.
-        - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. i. des.
+        - i. destruct (FWDBANK loc0). des. econs; eauto.
+          + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + erewrite Memory.read_mon; eauto.
+        - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs; ss.
-          + econs; ss.
-            * rewrite x, <- COH. apply Memory.latest_ts_spec.
-            * rewrite x, app_length, <- Time.le_add_r, <- COH. apply Memory.latest_ts_spec.
-            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-          + exploit ExecUnit.read_wf; eauto. lia.
-          + apply sim_view_app2. apply sim_view_refl.
-            rewrite x0. apply COH.
+          ii. eapply EXCLUSIVE; eauto. apply nth_error_app_mon. ss.
         - i. rewrite Promises.set_o. condtac; ss.
           inversion e. subst. lia.
         - i. destruct (Promises.lookup tsp (Local.promises lc1)) eqn:X; ss.
@@ -899,11 +876,11 @@ Proof.
   all: try rewrite app_length.
   all: try lia.
   - rewrite COH. lia.
-  - exploit FWDBANK; eauto. i. des. esplits; eauto.
-    + rewrite x, Memory.latest_ts_append. ss.
+  - destruct (FWDBANK loc). des. econs; esplits; eauto.
+    + rewrite TS, Memory.latest_ts_append. ss.
     + apply Memory.read_mon. eauto.
-  - exploit EXBANK; eauto. i. des. esplits; eauto.
-    + rewrite x, Memory.latest_ts_append. ss.
+  - exploit EXBANK; eauto. intro Y. inv Y. des. econs; esplits; eauto.
+    + rewrite TS, Memory.latest_ts_append. ss.
     + apply Memory.read_mon. eauto.
   - exploit PROMISES; eauto. lia.
   - apply Memory.get_msg_app_inv in MSG. des.
@@ -950,34 +927,15 @@ Proof.
   { econs; ss.
     - econs; ss. econs. ii.
       destruct (IdMap.find id (State.rmap st)) eqn:FIND; ss. econs.
-      inv WF. ss. inv STATE. exploit RMAP; eauto. unfold RMap.find. rewrite FIND. i.
-      econs; ss.
-      + rewrite List.app_length. s. lia.
-      + ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
+      inv WF. ss.
     - (* sim_lc *)
       { inv WF. inv LOCAL. ss. econs; ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. apply sim_view_app2. apply sim_view_refl. ss.
-        - i. specialize (FWDBANK loc). des. econs; eauto.
-          + apply sim_time_app2. apply sim_time_refl.
-            rewrite FWDBANK, <- COH. apply Memory.latest_ts_spec.
-          + apply sim_view_app2. apply sim_view_refl.
-            rewrite FWDBANK0, FWDBANK, <- COH. apply Memory.latest_ts_spec.
-          + apply Memory.read_mon. ss.
-        - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. i. des.
+        - i. destruct (FWDBANK loc). des. econs; eauto.
+          + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + erewrite Memory.read_mon; eauto.
+        - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs; ss.
-          + econs; ss.
-            * rewrite x, <- COH. apply Memory.latest_ts_spec.
-            * rewrite x, app_length, <- Time.le_add_r, <- COH. apply Memory.latest_ts_spec.
-            * ii. eapply LAT; eauto. apply nth_error_app_mon. ss.
-          + exploit ExecUnit.read_wf; eauto. lia.
-          + apply sim_view_app2. apply sim_view_refl.
-            rewrite x0. apply COH.
+          ii. eapply EXCLUSIVE; eauto. apply nth_error_app_mon. ss.
         - i. destruct (Promises.lookup tsp (Local.promises lc)) eqn:X; ss.
           exploit PROMISES0; eauto. lia.
       }
