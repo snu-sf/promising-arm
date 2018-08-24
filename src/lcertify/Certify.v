@@ -1043,8 +1043,12 @@ Proof.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
-          econs. econs; ss.
-          ii. eapply EXCLUSIVE; eauto. apply nth_error_app_mon. ss.
+          econs. econs 1; ss.
+          + rewrite VIEW, COH. ss.
+          + i. exploit lt_le_trans; eauto.
+            i. exploit lt_le_trans; [|apply Memory.latest_ts_spec|]; eauto.
+            i. exploit lt_le_trans; [|apply COH|]; eauto.
+            clear. lia.
         - i. rewrite Promises.set_o. condtac; ss.
           inversion e. subst. lia.
         - i. destruct (Promises.lookup tsp (Local.promises lc1)) eqn:X; ss.
@@ -1135,8 +1139,12 @@ Proof.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
-          econs. econs; ss.
-          ii. eapply EXCLUSIVE; eauto. apply nth_error_app_mon. ss.
+          econs. econs 1; ss.
+          + rewrite VIEW, COH. ss.
+          + i. exploit lt_le_trans; eauto.
+            i. exploit lt_le_trans; [|apply Memory.latest_ts_spec|]; eauto.
+            i. exploit lt_le_trans; [|apply COH|]; eauto.
+            clear. lia.
         - i. destruct (Promises.lookup tsp (Local.promises lc)) eqn:X; ss.
           exploit PROMISES0; eauto. lia.
       }
