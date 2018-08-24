@@ -696,7 +696,7 @@ Proof.
               { intro X. specialize (EX X). des. inv LOCAL. inv EXBANK0; [congr|].
                 rewrite TSX in H. inv H. esplits; eauto.
                 destruct a, eb. ss. i. subst. inv REL. ss.
-                admit. (* ? *)
+                admit. (* exclusive *)
               }
             * unfold Memory.get_msg. s. rewrite nth_error_app2, Nat.sub_diag; ss.
             * rewrite Promises.set_o. condtac; ss. congr.
@@ -712,13 +712,20 @@ Proof.
             * apply sim_view_join; ss.
             * apply sim_view_join; ss. unfold ifc. condtac; ss. admit. (* above *)
             * i. rewrite ? fun_add_spec. condtac; ss.
-              { econs 2; ss.
-                - admit. (* ? *)
-                - admit. (* ? *)
+              { destruct (le_lt_dec 
+                            (join (View.ts (ValA.annot (sem_expr rmap2 eloc)))
+                                  (View.ts (ValA.annot (sem_expr rmap2 eval))))
+                            ts).
+                - econs 1; ss.
+                  + admit. (* above *)
+                  + admit. (* using l *)
+                  + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
+                    admit. (* using l *)
+                - econs 2; ss. rewrite app_length. s. ii. lia.
               }
-              { admit. (* ? *) }
+              { admit. (* sim_fwdbank mon *) }
             * destruct ex0; ss. inv EXBANK; econs; ss. inv REL. econs; ss.
-              admit. (* ? *)
+              admit. (* exclusive mon *)
             * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
               { inversion e. subst. admit. (* above *) }
               condtac.
