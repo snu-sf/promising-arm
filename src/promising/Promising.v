@@ -731,8 +731,8 @@ Section Local.
       (VIEW_VAL: view_val = vval.(ValA.annot))
       (VIEW_EXT: view_ext = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwn);
-                                ifc (OrdW.ge ord OrdW.release) lc1.(vro);
-                                ifc (OrdW.ge ord OrdW.release) lc1.(vwo);
+                                ifc (OrdW.ge ord OrdW.release_pc) lc1.(vro);
+                                ifc (OrdW.ge ord OrdW.release_pc) lc1.(vwo);
                                 ifc (ex && (arch == riscv))
                                     (match lc1.(exbank) with
                                      | Some exbank => exbank.(Exbank.view)

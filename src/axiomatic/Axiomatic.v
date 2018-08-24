@@ -60,6 +60,12 @@ Module Label.
     | _ => false
     end.
 
+  Definition is_release_pc (label:t): bool :=
+    match label with
+    | write _ ord _ _ => OrdW.ge ord OrdW.release_pc
+    | _ => false
+    end.
+
   Definition is_release (label:t): bool :=
     match label with
     | write _ ord _ _ => OrdW.ge ord OrdW.release
@@ -878,7 +884,7 @@ Module Execution.
      po) ∪
 
     (po ⨾
-     ⦗ex.(label_is) Label.is_release⦘) ∪
+     ⦗ex.(label_is) Label.is_release_pc⦘) ∪
 
     (ifc (arch == riscv) ex.(rmw)).
 
