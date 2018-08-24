@@ -142,6 +142,234 @@ Inductive sim_fwdbank (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (fwd1 fwd2:Fw
     (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
 .
 
+Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank.t (A:=unit)): Prop :=
+| sim_exbank_below
+    (BELOW: eb2.(Exbank.view).(View.ts) <= ts)
+    (LOC: eb1.(Exbank.loc) = eb2.(Exbank.loc))
+    (TS1: sim_time ts eb1.(Exbank.ts) eb2.(Exbank.ts))
+    (EXCLUSIVE: ts < eb2.(Exbank.ts) -> Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) ts mem1)
+    (VIEW: eb1.(Exbank.view) = eb2.(Exbank.view))
+| sim_exbank_above
+    (ABOVE: ts < eb2.(Exbank.view).(View.ts))
+    (EXCLUSIVE: Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) ts mem1)
+.
+Hint Constructors sim_exbank.
+
+Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
+| sim_lc_intro
+    (COH: forall loc, sim_view ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
+    (VRN: sim_view ts lc1.(Local.vrn) lc2.(Local.vrn))
+    (VWN: sim_view ts lc1.(Local.vwn) lc2.(Local.vwn))
+    (VRO: sim_view ts lc1.(Local.vro) lc2.(Local.vro))
+    (VWO: sim_view ts lc1.(Local.vwo) lc2.(Local.vwo))
+    (VCAP: sim_view ts lc1.(Local.vcap) lc2.(Local.vcap))
+    (VREL: sim_view ts lc1.(Local.vrel) lc2.(Local.vrel))
+    (FWDBANK: forall loc, sim_fwdbank ts mem1 mem2 loc (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
+    (EXBANK: opt_rel (sim_exbank tid ts mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
+    (PROMISES1: forall tsp (TSP: tsp <= ts), Promises.lookup tsp lc1.(Local.promises) = Promises.lookup tsp lc2.(Local.promises))
+    (PROMISES2: forall tsp (TSP: tsp > ts), Promises.lookup tsp lc1.(Local.promises) = false)
+.
+Hint Constructors sim_lc.
+
+Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
+| sim_eu_intro
+    (STATE: sim_state ts eu1.(ExecUnit.state) eu2.(ExecUnit.state))
+    (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) eu1.(ExecUnit.local) eu2.(ExecUnit.local))
+    (MEM: sim_mem tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
+.
+Hint Constructors sim_eu.
+
+Lemma sim_time_join
+      ts l1 l2 r1 r2
+      (VIEW1: sim_time ts l1 r1)
+      (VIEW2: sim_time ts l2 r2):
+  sim_time ts (join l1 l2) (join r1 r2).
+Proof.
+  inv VIEW1. inv VIEW2. econs.
+  i. rewrite TS, TS0; ss.
+  - rewrite <- H, <- join_r. ss.
+  - rewrite <- H, <- join_l. ss.
+Qed.
+
+Lemma sim_time_eq
+      ts v1 v2
+      (SIM: sim_time ts v1 v2)
+      (V2: v2 <= ts):
+  v1 = v2.
+Proof.
+  apply SIM. ss.
+Qed.
+
+Lemma sim_time_above
+      ts v1 v2
+      (ABOVE: ts < v2):
+  sim_time ts v1 v2.
+Proof.
+  econs. lia.
+Qed.
+
+Lemma sim_val_const
+      ts c:
+  sim_val ts (ValA.mk _ c bot) (ValA.mk _ c bot).
+Proof.
+  econs; splits; ss; try apply bot_spec.
+Qed.
+
+Lemma sim_view_bot
+      ts:
+  sim_view ts bot bot.
+Proof.
+  econs; splits; ss; try apply bot_spec.
+Qed.
+
+Lemma sim_view_const
+      ts c
+      (C1: c <= ts):
+  sim_view ts (View.mk c bot) (View.mk c bot).
+Proof.
+  econs; ss.
+Qed.
+
+Lemma sim_view_join
+      ts l1 l2 r1 r2
+      (VIEW1: sim_view ts l1 r1)
+      (VIEW2: sim_view ts l2 r2):
+  sim_view ts (join l1 l2) (join r1 r2).
+Proof.
+  destruct l1 as [lt1 lv1].
+  destruct l2 as [lt2 lv2].
+  destruct r1 as [rt1 rv1].
+  destruct r2 as [rt2 rv2].
+  inv VIEW1. inv VIEW2. econs; ss.
+  i. rewrite TS, TS0; ss.
+  - rewrite <- H, <- join_r. ss.
+  - rewrite <- H, <- join_l. ss.
+Qed.
+
+Lemma sim_view_ifc
+      ts c l1 r1
+      (VIEW1: sim_view ts l1 r1):
+  sim_view ts (ifc c l1) (ifc c r1).
+Proof.
+  destruct c; ss.
+Qed.
+
+Lemma sim_view_eq
+      ts v1 v2
+      (SIM: sim_view ts v1 v2)
+      (V2: v2.(View.ts) <= ts):
+  v1 = v2.
+Proof.
+  apply SIM. ss.
+Qed.
+
+
+Lemma sim_view_above
+      ts v1 v2
+      (ABOVE: ts < v2.(View.ts)):
+  sim_view ts v1 v2.
+Proof.
+  econs. lia.
+Qed.
+
+Lemma sim_val_view ts v1 v2
+      (VAL: sim_val ts v1 v2):
+  sim_view ts v1.(ValA.annot) v2.(ValA.annot).
+Proof.
+  inv VAL. econs; ss. i. rewrite TS; ss.
+Qed.
+
+Lemma sim_view_val
+      ts c v1 v2
+      (SIM: sim_view ts v1 v2):
+  sim_val ts (ValA.mk _ c v1) (ValA.mk _ c v2).
+Proof.
+  inv SIM. econs; ss. i. rewrite TS; ss.
+Qed.
+
+Lemma sim_val_above
+      ts (v1 v2:ValA.t (A:=View.t (A:=unit)))
+      (ABOVE: ts < v2.(ValA.annot).(View.ts)):
+  sim_val ts v1 v2.
+Proof.
+  econs. lia.
+Qed.
+
+Lemma sim_rmap_expr
+      ts rmap1 rmap2 e
+      (RMAP: sim_rmap ts rmap1 rmap2):
+  sim_val ts (sem_expr rmap1 e) (sem_expr rmap2 e).
+Proof.
+  induction e; s.
+  - apply sim_val_const.
+  - unfold RMap.find. inv RMAP. specialize (RMAP0 reg). inv RMAP0; ss.
+  - inv IHe. econs; ss.
+    i. rewrite TS; ss.
+  - inv IHe1. inv IHe2. econs; ss.
+    + i. rewrite TS, TS0; ss.
+      * rewrite <- H, <- join_r. ss.
+      * rewrite <- H, <- join_l. ss.
+Qed.
+
+Lemma sim_rmap_add
+      ts rmap1 rmap2 v1 v2 r
+      (RMAP: sim_rmap ts rmap1 rmap2)
+      (VAL: sim_val ts v1 v2):
+  sim_rmap ts (RMap.add r v1 rmap1) (RMap.add r v2 rmap2).
+Proof.
+  inv RMAP. econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
+  condtac; ss. inversion e. subst. econs. ss.
+Qed.
+
+Lemma sim_mem_read
+      tid ts mem1 mem2 loc ts0
+      (SIM: sim_mem tid ts mem1 mem2)
+      (TS0: ts0 <= ts):
+  Memory.read loc ts0 mem1 = Memory.read loc ts0 mem2.
+Proof.
+  inv SIM. unfold Memory.read. destruct ts0; ss. rewrite ? nth_error_app1; ss.
+Qed.
+
+Lemma sim_mem_get_msg
+      tid ts mem1 mem2 ts0
+      (SIM: sim_mem tid ts mem1 mem2)
+      (TS0: ts0 <= ts):
+  Memory.get_msg ts0 mem1 = Memory.get_msg ts0 mem2.
+Proof.
+  inv SIM. unfold Memory.get_msg. destruct ts0; ss. rewrite ? nth_error_app1; ss.
+Qed.
+
+Lemma sim_mem_length
+      tid ts mem1 mem2
+      (SIM: sim_mem tid ts mem1 mem2):
+  ts <= length mem1 /\ ts <= length mem2.
+Proof.
+  inv SIM. rewrite ? app_length. lia.
+Qed.
+
+Lemma sim_mem1_exclusive
+      tid ts loc from to mem1 mem2
+      (MEM: sim_mem tid ts mem1 mem2)
+      (EXCLUSIVE: Memory.exclusive tid loc from ts mem1):
+  Memory.exclusive tid loc from to mem1.
+Proof.
+  ii. destruct (le_lt_dec (S ts0) ts).
+  - eapply EXCLUSIVE; eauto.
+  - inv MEM. rewrite nth_error_app2 in MSG; [|lia].
+    apply nth_error_In in MSG. eapply Forall_forall in MSG; eauto. ss.
+    des. subst. ss.
+Qed.
+
+Lemma sim_mem_exclusive
+      tid ts loc from to mem1 mem2
+      (MEM: sim_mem tid ts mem1 mem2)
+      (TS: to <= ts)
+      (EXCLUSIVE: Memory.exclusive tid loc from to mem2):
+  Memory.exclusive tid loc from to mem1.
+Proof.
+  ii. eapply EXCLUSIVE; eauto. inv MEM. rewrite nth_error_app1 in *; try lia. ss.
+Qed.
+
 (* TODO: move many lemmas *)
 (* TODO: move *)
 Ltac des_eq :=
@@ -237,186 +465,6 @@ Proof.
   ii. eapply LATEST; eauto. lia.
 Qed.
 
-Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank.t (A:=unit)): Prop :=
-| sim_exbank_below
-    (BELOW: eb2.(Exbank.view).(View.ts) <= ts)
-    (LOC: eb1.(Exbank.loc) = eb2.(Exbank.loc))
-    (TS1: sim_time ts eb1.(Exbank.ts) eb2.(Exbank.ts))
-    (EXCLUSIVE: ts < eb2.(Exbank.ts) -> Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) ts mem1)
-    (VIEW: eb1.(Exbank.view) = eb2.(Exbank.view))
-| sim_exbank_above
-    (ABOVE: ts < eb2.(Exbank.view).(View.ts))
-    (EXCLUSIVE: Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) ts mem1)
-.
-Hint Constructors sim_exbank.
-
-Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
-| sim_lc_intro
-    (COH: forall loc, sim_view ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
-    (VRN: sim_view ts lc1.(Local.vrn) lc2.(Local.vrn))
-    (VWN: sim_view ts lc1.(Local.vwn) lc2.(Local.vwn))
-    (VRO: sim_view ts lc1.(Local.vro) lc2.(Local.vro))
-    (VWO: sim_view ts lc1.(Local.vwo) lc2.(Local.vwo))
-    (VCAP: sim_view ts lc1.(Local.vcap) lc2.(Local.vcap))
-    (VREL: sim_view ts lc1.(Local.vrel) lc2.(Local.vrel))
-    (FWDBANK: forall loc, sim_fwdbank ts mem1 mem2 loc (lc1.(Local.fwdbank) loc) (lc2.(Local.fwdbank) loc))
-    (EXBANK: opt_rel (sim_exbank tid ts mem1 mem2) lc1.(Local.exbank) lc2.(Local.exbank))
-    (PROMISES1: forall tsp (TSP: tsp <= ts), Promises.lookup tsp lc1.(Local.promises) = Promises.lookup tsp lc2.(Local.promises))
-    (PROMISES2: forall tsp (TSP: tsp > ts), Promises.lookup tsp lc1.(Local.promises) = false)
-.
-Hint Constructors sim_lc.
-
-Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
-| sim_eu_intro
-    (STATE: sim_state ts eu1.(ExecUnit.state) eu2.(ExecUnit.state))
-    (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) eu1.(ExecUnit.local) eu2.(ExecUnit.local))
-    (MEM: sim_mem tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
-.
-Hint Constructors sim_eu.
-
-Lemma sim_time_join
-      ts l1 l2 r1 r2
-      (VIEW1: sim_time ts l1 r1)
-      (VIEW2: sim_time ts l2 r2):
-  sim_time ts (join l1 l2) (join r1 r2).
-Proof.
-  inv VIEW1. inv VIEW2. econs.
-  i. rewrite TS, TS0; ss.
-  - rewrite <- H, <- join_r. ss.
-  - rewrite <- H, <- join_l. ss.
-Qed.
-
-Lemma sim_time_eq
-      ts v1 v2
-      (SIM: sim_time ts v1 v2)
-      (V2: v2 <= ts):
-  v1 = v2.
-Proof.
-  apply SIM. ss.
-Qed.
-
-Lemma sim_val_const
-      ts c:
-  sim_val ts (ValA.mk _ c bot) (ValA.mk _ c bot).
-Proof.
-  econs; splits; ss; try apply bot_spec.
-Qed.
-
-Lemma sim_view_bot
-      ts:
-  sim_view ts bot bot.
-Proof.
-  econs; splits; ss; try apply bot_spec.
-Qed.
-
-Lemma sim_view_const
-      ts c
-      (C1: c <= ts):
-  sim_view ts (View.mk c bot) (View.mk c bot).
-Proof.
-  econs; ss.
-Qed.
-
-Lemma sim_view_join
-      ts l1 l2 r1 r2
-      (VIEW1: sim_view ts l1 r1)
-      (VIEW2: sim_view ts l2 r2):
-  sim_view ts (join l1 l2) (join r1 r2).
-Proof.
-  destruct l1 as [lt1 lv1].
-  destruct l2 as [lt2 lv2].
-  destruct r1 as [rt1 rv1].
-  destruct r2 as [rt2 rv2].
-  inv VIEW1. inv VIEW2. econs; ss.
-  i. rewrite TS, TS0; ss.
-  - rewrite <- H, <- join_r. ss.
-  - rewrite <- H, <- join_l. ss.
-Qed.
-
-Lemma sim_view_ifc
-      ts c l1 r1
-      (VIEW1: sim_view ts l1 r1):
-  sim_view ts (ifc c l1) (ifc c r1).
-Proof.
-  destruct c; ss.
-Qed.
-
-Lemma sim_view_eq
-      ts v1 v2
-      (SIM: sim_view ts v1 v2)
-      (V2: v2.(View.ts) <= ts):
-  v1 = v2.
-Proof.
-  apply SIM. ss.
-Qed.
-
-Lemma sim_val_view ts v1 v2
-      (VAL: sim_val ts v1 v2):
-  sim_view ts v1.(ValA.annot) v2.(ValA.annot).
-Proof.
-  inv VAL. econs; ss. i. rewrite TS; ss.
-Qed.
-
-Lemma sim_rmap_expr
-      ts rmap1 rmap2 e
-      (RMAP: sim_rmap ts rmap1 rmap2):
-  sim_val ts (sem_expr rmap1 e) (sem_expr rmap2 e).
-Proof.
-  induction e; s.
-  - apply sim_val_const.
-  - unfold RMap.find. inv RMAP. specialize (RMAP0 reg). inv RMAP0; ss.
-  - inv IHe. econs; ss.
-    i. rewrite TS; ss.
-  - inv IHe1. inv IHe2. econs; ss.
-    + i. rewrite TS, TS0; ss.
-      * rewrite <- H, <- join_r. ss.
-      * rewrite <- H, <- join_l. ss.
-Qed.
-
-Lemma sim_rmap_add
-      ts rmap1 rmap2 v1 v2 r
-      (RMAP: sim_rmap ts rmap1 rmap2)
-      (VAL: sim_val ts v1 v2):
-  sim_rmap ts (RMap.add r v1 rmap1) (RMap.add r v2 rmap2).
-Proof.
-  inv RMAP. econs. ii. unfold RMap.add. rewrite ? IdMap.add_spec.
-  condtac; ss. inversion e. subst. econs. ss.
-Qed.
-
-Lemma sim_mem_read
-      tid ts mem1 mem2 loc ts0
-      (SIM: sim_mem tid ts mem1 mem2)
-      (TS0: ts0 <= ts):
-  Memory.read loc ts0 mem1 = Memory.read loc ts0 mem2.
-Proof.
-  inv SIM. unfold Memory.read. destruct ts0; ss. rewrite ? nth_error_app1; ss.
-Qed.
-
-Lemma sim_mem_get_msg
-      tid ts mem1 mem2 ts0
-      (SIM: sim_mem tid ts mem1 mem2)
-      (TS0: ts0 <= ts):
-  Memory.get_msg ts0 mem1 = Memory.get_msg ts0 mem2.
-Proof.
-  inv SIM. unfold Memory.get_msg. destruct ts0; ss. rewrite ? nth_error_app1; ss.
-Qed.
-
-Lemma sim_mem_length
-      tid ts mem1 mem2
-      (SIM: sim_mem tid ts mem1 mem2):
-  ts <= length mem1 /\ ts <= length mem2.
-Proof.
-  inv SIM. rewrite ? List.app_length. splits; lia.
-Qed.
-
-Lemma sim_view_val
-      ts c v1 v2
-      (SIM: sim_view ts v1 v2):
-  sim_val ts (ValA.mk _ c v1) (ValA.mk _ c v2).
-Proof.
-  inv SIM. econs; ss. i. rewrite TS; ss.
-Qed.
-
 Lemma Memory_no_msgs_split
       a b c pred mem
       (AB: a <= b)
@@ -452,29 +500,6 @@ Lemma Memory_no_msgs_full
 Proof.
   ii. eapply NOMSGS; eauto.
   rewrite nth_error_app1 in MSG; ss.
-Qed.
-
-Lemma sim_mem1_exclusive
-      tid ts loc from to mem1 mem2
-      (MEM: sim_mem tid ts mem1 mem2)
-      (EXCLUSIVE: Memory.exclusive tid loc from ts mem1):
-  Memory.exclusive tid loc from to mem1.
-Proof.
-  ii. destruct (le_lt_dec (S ts0) ts).
-  - eapply EXCLUSIVE; eauto.
-  - inv MEM. rewrite nth_error_app2 in MSG; [|lia].
-    apply nth_error_In in MSG. eapply Forall_forall in MSG; eauto. ss.
-    des. subst. ss.
-Qed.
-
-Lemma sim_mem_exclusive
-      tid ts loc from to mem1 mem2
-      (MEM: sim_mem tid ts mem1 mem2)
-      (TS: to <= ts)
-      (EXCLUSIVE: Memory.exclusive tid loc from to mem2):
-  Memory.exclusive tid loc from to mem1.
-Proof.
-  ii. eapply EXCLUSIVE; eauto. inv MEM. rewrite nth_error_app1 in *; try lia. ss.
 Qed.
 
 Lemma sim_eu_step
@@ -528,7 +553,7 @@ Proof.
               inv TS1. rewrite TS0 in *; ss.
               eapply sim_mem_exclusive; eauto.
               eapply Memory_no_msgs_weaken; [|by apply EX0; ss].
-              inv MEM. rewrite app_length. clear. lia.
+              exploit sim_mem_length; eauto. clear. lia.
             - ii. replace ts2 with (length mem1) in * by (clear -TS1 TS2; lia).
               rewrite nth_error_app2, Nat.sub_diag in MSG0; ss. inv MSG0. des. ss.
           }
@@ -537,16 +562,17 @@ Proof.
     - inv MEM2. inv WRITABLE. ss.
       econs; ss.
       + econs; ss. apply sim_rmap_add; ss. econs; ss.
-        unfold ifc. condtac; ss. intro Y. clear -Y MEM.
-        inv MEM. rewrite app_length in Y. lia.
-      + inv LOCAL. econs; ss.
+        unfold ifc. condtac; ss. intro Y. clear -Y MEM. exfalso.
+        exploit sim_mem_length; eauto. lia.
+      + exploit sim_mem_length; eauto. intro LEN. des.
+        inv LOCAL. econs; ss.
         * i. rewrite ? fun_add_spec. condtac; ss.
-          admit. (* above *)
+          apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
-          admit. (* above *)
+          apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
         * apply sim_view_join; ss. unfold ifc. condtac; ss.
-          admit. (* above *)
+          apply sim_view_above. s. clear -LEN0. lia.
         * i. rewrite ? fun_add_spec. condtac; ss.
           { destruct (le_lt_dec
                         (join (View.ts (ValA.annot (sem_expr rmap2 eloc)))
@@ -554,22 +580,22 @@ Proof.
                       ts).
             - econs 1; ss.
               + rewrite TS. ss.
-              + admit. (* above *)
+              + apply sim_time_above. s. clear -LEN0. lia.
               + admit. (* using l *)
               + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
                 condtac; ss. admit. (* using l *)
             - econs 2; ss.
               + rewrite TS. ss.
-              + admit. (* above *)
+              + apply sim_time_above. s. clear -LEN0. lia.
               + rewrite app_length. s. ii. lia.
           }
           { admit. (* sim_fwdbank mon *) }
         * destruct ex; ss. inv EXBANK; econs; ss.
           admit. (* sim_exbank mon *)
         * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
-          { inversion e. subst. admit. (* above *) }
+          { inversion e. subst. clear -LEN TSP. lia. }
           condtac.
-          { inversion e. subst. admit. (* above *) }
+          { inversion e. subst. clear -LEN0 TSP. lia. }
           apply PROMISES1. ss.
         * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss. eauto.
       + inv MEM. ss. econs.
@@ -622,18 +648,13 @@ Proof.
               admit. (* easy *)
             * admit. (* easy *)
         - econs; ss.
-          + econs; ss. apply sim_rmap_add; ss.
-            admit. (* POST_ABOVE *)
+          + econs; ss. apply sim_rmap_add; ss. apply sim_val_above. ss.
           + econs; ss.
             * i. rewrite ? fun_add_spec. condtac; ss.
-              apply sim_view_join; ss.
-              admit. (* POST_ABOVE *)
-            * apply sim_view_join; ss. apply sim_view_ifc; ss.
-              admit. (* POST_ABOVE *)
-            * apply sim_view_join; ss. apply sim_view_ifc; ss.
-              admit. (* POST_ABOVE *)
-            * apply sim_view_join; ss.
-              admit. (* POST_ABOVE *)
+              apply sim_view_join; ss. apply sim_view_above. ss.
+            * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
+            * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
+            * apply sim_view_join; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss.
             * destruct ex0; ss. econs. econs 2; ss.
               ii. des. eapply Memory.latest_ts_latest; eauto.
@@ -805,10 +826,10 @@ Proof.
           + econs; ss. apply sim_rmap_add; ss. econs; ss.
             unfold ifc. condtac; ss. intro Y. clear -Y TS0. lia.
           + inv LOCAL. econs; ss.
-            * i. rewrite ? fun_add_spec. condtac; ss. admit. (* above *)
-            * apply sim_view_join; ss. admit. (* above *)
+            * i. rewrite ? fun_add_spec. condtac; ss. apply sim_view_above. ss.
+            * apply sim_view_join; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss.
-            * apply sim_view_join; ss. unfold ifc. condtac; ss. admit. (* above *)
+            * apply sim_view_join; ss. unfold ifc. condtac; ss. apply sim_view_above. ss.
             * i. rewrite ? fun_add_spec. condtac; ss.
               { inversion e. subst.
                 destruct (le_lt_dec (View.ts (ValA.annot (sem_expr rmap2 eval))) ts).
@@ -816,7 +837,7 @@ Proof.
                   intro Y. inv Y. exploit TS; ss. clear TS. intro EVAL. rewrite <- EVAL in *.
                   econs 1; ss.
                   + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
-                  + admit. (* above *)
+                  + apply sim_time_above. ss.
                   + symmetry. erewrite Memory.get_msg_read; eauto.
                     unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
                 - econs 2; ss.
