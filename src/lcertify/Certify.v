@@ -651,7 +651,53 @@ Proof.
           * rewrite Promises.unset_o. condtac; ss. eauto.
       }
       { (* fulfilling a new promise > ts (only in tgt) *)
-        admit.
+        rename l into TS0.
+        eexists (ExecUnit.mk _ _ _). esplits.
+        - econs 2. econs; ss.
+          + econs; ss.
+          + econs; ss.
+            * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
+              { eapply le_lt_trans; [|ss]. apply COH. }
+              { eapply le_lt_trans; [|ss]. s. admit. (* easy *) }
+              { intro X. specialize (EX X). des. inv LOCAL. inv EXBANK0; [congr|].
+                rewrite TSX in H. inv H. esplits; eauto.
+                destruct a, eb. ss. i. subst. inv REL. ss.
+                admit. (* ? *)
+              }
+            * unfold Memory.get_msg. s. rewrite nth_error_app2, Nat.sub_diag; ss.
+            * rewrite Promises.set_o. condtac; ss. congr.
+        - inv WRITABLE. ss.
+          exploit sim_rmap_expr; eauto. i. inv x1. rewrite TS in *; cycle 1.
+          { rewrite <- VCAP. apply join_r. }
+          econs; ss.
+          + econs; ss. apply sim_rmap_add; ss. econs; ss.
+            unfold ifc. condtac; ss. intro Y. clear -Y TS0. lia.
+          + inv LOCAL. econs; ss.
+            * i. rewrite ? fun_add_spec. condtac; ss. admit. (* above *)
+            * apply sim_view_join; ss. admit. (* above *)
+            * apply sim_view_join; ss.
+            * apply sim_view_join; ss. unfold ifc. condtac; ss. admit. (* above *)
+            * i. rewrite ? fun_add_spec. condtac; ss.
+              { econs 2; ss.
+                - admit. (* ? *)
+                - admit. (* ? *)
+              }
+              { admit. (* ? *) }
+            * destruct ex0; ss. inv EXBANK; econs; ss. inv REL. econs; ss.
+              admit. (* ? *)
+            * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
+              { inversion e. subst. admit. (* above *) }
+              condtac.
+              { inversion e. subst. admit. (* above *) }
+              apply PROMISES1. ss.
+            * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss. eauto.
+          + inv MEM. ss. econs.
+            * ss.
+            * rewrite <- app_assoc. ss.
+            * ss.
+            * apply Forall_forall. i. apply in_app_iff in H. des.
+              { eapply Forall_forall in MEM1'; eauto. }
+              { inv H; ss. }
       }
     - (* write_failure *)
       inv STEP. eexists (ExecUnit.mk _ _ _). esplits.
