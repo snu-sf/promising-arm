@@ -77,6 +77,7 @@ End OrdR.
 Module OrdW.
   Inductive t :=
   | pln
+  | release_pc
   | release
   .
   Hint Constructors t.
@@ -85,6 +86,8 @@ Module OrdW.
     match a, b with
     | release, _ => true
     | _, release => false
+    | release_pc, _ => true
+    | _, release_pc => false
     | pln, pln => true
     end.
 End OrdW.

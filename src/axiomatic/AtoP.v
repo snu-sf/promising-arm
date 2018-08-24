@@ -865,7 +865,7 @@ Proof.
           - eapply sim_local_vwn_spec; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
-        { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
+        { destruct (OrdW.ge ord OrdW.release_pc) eqn:ORD; s; cycle 1.
           { apply bot_spec. }
           generalize SIM_LOCAL.(VRO). intro X. inv X.
           { rewrite VIEW2. apply bot_spec. }
@@ -875,7 +875,7 @@ Proof.
             right. left. right. econs. splits; eauto. econs; eauto.
           - econs; eauto. apply Label.write_is_writing.
         }
-        { destruct (OrdW.ge ord OrdW.release) eqn:ORD; s; cycle 1.
+        { destruct (OrdW.ge ord OrdW.release_pc) eqn:ORD; s; cycle 1.
           { apply bot_spec. }
           generalize SIM_LOCAL.(VWO). intro X. inv X.
           { rewrite VIEW2. apply bot_spec. }
