@@ -574,19 +574,19 @@ Proof.
         * apply sim_view_join; ss. unfold ifc. condtac; ss.
           apply sim_view_above. s. clear -LEN0. lia.
         * i. rewrite ? fun_add_spec. condtac; ss.
-          { destruct (le_lt_dec
-                        (join (View.ts (ValA.annot (sem_expr rmap2 eloc)))
-                              (View.ts (ValA.annot (sem_expr rmap2 eval))))
-                      ts).
-            - econs 1; ss.
-              + rewrite TS. ss.
-              + apply sim_time_above. s. clear -LEN0. lia.
-              + admit. (* using l *)
-              + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
-                condtac; ss. admit. (* using l *)
+          { inversion e. subst.
+            destruct (le_lt_dec (View.ts (ValA.annot (sem_expr rmap2 eval))) ts).
+            - exploit sim_rmap_expr; eauto. instantiate (1 := eval).
+              intro Y. inv Y. exploit TS0; ss. clear TS0. intro EVAL. rewrite <- EVAL in *.
+              econs 1; ss.
+              + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
+              + apply sim_time_above. clear -LEN0. lia.
+              + symmetry. erewrite Memory.get_msg_read; eauto.
+                unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
+                condtac; ss.
             - econs 2; ss.
-              + rewrite TS. ss.
-              + apply sim_time_above. s. clear -LEN0. lia.
+              + eapply lt_le_trans; eauto. apply join_r.
+              + apply sim_time_above. clear -LEN0. lia.
               + rewrite app_length. s. ii. lia.
           }
           { admit. (* sim_fwdbank mon *) }
@@ -679,7 +679,11 @@ Proof.
             econs 2; eauto. econs; ss; cycle 2.
             * destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
               { rewrite READ. eauto. }
-              { admit. (* contradiction from POST_BELOW and ABOVE *) }
+              { exploit (Local.fwd_view_le (A:=unit)); try by apply WF2.
+                all: s; eauto.
+                instantiate (1 := ord). rewrite POST in POST_BELOW. clear -POST_BELOW ABOVE.
+                ss. unfold join, Time.join in *. lia.
+              }
             * destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
               { admit.
                 (* 1. if lc2.coh <= ts, then obvious. *)
@@ -700,7 +704,18 @@ Proof.
                 - ii. des. eapply LATEST0; eauto. rewrite TS2.
                   inv MEM. rewrite app_length. clear. lia.
               }
-              { admit. (* sim_view -> equal *) }
+              { Lemma sim_view_below
+                      ts v1 v2
+                      (SIM: sim_view ts v1 v2)
+                      (BELOW: v2.(View.ts) <= ts):
+                  v1 = v2.
+                Proof.
+                  apply SIM. ss.
+                Qed.
+
+                eapply sim_view_below; eauto. rewrite POST.
+                eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
+              }
       }
       { (* Case 3: Tgt didn't read from fwdbank. Src reads the same msg. *)
         assert (BELOW: ts0 <= ts).
@@ -736,7 +751,9 @@ Proof.
               rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * destruct ex0; ss. econs. econs; ss.
               { clear. ii. lia. }
-              { admit. (* sim_view -> equal *) }
+              { eapply sim_view_below; eauto. rewrite POST.
+                eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
+              }
       }
     - (* fulfill *)
       inv STEP. ss.
@@ -800,7 +817,15 @@ Proof.
           + econs; ss.
             * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
               { eapply le_lt_trans; [|ss]. apply COH. }
-              { eapply le_lt_trans; [|ss]. s. admit. (* easy *) }
+              { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
+                all: unfold ifc.
+                all: try condtac; ss.
+                all: try apply bot_spec.
+                - apply ExecUnit.expr_wf. ss.
+                - apply ExecUnit.expr_wf. ss.
+                - destruct lc1; ss. destruct exbank; [|by apply bot_spec].
+                  exploit EXBANK; eauto. intro Y. inv Y. rewrite VIEW. ss.
+              }
               { intro X. specialize (EX X). des. inv LOCAL. inv EXBANK0; [congr|].
                 rewrite TSX in H. inv H. esplits; eauto.
                 destruct a, eb. ss. i. subst.
