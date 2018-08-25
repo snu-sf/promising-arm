@@ -1106,6 +1106,8 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc0). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + exploit Memory.latest_ts_spec; eauto. i. des.
+            rewrite LE, COH in TS. clear -TS H. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
@@ -1202,6 +1204,8 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + exploit Memory.latest_ts_spec; eauto. i. des.
+            rewrite LE, COH in TS. clear -TS H. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
