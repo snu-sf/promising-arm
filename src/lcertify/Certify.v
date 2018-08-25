@@ -130,12 +130,14 @@ Hint Constructors sim_mem.
 
 Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (fwd1 fwd2:FwdItem.t (A:=unit)): Prop :=
 | sim_fwdbank_below
+    val
     (BELOW: fwd2.(FwdItem.view).(View.ts) <= ts)
     (TS: sim_time ts fwd1.(FwdItem.ts) fwd2.(FwdItem.ts))
     (EXCLUSIVE: ts < fwd2.(FwdItem.ts) -> Memory.exclusive tid loc fwd1.(FwdItem.ts) ts mem1)
     (VIEW: fwd1.(FwdItem.view) = fwd2.(FwdItem.view))
     (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
-    (READ: Memory.read loc fwd1.(FwdItem.ts) mem1 = Memory.read loc fwd2.(FwdItem.ts) mem2)
+    (READ1: Memory.read loc fwd1.(FwdItem.ts) mem1 = Some val)
+    (READ2: Memory.read loc fwd2.(FwdItem.ts) mem2 = Some val)
 | sim_fwdbank_above
     (ABOVE: ts < fwd2.(FwdItem.view).(View.ts))
     (TS: sim_time ts fwd1.(FwdItem.ts) fwd2.(FwdItem.ts))
@@ -590,17 +592,62 @@ Proof.
                   ii. lia.
                 Qed.
                 i. apply Memory_ge_no_msgs. clear -LEN. lia.
-              + symmetry. erewrite Memory.get_msg_read; eauto.
-                unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
+              + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
                 condtac; ss.
+              + eapply Memory.get_msg_read; eauto.
             - econs 2; ss.
               + eapply lt_le_trans; eauto. apply join_r.
               + apply sim_time_above. clear -LEN0. lia.
               + rewrite app_length. s. ii. lia.
           }
-          { admit. (* sim_fwdbank mon *) }
+          { Lemma sim_fwdbank_mon
+                  tid ts mem1 mem2 loc fwd1 fwd2 mem1' mem2'
+                  (MEM: sim_mem tid ts mem1 mem2)
+                  (SIM: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
+                  (FWD1: fwd1.(FwdItem.ts) <= length mem1)
+                  (MEM1': Forall (fun msg => msg.(Msg.loc) <> loc) mem1'):
+              sim_fwdbank tid ts (mem1 ++ mem1') (mem2 ++ mem2') loc fwd1 fwd2.
+            Proof.
+              inv SIM.
+              - econs 1; ss.
+                + i. eapply Memory_no_msgs_weaken.
+                  * instantiate (1 := length mem1).
+                    exploit sim_mem_length; eauto. clear. lia.
+                  * rewrite app_nil_r. eapply Memory_no_msgs_full.
+                    eapply sim_mem1_exclusive; eauto.
+                + apply Memory.read_mon. eauto.
+                + apply Memory.read_mon. eauto.
+              - econs 2; ss. eapply Memory_no_msgs_split; eauto.
+                { rewrite app_length. clear. lia. }
+                splits.
+                + apply Memory_no_msgs_full. ss.
+                + ii. subst. rewrite nth_error_app2 in MSG; [|lia].
+                  apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto.
+                  destruct (nequiv_dec (Msg.loc msg) (Msg.loc msg)); ss. congr.
+            Qed.
+
+            apply sim_fwdbank_mon; ss.
+            - inv WF1. ss. inv LOCAL. destruct (FWDBANK0 loc). des.
+              rewrite TS0, <- COH1. apply Memory.latest_ts_spec.
+            - econs; ss. destruct (nequiv_dec (ValA.val (sem_expr rmap1 eloc)) loc); ss. congr.
+          }
         * destruct ex; ss. inv EXBANK; econs; ss.
-          admit. (* sim_exbank mon *)
+
+          Lemma sim_exbank_mon
+                tid ts mem1 mem2 eb1 eb2 mem1' mem2'
+                (MEM: sim_mem tid ts mem1 mem2)
+                (SIM: sim_exbank tid ts mem1 mem2 eb1 eb2):
+            sim_exbank tid ts (mem1 ++ mem1') (mem2 ++ mem2') eb1 eb2.
+          Proof.
+            exploit sim_mem_length; eauto. i. des.
+            inv SIM.
+            - econs 1; ss. ii. eapply EXCLUSIVE; eauto.
+              rewrite nth_error_app1 in MSG; ss. lia.
+            - econs 2; ss. ii. eapply EXCLUSIVE; eauto.
+              rewrite nth_error_app1 in MSG; ss. lia.
+          Qed.
+
+          apply sim_exbank_mon; ss.
         * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
           { inversion e. subst. clear -LEN TSP. lia. }
           condtac.
@@ -695,7 +742,7 @@ Proof.
           + rewrite ELOC in *.
             econs 2; eauto. econs; ss; cycle 2.
             * destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
-              { rewrite READ. eauto. }
+              { rewrite READ1, <- READ2. eauto. }
               { exploit (Local.fwd_view_le (A:=unit)); try by apply WF2.
                 all: s; eauto.
                 instantiate (1 := ord). rewrite POST in POST_BELOW. clear -POST_BELOW ABOVE.
@@ -822,7 +869,8 @@ Proof.
           * inversion e. subst. econs; ss.
             { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
             { i. eapply Memory_ge_no_msgs. clear -H. lia. }
-            { eapply sim_mem_read; eauto. }
+            { erewrite sim_mem_read; eauto. eapply Memory.get_msg_read; eauto. }
+            { eapply Memory.get_msg_read; eauto. }
           * rewrite ? Promises.unset_o. condtac; ss. eauto.
           * rewrite Promises.unset_o. condtac; ss. eauto.
       }
@@ -882,16 +930,22 @@ Proof.
                   + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
                   + apply sim_time_above. ss.
                   + i. apply Memory_ge_no_msgs. clear -LEN. lia.
-                  + symmetry. erewrite Memory.get_msg_read; eauto.
-                    unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
+                  + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
+                  + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
                   + eapply lt_le_trans; eauto. apply join_r.
                   + clear -TS0. econs. lia.
                   + rewrite app_length. s. ii. lia.
               }
-              { admit. (* sim_fwdbank mon *) }
+              { exploit sim_fwdbank_mon; try exact MEM; cycle 3.
+                - rewrite (@app_nil_r _ mem2). eauto.
+                - ss.
+                - inv WF1. ss. inv LOCAL. destruct (FWDBANK0 loc). des.
+                  rewrite TS, <- COH1. apply Memory.latest_ts_spec.
+                - econs; ss. destruct (nequiv_dec (ValA.val (sem_expr rmap1 eloc)) loc); ss. congr.
+              }
             * destruct ex0; ss. inv EXBANK; econs; ss.
-              admit. (* exclusive mon *)
+              exploit sim_exbank_mon; eauto. rewrite (@app_nil_r _ mem2). eauto.
             * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
               { inversion e. subst. clear -TSP MEM. inv MEM. rewrite app_length in TSP. lia. }
               condtac.
