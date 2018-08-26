@@ -348,6 +348,72 @@ Module Memory.
     - inv LE; eauto.
       unfold read in READ. ss. rewrite Heq in READ. inv READ.
   Qed.
+
+  Lemma no_msgs_split
+        a b c pred mem
+        (AB: a <= b)
+        (BC: b <= c):
+    no_msgs a c pred mem <->
+    no_msgs a b pred mem /\ no_msgs b c pred mem.
+  Proof.
+    econs; intro X.
+    - split; ii; eapply X; try exact MSG; ss.
+      + lia.
+      + lia.
+    - des. ii.  destruct (le_lt_dec (S ts) b).
+      + eapply X; eauto.
+      + eapply X0; eauto.
+  Qed.
+
+
+  Lemma no_msgs_weaken
+        a b c pred mem1 mem2
+        (BC: b <= c)
+        (NOMSGS: no_msgs a c pred (mem1 ++ mem2)):
+    no_msgs a b pred mem1.
+  Proof.
+    ii. eapply NOMSGS; eauto.
+    - lia.
+    - rewrite nth_error_app1; ss. apply nth_error_Some. congr.
+  Qed.
+
+  Lemma no_msgs_full
+        a pred mem1 mem2
+        (NOMSGS: no_msgs a (length mem1) pred mem1):
+    no_msgs a (length mem1) pred (mem1 ++ mem2).
+  Proof.
+    ii. eapply NOMSGS; eauto.
+    rewrite nth_error_app1 in MSG; ss.
+  Qed.
+
+  Lemma ge_no_msgs
+        ts1 ts2 pred mem
+        (GE: ts2 <= ts1):
+    no_msgs ts1 ts2 pred mem.
+  Proof.
+    ii. lia.
+  Qed.
+
+  Lemma latest_uniq
+        ts1 ts2 ts loc mem val1 val2
+        (TS1: ts1 <= ts)
+        (TS2: ts2 <= ts)
+        (LATEST1: latest loc ts1 ts mem)
+        (LATEST2: latest loc ts2 ts mem)
+        (MSG1: read loc ts1 mem = Some val1)
+        (MSG2: read loc ts2 mem = Some val2):
+    ts1 = ts2.
+  Proof.
+    destruct (Nat.lt_trichotomy ts1 ts2); des; ss.
+    - destruct ts2; [lia|]. exfalso.
+      revert MSG2. unfold read. s. destruct (nth_error mem ts2) eqn:NTH; ss.
+      condtac; ss. inversion e. subst. i. inv MSG2.
+      eapply LATEST1; eauto.
+    - destruct ts1; [lia|]. exfalso.
+      revert MSG1. unfold read. s. destruct (nth_error mem ts1) eqn:NTH; ss.
+      condtac; ss. inversion e. subst. i. inv MSG1.
+      eapply LATEST2; eauto.
+  Qed.
 End Memory.
 
 Module View.
@@ -969,6 +1035,29 @@ Section Local.
         apply Memory.latest_join; ss.
         apply Memory.ge_latest. etrans; eauto.
   Qed.
+
+  Lemma interference_wf
+        tid (lc:t) mem mem_interference
+        (INTERFERENCE: Forall (fun msg => msg.(Msg.tid) <> tid) mem_interference)
+        (WF: wf tid mem lc):
+    wf tid (mem ++ mem_interference) lc.
+  Proof.
+    inv WF. econs; i.
+    all: try rewrite app_length.
+    all: try lia.
+    - rewrite COH. lia.
+    - destruct (FWDBANK loc). des. econs; esplits; eauto.
+      + rewrite TS, Memory.latest_ts_append. ss.
+      + apply Memory.read_mon. eauto.
+    - exploit EXBANK; eauto. intro Y. inv Y. des. econs; esplits; eauto.
+      + rewrite TS, Memory.latest_ts_append. ss.
+      + apply Memory.read_mon. eauto.
+    - exploit PROMISES; eauto. lia.
+    - apply Memory.get_msg_app_inv in MSG. des.
+      + eapply PROMISES0; eauto.
+      + apply nth_error_In in MSG0. eapply Forall_forall in INTERFERENCE; eauto.
+        subst. destruct (nequiv_dec (Msg.tid msg) (Msg.tid msg)); ss. congr.
+  Qed.
 End Local.
 End Local.
 
@@ -1176,6 +1265,14 @@ Section ExecUnit.
     rmap_wf (mem ++ [msg]) rmap.
   Proof.
     inv WF. econs. i. rewrite RMAP. rewrite List.app_length. lia.
+  Qed.
+
+  Lemma rmap_interference_wf
+        mem rmap mem_interference
+        (WF: rmap_wf mem rmap):
+    rmap_wf (mem ++ mem_interference) rmap.
+  Proof.
+    inv WF. econs. i. rewrite RMAP, app_length. lia.
   Qed.
 
   Lemma promise_step_wf tid eu1 eu2
