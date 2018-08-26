@@ -82,7 +82,6 @@ Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (f
     (READ2: Memory.read loc fwd2.(FwdItem.ts) mem2 = Some val)
 | sim_fwdbank_above
     (ABOVE: ts < fwd2.(FwdItem.view).(View.ts))
-    (TS: sim_time ts fwd1.(FwdItem.ts) fwd2.(FwdItem.ts))
     (LATEST: Memory.latest loc fwd1.(FwdItem.ts) (length mem1) mem1)
     (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
 .
@@ -555,7 +554,6 @@ Proof.
               + eapply Memory.get_msg_read; eauto.
             - econs 2; ss.
               + eapply lt_le_trans; eauto. apply join_r.
-              + apply sim_time_above. clear -LEN0. lia.
               + rewrite app_length. s. ii. lia.
           }
           { eapply sim_fwdbank_mon; eauto.
@@ -736,7 +734,11 @@ Proof.
             * i. rewrite ? fun_add_spec. condtac; ss.
               rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * destruct ex0; ss. econs. econs 1; ss.
-              { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss. }
+              { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss.
+                apply sim_time_above. inv WF2. ss. inv LOCAL.
+                destruct (FWDBANK0 (ValA.val (sem_expr rmap2 eloc))). des.
+                clear -ABOVE VIEW. lia.
+              }
               { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); eauto.
                 - intro Y. specialize (TSABOVE Y).
                   apply Memory.ge_no_msgs. clear -TSABOVE. lia.
@@ -943,7 +945,6 @@ Proof.
                   + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
                   + eapply lt_le_trans; eauto. apply join_r.
-                  + clear -TS0. econs. lia.
                   + rewrite app_length. s. ii. lia.
               }
               { exploit sim_fwdbank_mon; try exact MEM; cycle 3.
