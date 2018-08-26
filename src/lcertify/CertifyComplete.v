@@ -483,9 +483,11 @@ Proof.
   destruct eu1 as [[stmts1 rmap1] lc1 mem1].
   destruct eu2 as [[stmts2 rmap2] lc2 mem2].
   destruct eu2' as [[stmts2' rmap2'] lc2' mem2'].
-  inv SIM. inv STATE. ss. subst. inv STEP; cycle 1.
+  inv SIM. inv STATE. ss. subst.
+  exploit sim_mem_length; eauto. intro LEN. des.
+  inv STEP; cycle 1.
   { (* write step *)
-    inv STEP0. ss. inv STATE. inv PROMISE. inv FULFILL. ss.
+    inv STEP0. ss. inv STATE. inv PROMISE. inv FULFILL. inv MEM2. ss.
     exploit sim_rmap_expr; eauto. instantiate (1 := eloc).
     intro X. inv X. exploit TS.
     { rewrite <- VCAP, <- join_r. ss. }
@@ -494,7 +496,7 @@ Proof.
     - econs 2. econs; ss.
       + econs; ss.
       + econs; ss.
-        * inv WF1. ss. inv LOCAL0. inv WRITABLE. inv MEM2. ss. econs; ss.
+        * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
           { eapply le_lt_trans; [|ss]. apply COH. }
           { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
             all: unfold ifc.
@@ -519,19 +521,17 @@ Proof.
               inv TS0. rewrite TS1 in *; ss.
               eapply sim_mem_no_msgs; eauto.
               eapply Memory.no_msgs_weaken; [|by apply EX0; ss].
-              exploit sim_mem_length; eauto. clear. lia.
+              clear -LEN0. lia.
             - ii. replace ts2 with (length mem1) in * by (clear -TS1 TS2; lia).
               rewrite nth_error_app2, Nat.sub_diag in MSG0; ss. inv MSG0. des. ss.
           }
         * unfold Memory.get_msg. s. rewrite nth_error_app2, Nat.sub_diag; ss.
         * rewrite Promises.set_o. condtac; ss. congr.
-    - inv MEM2. inv WRITABLE. ss.
+    - inv WRITABLE. ss.
       econs; ss.
       + econs; ss. apply sim_rmap_add; ss. econs; ss.
-        unfold ifc. condtac; ss. intro Y. clear -Y MEM. exfalso.
-        exploit sim_mem_length; eauto. lia.
-      + exploit sim_mem_length; eauto. intro LEN. des.
-        inv LOCAL. econs; ss.
+        unfold ifc. condtac; ss. intro Y. clear -Y LEN0. exfalso. lia.
+      + inv LOCAL. econs; ss.
         * i. rewrite ? fun_add_spec. condtac; ss.
           apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
@@ -675,7 +675,6 @@ Proof.
         - rewrite <- POST_BELOW, POST. s.
           rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
       }
-      exploit sim_mem_length; eauto. intro LEN. des.
       (* Now case analysis on whether tgt read from fwdbank. *)
       destruct (((lc2.(Local.fwdbank) (ValA.val (sem_expr rmap2 eloc))).(FwdItem.ts) == ts0) &&
                 (negb (__guard__ (andb (lc2.(Local.fwdbank) (ValA.val (sem_expr rmap2 eloc))).(FwdItem.ex)
@@ -885,7 +884,6 @@ Proof.
       }
       { (* fulfilling a new promise > ts (only in tgt) *)
         rename l into TS0.
-        exploit sim_mem_length; eauto. intro LEN. des.
         eexists (ExecUnit.mk _ _ _). esplits.
         - econs 2. econs; ss.
           + econs; ss.
