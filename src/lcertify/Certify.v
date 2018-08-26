@@ -135,7 +135,7 @@ Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (f
     val
     (BELOW: fwd2.(FwdItem.view).(View.ts) <= ts)
     (TS: sim_time ts fwd1.(FwdItem.ts) fwd2.(FwdItem.ts))
-    (EXCLUSIVE: ts < fwd2.(FwdItem.ts) -> Memory.exclusive tid loc fwd1.(FwdItem.ts) ts mem1)
+    (TSABOVE: ts < fwd2.(FwdItem.ts) -> ts < fwd1.(FwdItem.ts))
     (VIEW: fwd1.(FwdItem.view) = fwd2.(FwdItem.view))
     (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
     (READ1: Memory.read loc fwd1.(FwdItem.ts) mem1 = Some val)
@@ -561,11 +561,6 @@ Lemma sim_fwdbank_mon
 Proof.
   inv SIM.
   - econs 1; ss.
-    + i. eapply Memory_no_msgs_weaken.
-      * instantiate (1 := length mem1).
-        exploit sim_mem_length; eauto. clear. lia.
-      * rewrite app_nil_r. eapply Memory_no_msgs_full.
-        eapply sim_mem1_exclusive; eauto.
     + apply Memory.read_mon. eauto.
     + apply Memory.read_mon. eauto.
   - econs 2; ss. eapply Memory_no_msgs_split; eauto.
@@ -670,7 +665,7 @@ Proof.
               econs 1; ss.
               + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
               + apply sim_time_above. clear -LEN0. lia.
-              + i. apply Memory_ge_no_msgs. clear -LEN. lia.
+              + clear -LEN. lia.
               + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
                 condtac; ss.
               + eapply Memory.get_msg_read; eauto.
@@ -774,6 +769,17 @@ Proof.
 
       (* Tgt's post-view <= ts. *)
       rename l into POST_BELOW.
+      assert (VRNEQ: lc1.(Local.vrn) = lc2.(Local.vrn)).
+      { inv LOCAL. eapply sim_view_below; eauto. rewrite <- POST_BELOW, POST. s.
+        rewrite <- join_l, <- join_r, <- join_l. ss.
+      }
+      assert (VRELEQ: (ifc (OrdR.ge ord OrdR.acquire) lc1.(Local.vrel)) =
+                      (ifc (OrdR.ge ord OrdR.acquire) lc2.(Local.vrel))).
+      { inv LOCAL. eapply sim_view_below.
+        - apply sim_view_ifc. eauto.
+        - rewrite <- POST_BELOW, POST. s.
+          rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
+      }
       exploit sim_mem_length; eauto. intro LEN. des.
       (* Now case analysis on whether tgt read from fwdbank. *)
       destruct (((lc2.(Local.fwdbank) (ValA.val (sem_expr rmap2 eloc))).(FwdItem.ts) == ts0) &&
@@ -802,20 +808,15 @@ Proof.
                 (* 2. if lc2.coh > ts, then there should be no msg of > ts in src. *)
               }
               { eapply Memory.latest_mon2; eauto. inv WF1. ss. inv LOCAL. apply COH1. }
-            * assert (VRNEQ: lc1.(Local.vrn) = lc2.(Local.vrn)).
-              { eapply sim_view_below; eauto. rewrite <- POST_BELOW, POST. s.
-                rewrite <- join_l, <- join_r, <- join_l. ss.
-              }
-              assert (VRELEQ: (ifc (OrdR.ge ord OrdR.acquire) lc1.(Local.vrel)) =
-                              (ifc (OrdR.ge ord OrdR.acquire) lc2.(Local.vrel))).
-              { eapply sim_view_below.
-                - apply sim_view_ifc. eauto.
-                - rewrite <- POST_BELOW, POST. s.
-                  rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
-              }
-              rewrite VRNEQ, VRELEQ.
+            * rewrite VRNEQ, VRELEQ.
               destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
-              { admit. (* similar *) }
+              { destruct (le_lt_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
+                - apply sim_time_below in TS; ss. rewrite TS.
+                  eapply sim_mem_no_msgs; eauto. rewrite <- POST_BELOW, POST. s. apply join_l.
+                - specialize (TSABOVE l). apply Memory_ge_no_msgs.
+                  rewrite POST in POST_BELOW. clear -POST_BELOW TSABOVE. ss.
+                  unfold join, Time.join in *. lia.
+              }
               { eapply Memory.latest_mon2; eauto. rewrite <- LEN, <- POST_BELOW, POST. s. apply join_l. }
         - econs; ss.
           + econs; ss. apply sim_rmap_add; ss. apply sim_view_val.
@@ -826,8 +827,10 @@ Proof.
             * destruct ex0; ss. econs. econs 1; ss.
               { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss. }
               { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); eauto.
-                ii. des. eapply LATEST0; eauto. rewrite TS2.
-                inv MEM. rewrite app_length. clear. lia.
+                - intro Y. specialize (TSABOVE Y).
+                  apply Memory_ge_no_msgs. clear -TSABOVE. lia.
+                - ii. des. eapply LATEST0; eauto. rewrite TS2.
+                  inv MEM. rewrite app_length. clear. lia.
               }
               { eapply sim_view_below; eauto. rewrite POST.
                 eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
@@ -880,18 +883,7 @@ Proof.
               (*       // S ts1 <= coh1 loc *)
               (*       apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto. subst. *)
               (* Qed. *)
-            * assert (VRNEQ: lc1.(Local.vrn) = lc2.(Local.vrn)).
-              { eapply sim_view_below; eauto. rewrite <- POST_BELOW, POST'. s.
-                rewrite <- join_l, <- join_r, <- join_l. ss.
-              }
-              assert (VRELEQ: (ifc (OrdR.ge ord OrdR.acquire) lc1.(Local.vrel)) =
-                              (ifc (OrdR.ge ord OrdR.acquire) lc2.(Local.vrel))).
-              { eapply sim_view_below.
-                - apply sim_view_ifc. eauto.
-                - rewrite <- POST_BELOW, POST'. s.
-                  rewrite <- join_l, <- join_r, <- join_r, <- join_l. ss.
-              }
-              rewrite VRNEQ, VRELEQ. eapply sim_mem_no_msgs; eauto.
+            * rewrite VRNEQ, VRELEQ. eapply sim_mem_no_msgs; eauto.
               rewrite <- POST_BELOW, POST'. s. apply join_l.
         - econs; ss.
           + econs; ss. apply sim_rmap_add; ss. apply sim_view_val.
@@ -958,7 +950,6 @@ Proof.
           all: try condtac; ss.
           * inversion e. subst. econs; ss.
             { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
-            { i. eapply Memory_ge_no_msgs. clear -H. lia. }
             { erewrite sim_mem_read; eauto. eapply Memory.get_msg_read; eauto. }
             { eapply Memory.get_msg_read; eauto. }
           * rewrite ? Promises.unset_o. condtac; ss. eauto.
@@ -1025,7 +1016,7 @@ Proof.
                   econs 1; ss.
                   + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
                   + apply sim_time_above. ss.
-                  + i. apply Memory_ge_no_msgs. clear -LEN. lia.
+                  + i. clear -LEN. lia.
                   + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
                   + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
@@ -1262,8 +1253,6 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc0). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
-          + exploit Memory.latest_ts_spec; eauto. i. des.
-            rewrite LE, COH in TS. clear -TS H. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
@@ -1362,8 +1351,6 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
-          + exploit Memory.latest_ts_spec; eauto. i. des.
-            rewrite LE, COH in TS. clear -TS H. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
