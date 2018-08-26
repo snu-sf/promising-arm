@@ -118,15 +118,19 @@ Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=unit))): Prop :=
 .
 Hint Constructors sim_state.
 
-Inductive sim_mem (tid:Id.t) (ts:Time.t) (coh1: Loc.t -> View.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
+Inductive sim_mem (tid:Id.t) (ts:Time.t) (coh1 coh2: Loc.t -> View.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
 | sim_mem_intro
     mem mem1' mem2'
     (MEM: ts = length mem)
     (MEM1: mem1 = mem ++ mem1')
     (MEM2: mem2 = mem ++ mem2')
-    (MEM1': forall n msg (NTH: nth_error mem1' n = Some msg),
-        msg.(Msg.tid) = tid /\
-        S (length mem) + n <= (coh1 msg.(Msg.loc)).(View.ts))
+    (MEM1': forall n1 msg1 (NTH: nth_error mem1' n1 = Some msg1),
+        <<TID: msg1.(Msg.tid) = tid>> /\
+        <<MSGCOH: S (length mem) + n1 <= (coh1 msg1.(Msg.loc)).(View.ts)>> /\
+        exists n2 msg2,
+          <<MSG: nth_error mem2' n2 = Some msg2>> /\
+          <<LOC: msg1.(Msg.loc) = msg2.(Msg.loc)>> /\
+          <<MSGCOH: S (length mem) + n2 <= (coh2 msg2.(Msg.loc)).(View.ts)>>)
 .
 Hint Constructors sim_mem.
 
@@ -180,7 +184,7 @@ Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
     (STATE: sim_state ts eu1.(ExecUnit.state) eu2.(ExecUnit.state))
     (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) eu1.(ExecUnit.local) eu2.(ExecUnit.local))
-    (MEM: sim_mem tid ts eu1.(ExecUnit.local).(Local.coh) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
+    (MEM: sim_mem tid ts eu1.(ExecUnit.local).(Local.coh) eu2.(ExecUnit.local).(Local.coh) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
 .
 Hint Constructors sim_eu.
 
@@ -327,8 +331,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_read
-      tid ts coh1 mem1 mem2 loc ts0
-      (SIM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts coh1 coh2 mem1 mem2 loc ts0
+      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.read loc ts0 mem1 = Memory.read loc ts0 mem2.
 Proof.
@@ -336,8 +340,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_get_msg
-      tid ts coh1 mem1 mem2 ts0
-      (SIM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts coh1 coh2 mem1 mem2 ts0
+      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.get_msg ts0 mem1 = Memory.get_msg ts0 mem2.
 Proof.
@@ -345,16 +349,16 @@ Proof.
 Qed.
 
 Lemma sim_mem_length
-      tid ts coh1 mem1 mem2
-      (SIM: sim_mem tid ts coh1 mem1 mem2):
+      tid ts coh1 coh2 mem1 mem2
+      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2):
   ts <= length mem1 /\ ts <= length mem2.
 Proof.
   inv SIM. rewrite ? app_length. lia.
 Qed.
 
 Lemma sim_mem1_exclusive
-      tid ts loc from to coh1 mem1 mem2
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts loc from to coh1 coh2 mem1 mem2
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (EXCLUSIVE: Memory.exclusive tid loc from ts mem1):
   Memory.exclusive tid loc from to mem1.
 Proof.
@@ -365,8 +369,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_no_msgs
-      tid ts from to pred coh1 mem1 mem2
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts from to pred coh1 coh2 mem1 mem2
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (TS: to <= ts)
       (NOMSGS: Memory.no_msgs from to pred mem2):
   Memory.no_msgs from to pred mem1.
@@ -394,8 +398,8 @@ Ltac des_eq :=
 Lemma sim_fwd_view1 tid ts mem1 mem2 loc coh1 coh2 fwd1 fwd2 o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
-      (WF2: Local.wf_fwdbank loc mem2 coh2 fwd2)
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (COND: andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = false):
   sim_view ts (FwdItem.read_view fwd1 fwd1.(FwdItem.ts) o) (FwdItem.read_view fwd2 fwd2.(FwdItem.ts) o).
 Proof.
@@ -416,8 +420,8 @@ Qed.
 Lemma sim_fwd_view2 tid ts mem1 mem2 loc coh1 coh2 fwd1 fwd2 t o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
-      (WF2: Local.wf_fwdbank loc mem2 coh2 fwd2)
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (TS: t <= ts)
       (FWDTS: fwd2.(FwdItem.ts) <= t)
       (COND: fwd2.(FwdItem.ts) <> t \/ andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = true):
@@ -552,8 +556,8 @@ Proof.
 Qed.
 
 Lemma sim_fwdbank_mon
-      tid ts coh1 mem1 mem2 loc fwd1 fwd2 mem1' mem2'
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts coh1 coh2 mem1 mem2 loc fwd1 fwd2 mem1' mem2'
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (SIM: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (FWD1: fwd1.(FwdItem.ts) <= length mem1)
       (MEM1': Forall (fun msg => msg.(Msg.loc) <> loc) mem1'):
@@ -573,8 +577,8 @@ Proof.
 Qed.
 
 Lemma sim_exbank_mon
-      tid ts coh1 mem1 mem2 eb1 eb2 mem1' mem2'
-      (MEM: sim_mem tid ts coh1 mem1 mem2)
+      tid ts coh1 coh2 mem1 mem2 eb1 eb2 mem1' mem2'
+      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
       (SIM: sim_exbank tid ts mem1 mem2 eb1 eb2):
   sim_exbank tid ts (mem1 ++ mem1') (mem2 ++ mem2') eb1 eb2.
 Proof.
@@ -692,13 +696,21 @@ Proof.
         * rewrite <- app_assoc. ss.
         * rewrite <- app_assoc. ss.
         * i. apply nth_error_snoc_inv in NTH. des.
-          { exploit MEM1'; eauto. i. des. subst. splits; ss.
-            rewrite fun_add_spec. condtac; ss.
-            rewrite app_length. clear -NTH. lia.
+          { exploit MEM1'; eauto. i. des. subst. esplits; swap 1 3.
+            { apply nth_error_app_mon. eauto. }
+            all: ss.
+            - rewrite fun_add_spec. condtac; ss.
+              rewrite app_length. clear -NTH. lia.
+            - s. rewrite MSGCOH0, fun_add_spec. condtac; ss.
+              inv WF2. ss. inv LOCAL0. rewrite COH0. clear. lia.
           }
-          { subst. ss. splits; ss.
-            rewrite fun_add_spec. condtac; [|congr]. s.
-            rewrite app_length. ss.
+          { subst. ss. esplits; swap 1 3.
+            { rewrite nth_error_app2, Nat.sub_diag; ss. }
+            all: ss.
+            - rewrite fun_add_spec. condtac; [|congr]. s.
+              rewrite app_length. ss.
+            - s. rewrite fun_add_spec. condtac; [|congr]. s.
+              rewrite app_length. clear. lia.
           }
   }
   { (* state step *)
@@ -763,8 +775,11 @@ Proof.
               ii. des. eapply Memory.latest_ts_latest; eauto.
               rewrite TS2. clear -MEM. inv MEM. rewrite app_length. lia.
           + inv MEM. econs; ss. i. exploit MEM1'; eauto. i. des. subst.
-            splits; ss. rewrite fun_add_spec. condtac; ss. inversion e. subst.
-            rewrite x1, <- join_l. ss.
+            esplits; try exact MSG0; ss.
+            * rewrite fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite MSGCOH, <- join_l. ss.
+            * rewrite MSGCOH0, fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite <- join_l. ss.
       }
 
       (* Tgt's post-view <= ts. *)
@@ -836,8 +851,11 @@ Proof.
                 eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
               }
           + inv MEM. econs; ss. i. exploit MEM1'; eauto. i. des. subst.
-            splits; ss. rewrite fun_add_spec. condtac; ss. inversion e. subst.
-            rewrite x1, <- join_l. ss.
+            esplits; try exact MSG0; ss.
+            * rewrite fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite MSGCOH, <- join_l. ss.
+            * rewrite MSGCOH0, fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite <- join_l. ss.
       }
       { (* Case 3: Tgt didn't read from fwdbank. Src reads the same msg. *)
         generalize POST. intro POST'.
@@ -862,7 +880,10 @@ Proof.
           + rewrite ELOC in *.
             econs 2; eauto. econs; ss; cycle 2.
             * erewrite sim_mem_read; eauto.
-            * admit. (* coh, similar *)
+            * (* move COH at bottom. *)
+              (* eapply sim_mem_no_msgs; try by apply MEM. *)
+              (* try by apply COH; eauto. *)
+              admit. (* coh, similar *)
 
               (* Lemma sim_mem_latest *)
               (*       tid ts coh1 mem1 mem2 v1 v2 ts0 loc *)
@@ -897,8 +918,11 @@ Proof.
                 eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
               }
           + inv MEM. econs; ss. i. exploit MEM1'; eauto. i. des. subst.
-            splits; ss. rewrite fun_add_spec. condtac; ss. inversion e. subst.
-            rewrite x1, <- join_l. ss.
+            esplits; try exact MSG0; ss.
+            * rewrite fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite MSGCOH, <- join_l. ss.
+            * rewrite MSGCOH0, fun_add_spec. condtac; ss. inversion e. subst.
+              rewrite <- join_l. ss.
       }
     - (* fulfill *)
       inv STEP. ss.
@@ -955,11 +979,19 @@ Proof.
           * rewrite ? Promises.unset_o. condtac; ss. eauto.
           * rewrite Promises.unset_o. condtac; ss. eauto.
           * inv MEM. econs; ss. i. exploit MEM1'; eauto. i. des. subst.
-            splits; ss. rewrite fun_add_spec. condtac; ss. inversion e. destruct msg. ss. subst.
-            inv WRITABLE. ss. exploit sim_view_below.
-            { inv LOCAL. apply COH0. }
-            { rewrite <- TS0. apply Nat.le_lteq. left. eauto. }
-            i. rewrite x2 in *. clear -TS0 COH x1. lia.
+            esplits; try exact MSG0; ss.
+            { rewrite fun_add_spec. condtac; ss. inversion e. destruct msg1, msg2. ss. subst.
+              inv WRITABLE. ss. exploit sim_view_below.
+              { inv LOCAL. apply COH0. }
+              { rewrite <- TS0. apply Nat.le_lteq. left. eauto. }
+              i. rewrite <- x1 in *. clear -TS0 COH MSGCOH. lia.
+            }
+            { rewrite fun_add_spec. condtac; ss. inversion e. destruct msg1, msg2. ss. subst.
+              inv WRITABLE. ss. exploit sim_view_below.
+              { inv LOCAL. apply COH0. }
+              { rewrite <- TS0. apply Nat.le_lteq. left. eauto. }
+              i. rewrite <- x1 in *. clear -TS0 COH MSGCOH. lia.
+            }
       }
       { (* fulfilling a new promise > ts (only in tgt) *)
         rename l into TS0.
@@ -1044,14 +1076,19 @@ Proof.
             * rewrite <- app_assoc. ss.
             * ss.
             * i. apply nth_error_snoc_inv in NTH. des.
-              { exploit MEM1'; eauto. i. des. subst. splits; ss.
-                rewrite fun_add_spec. condtac; ss.
-                rewrite app_length. clear -NTH. lia.
+              { exploit MEM1'; eauto. i. des. subst. esplits; try exact MSG0; ss.
+                - rewrite fun_add_spec. condtac; ss. rewrite app_length.
+                  exploit nth_error_Some. rewrite NTH0. intros [Y _]. clear -Y.
+                  exploit Y; [congr|]. lia.
+                - rewrite fun_add_spec. condtac; ss. inversion e. destruct msg1, msg2. ss. subst.
+                  rewrite MSGCOH0. clear -COH. ss. lia.
               }
-              { subst. ss. splits; ss.
-                rewrite fun_add_spec. condtac; [|congr]. s.
-                rewrite app_length. ss.
-              }              
+              { subst. ss. apply Memory.get_msg_app_inv in MSG. des.
+                { clear -MSG TS0. lia. }
+                esplits; try exact MSG0; eauto.
+                - rewrite fun_add_spec. condtac; [|congr]. s. rewrite app_length. ss.
+                - s. rewrite fun_add_spec. condtac; [|congr]. s. clear -TS0. lia.
+              }
       }
     - (* write_failure *)
       inv STEP. eexists (ExecUnit.mk _ _ _). esplits.
@@ -1268,7 +1305,7 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
-      + i. destruct n; ss.
+      + i. destruct n1; ss.
   }
 
   inv CERTIFY. exploit sim_eu_rtc_step; eauto.
@@ -1364,7 +1401,7 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
-      + i. destruct n; ss.
+      + i. destruct n1; ss.
   }
 
   inv CERTIFY. exploit sim_eu_rtc_step; eauto.
