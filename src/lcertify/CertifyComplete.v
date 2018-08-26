@@ -83,7 +83,6 @@ Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (f
 | sim_fwdbank_above
     (ABOVE: ts < fwd2.(FwdItem.view).(View.ts))
     (LATEST: Memory.latest loc fwd1.(FwdItem.ts) (length mem1) mem1)
-    (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
 .
 
 Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank.t (A:=unit)): Prop :=
