@@ -139,7 +139,7 @@ Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (f
     val
     (BELOW: fwd2.(FwdItem.view).(View.ts) <= ts)
     (TS: sim_time ts fwd1.(FwdItem.ts) fwd2.(FwdItem.ts))
-    (TSABOVE: ts < fwd2.(FwdItem.ts) -> ts < fwd1.(FwdItem.ts))
+    (TSABOVE: ts < fwd2.(FwdItem.ts) -> ts < fwd1.(FwdItem.ts) /\ Memory.latest loc fwd1.(FwdItem.ts) (length mem1) mem1)
     (VIEW: fwd1.(FwdItem.view) = fwd2.(FwdItem.view))
     (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
     (READ1: Memory.read loc fwd1.(FwdItem.ts) mem1 = Some val)
@@ -565,6 +565,12 @@ Lemma sim_fwdbank_mon
 Proof.
   inv SIM.
   - econs 1; ss.
+    + intro X. specialize (TSABOVE X). des. splits; ss.
+      ii. subst. apply nth_error_app_inv in MSG. des; cycle 1.
+      { apply nth_error_In in MSG0. eapply Forall_forall in MEM1'; eauto.
+        destruct (nequiv_dec (Msg.loc msg) (Msg.loc msg)); ss. congr.
+      }
+      eapply TSABOVE0; eauto.
     + apply Memory.read_mon. eauto.
     + apply Memory.read_mon. eauto.
   - econs 2; ss. eapply Memory_no_msgs_split; eauto.
@@ -669,7 +675,9 @@ Proof.
               econs 1; ss.
               + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
               + apply sim_time_above. clear -LEN0. lia.
-              + clear -LEN. lia.
+              + splits.
+                * clear -LEN. lia.
+                * apply Memory_ge_no_msgs. clear. rewrite app_length. s. lia.
               + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss.
                 condtac; ss.
               + eapply Memory.get_msg_read; eauto.
@@ -818,9 +826,26 @@ Proof.
                 ss. unfold join, Time.join in *. lia.
               }
             * destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
-              { admit.
-                (* 1. if lc2.coh <= ts, then obvious. *)
-                (* 2. if lc2.coh > ts, then there should be no msg of > ts in src. *)
+              { destruct (le_lt_dec (View.ts (Local.coh lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
+                - exploit sim_view_below; try exact l; eauto. i.
+                  rewrite x1 in *. eapply sim_mem_no_msgs; eauto.
+                  destruct (le_lt_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
+                  + apply sim_time_below in TS; ss. rewrite TS in *. ss.
+                  + specialize (TSABOVE l0). apply Memory_ge_no_msgs. clear -l TSABOVE. lia.
+                - destruct (le_lt_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
+                  + apply sim_time_below in TS; ss. rewrite TS in *. ss.
+                    ii. destruct (le_lt_dec (S ts0) ts).
+                    * eapply COH; eauto.
+                      { clear -l1 l. lia. }
+                      { inv MEM. rewrite nth_error_app1 in *; ss. }
+                    * inv MEM. rewrite nth_error_app2 in MSG0; ss; [|clear -l1; lia].
+                      exploit MEM1'; eauto. i. des. destruct msg, msg2. ss. subst.
+                      eapply COH; try exact MSGCOH0; eauto.
+                      { clear -l0. lia. }
+                      { rewrite <- MSG1. clear. rewrite nth_error_app2; [|lia]. f_equal. lia. }
+                      { ss. }
+                  + specialize (TSABOVE l0). des. eapply Memory.latest_mon2; eauto.
+                    inv WF1. ss. inv LOCAL. apply COH1.
               }
               { eapply Memory.latest_mon2; eauto. inv WF1. ss. inv LOCAL. apply COH1. }
             * rewrite VRNEQ, VRELEQ.
@@ -880,30 +905,22 @@ Proof.
           + rewrite ELOC in *.
             econs 2; eauto. econs; ss; cycle 2.
             * erewrite sim_mem_read; eauto.
-            * (* move COH at bottom. *)
-              (* eapply sim_mem_no_msgs; try by apply MEM. *)
-              (* try by apply COH; eauto. *)
-              admit. (* coh, similar *)
-
-              (* Lemma sim_mem_latest *)
-              (*       tid ts coh1 mem1 mem2 v1 v2 ts0 loc *)
-              (*       (MEM: sim_mem tid ts coh1 mem1 mem2) *)
-              (*       (TIME: sim_time ts v1 v2) *)
-              (*       (LATEST: Memory.latest loc ts0 v2 mem2): *)
-              (*   Memory.latest loc ts0 v1 mem1. *)
-              (* Proof. *)
-              (*   inv TIME. destruct (le_lt_dec v2 ts). *)
-              (*   - specialize (TS l). subst. *)
-              (*     ii. eapply LATEST; eauto. *)
-              (*     inv MEM. rewrite nth_error_app1 in *; ss; lia. *)
-              (*   - ii. destruct (le_lt_dec (S ts1) ts). *)
-              (*     + eapply LATEST; eauto; try lia. *)
-              (*       inv MEM. rewrite nth_error_app1 in *; ss; lia. *)
-              (*     + inv MEM. rewrite nth_error_app2 in MSG; try lia. *)
-              (*       exploit MEM1'; eauto. i. des. subst. *)
-              (*       // S ts1 <= coh1 loc *)
-              (*       apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto. subst. *)
-              (* Qed. *)
+            * destruct (le_lt_dec (View.ts (Local.coh lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
+              { exploit sim_view_below; try exact l; eauto. intro Y. rewrite Y in *.
+                eapply sim_mem_no_msgs; eauto.
+              }
+              ii. destruct (le_lt_dec (S ts1) ts).
+              { eapply COH; eauto.
+                - clear -l0 l. lia.
+                - inv MEM. rewrite nth_error_app1 in *; ss.
+              }
+              { inv MEM. rewrite nth_error_app2 in MSG0; ss; [|clear -l0; lia].
+                exploit MEM1'; eauto. i. des. destruct msg, msg2. ss. subst.
+                eapply COH; try exact MSGCOH0; eauto.
+                - clear -BELOW. lia.
+                - rewrite <- MSG1. clear. rewrite nth_error_app2; [|lia]. f_equal. lia.
+                - ss.
+              }
             * rewrite VRNEQ, VRELEQ. eapply sim_mem_no_msgs; eauto.
               rewrite <- POST_BELOW, POST'. s. apply join_l.
         - econs; ss.
@@ -974,6 +991,7 @@ Proof.
           all: try condtac; ss.
           * inversion e. subst. econs; ss.
             { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
+            { clear -TS0. lia. }
             { erewrite sim_mem_read; eauto. eapply Memory.get_msg_read; eauto. }
             { eapply Memory.get_msg_read; eauto. }
           * rewrite ? Promises.unset_o. condtac; ss. eauto.
@@ -1048,7 +1066,9 @@ Proof.
                   econs 1; ss.
                   + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
                   + apply sim_time_above. ss.
-                  + i. clear -LEN. lia.
+                  + splits.
+                    * clear -LEN. lia.
+                    * apply Memory_ge_no_msgs. clear. rewrite app_length. s. lia.
                   + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
                   + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
@@ -1128,7 +1148,7 @@ Proof.
         * econs 7. ss.
       + econs; ss.
   }
-Admitted.
+Qed.
 
 Lemma sim_eu_promises
       tid ts eu1 eu2
@@ -1290,6 +1310,9 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc0). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + destruct (FWDBANK loc0). des.
+            exploit Memory.latest_ts_spec; eauto. i. des.
+            rewrite LE, COH in TS0. clear -TS0 H. i. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc1) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
@@ -1388,6 +1411,9 @@ Proof.
       { inv WF. inv LOCAL. ss. econs; ss.
         - i. destruct (FWDBANK loc). des. econs; eauto.
           + rewrite VIEW, TS, <- COH. apply Memory.latest_ts_spec.
+          + destruct (FWDBANK loc). des.
+            exploit Memory.latest_ts_spec; eauto. i. des.
+            rewrite LE, COH in TS0. clear -TS0 H. i. lia.
           + erewrite Memory.read_mon; eauto.
         - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
