@@ -98,12 +98,11 @@ Hint Constructors sim_exbank.
 
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
 | sim_lc_intro
-    (COH: forall loc, sim_time ts
-                          (Memory.latest_ts loc (lc1.(Local.coh) loc).(View.ts) mem1)
-                          (Memory.latest_ts loc (lc2.(Local.coh) loc).(View.ts) mem2))
-    (COH': forall loc, sim_time ts
-                           (lc1.(Local.coh) loc).(View.ts)
-                           (lc2.(Local.coh) loc).(View.ts))
+    (COH: forall (VRN: lc2.(Local.vrn).(View.ts) <= ts) loc,
+        sim_time ts
+                 (Memory.latest_ts loc (lc1.(Local.coh) loc).(View.ts) mem1)
+                 (Memory.latest_ts loc (lc2.(Local.coh) loc).(View.ts) mem2))
+    (COH': forall loc, sim_view ts (lc1.(Local.coh) loc) (lc2.(Local.coh) loc))
     (VRN: sim_view ts lc1.(Local.vrn) lc2.(Local.vrn))
     (VWN: sim_view ts lc1.(Local.vwn) lc2.(Local.vwn))
     (VRO: sim_view ts lc1.(Local.vro) lc2.(Local.vro))
@@ -525,14 +524,14 @@ Proof.
         + econs; ss. apply sim_rmap_add; ss. rewrite RISCV. s.
           econs. s. i. clear -H LEN0. lia.
         + inv LOCAL. econs; ss.
-          * i. rewrite fun_add_spec. condtac; eauto.
+          * i. specialize (COH VRN0). rewrite fun_add_spec. condtac; eauto.
             { inversion e. subst.
               apply sim_time_above. s. rewrite nth_error_app2, Nat.sub_diag; ss.
               condtac; ss. clear -LEN0. lia.
             }
             { rewrite Memory_latest_ts_app1; ss. inv WF2. inv LOCAL. ss. }
           * i. rewrite fun_add_spec. condtac; eauto.
-            apply sim_time_above. s. clear -LEN0. lia.
+            apply sim_view_above. s. clear -LEN0. lia.
           * apply sim_view_join_r. ss.
           * apply sim_view_join_r. ss.
           * apply sim_view_join_r. ss.
@@ -566,7 +565,7 @@ Proof.
       econs; ss.
       + econs; ss. apply sim_rmap_add; ss. apply sim_val_const.
       + inv LOCAL. econs; ss.
-        * i. rewrite ? fun_add_spec. condtac.
+        * i. specialize (COH0 VRN0). rewrite ? fun_add_spec. condtac.
           { s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; [|congr].
             clear -LEN0. econs. lia.
           }
@@ -575,7 +574,7 @@ Proof.
             - inv WF1. inv LOCAL. ss.
           }
         * i. rewrite ? fun_add_spec. condtac; ss.
-          clear -LEN0. econs. lia.
+          apply sim_view_above. clear -LEN0. s. lia.
         * apply sim_view_join; ss.
           apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
@@ -670,15 +669,23 @@ Proof.
         - econs; ss.
           + econs; ss. apply sim_rmap_add; ss. apply sim_val_above. ss.
           + econs; ss.
-            * i. rewrite ? fun_add_spec. condtac; ss. inversion e. subst.
-              apply sim_time_above. eapply lt_le_trans; [exact POST_ABOVE|].
-              rewrite POST. s. clear -
-              
-
-              admit. (* sim_time on coh *)
-              (* i. rewrite ? fun_add_spec. condtac; ss. *)
-              (* apply sim_view_join; ss. apply sim_view_above. ss. *)
-            * admit. (* sim_time on coh *)
+            * destruct (OrdR.ge ord OrdR.acquire_pc) eqn:ORD; ss.
+              { clear -POST_ABOVE. unfold join, Time.join. lia. }
+              rewrite bot_join; [|apply Time.order]. intro VRN'. specialize (COH0 VRN').
+              i. rewrite ? fun_add_spec. condtac; ss. inversion e. subst.
+              generalize POST_ABOVE. rewrite POST. s. intro Y.
+              apply Nat.max_lt_iff in Y. des; cycle 1.
+              { admit. (* ts < ts0 *) }
+              apply Nat.max_lt_iff in Y. des.
+              { clear -VCAP Y. unfold join, Time.join in *. lia. }
+              apply Nat.max_lt_iff in Y. des.
+              { clear -VRN' Y. lia. }
+              { destruct (OrdR.ge ord OrdR.acquire) eqn:ORD'; ss.
+                - destruct ord; ss.
+                - clear -Y. unfold join, bot, Time.join, Time.bot in Y. lia.
+              }
+            * i. rewrite ? fun_add_spec. condtac; ss. apply sim_view_above. s.
+              eapply lt_le_trans; eauto. apply join_r.
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_above. ss.
@@ -772,7 +779,9 @@ Proof.
             * admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. *)
               (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
-            * admit. (* sim_time on coh *)
+            * i. rewrite ? fun_add_spec. condtac; eauto.
+              inversion e. subst. rewrite POST, ELOC0.
+              repeat apply sim_view_join; ss; eauto 10 using sim_view_bot.
             * admit.
             * admit.
             * admit.
@@ -875,9 +884,8 @@ Proof.
             { rewrite ELOC0, EVAL0, <- MSG. eapply sim_mem_get_msg; eauto. }
             { inv LOCAL. rewrite PROMISES1; ss. }
             { inv WRITABLE. econs; try by ss.
-              - inv LOCAL. rewrite <- ELOC0 in *.
-                destruct (COH' (ValA.val (sem_expr rmap1 eloc))).
-                rewrite TS; ss. rewrite <- TS0. apply Nat.le_lteq. left. ss.
+              - inv LOCAL. rewrite <- ELOC0 in *. eapply le_lt_trans; [|exact COH].
+                eapply sim_view_inv; eauto. rewrite <- TS0. apply Nat.le_lteq. left. ss.
               - eapply le_lt_trans; [|exact EXT]. eapply sim_view_inv; cycle 1.
                 { etrans; [|exact TS0]. apply Nat.le_lteq. left. ss. }
                 inv LOCAL. repeat apply sim_view_join; eauto 10 using sim_view_ifc, sim_view_bot.
@@ -897,13 +905,15 @@ Proof.
         + econs; ss.
           { econs; ss. apply sim_rmap_add; ss. econs. s. i. splits; ss. econs; ss. }
           inv LOCAL. econs; ss; i.
-          all: repeat rewrite fun_add_spec.
           all: repeat apply sim_view_join; ss.
+          all: repeat rewrite fun_add_spec.
           all: rewrite ? ELOC0, ? EVAL0 in *.
           all: try condtac; ss.
           * inversion e. subst. econs; ss. i. inv MEM.
             rewrite ? Memory_latest_ts_app1; ss.
+          * specialize (COH VRN0). ss.
           * apply sim_view_const. ss.
+          * apply sim_view_const. destruct (OrdW.ge ord OrdW.release); ss.
           * apply sim_view_const. destruct (OrdW.ge ord OrdW.release); ss. apply bot_spec.
           * inversion e. subst. econs; ss.
             { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
@@ -1014,12 +1024,14 @@ Proof.
         * econs 5; eauto. econs; eauto.
         * econs 5.
       + econs; ss. inv LOCAL. econs; eauto using sim_view_join.
+        s. i. apply COH. rewrite <- VRN0. apply join_l.
     - (* dmb *)
       inv STEP. eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
         * econs 6; eauto. econs; eauto.
         * econs 5.
       + econs; ss. inv LOCAL. econs; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
+        s. i. apply COH. rewrite <- VRN0. apply join_l.
     - (* if *)
       inv LC. eexists (ExecUnit.mk _ _ _). esplits.
       + econs 1. econs. econs; ss; cycle 1.
