@@ -81,6 +81,9 @@ Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (f
 | sim_fwdbank_above
     (ABOVE: ts < fwd2.(FwdItem.view).(View.ts))
     (LATEST: Memory.latest loc fwd1.(FwdItem.ts) (length mem1) mem1)
+| sim_fwdbank_above'
+    (ABOVE: ts < fwd2.(FwdItem.ts))
+    (EX: fwd2.(FwdItem.ex))
 .
 
 Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank.t (A:=unit)): Prop :=
@@ -374,7 +377,8 @@ Lemma sim_fwd_view1 tid ts mem1 mem2 loc coh1 coh2 fwd1 fwd2 o
       (WF1: Local.wf_fwdbank loc mem1 coh1 fwd1)
       (WF2: Local.wf_fwdbank loc mem2 coh2 fwd2)
       (MEM: sim_mem tid ts mem1 mem2)
-      (COND: andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = false):
+      (COND: andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = false)
+      (RISCV: arch == riscv):
   sim_view ts (FwdItem.read_view fwd1 fwd1.(FwdItem.ts) o) (FwdItem.read_view fwd2 fwd2.(FwdItem.ts) o).
 Proof.
   destruct fwd1 as [ts1 view1 ex1].
@@ -440,6 +444,7 @@ Proof.
     + ii. subst. rewrite nth_error_app2 in MSG; [|lia].
       apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto.
       destruct (nequiv_dec (Msg.loc msg) (Msg.loc msg)); ss. congr.
+  - econs 3; ss.
 Qed.
 
 Lemma sim_exbank_mon
@@ -528,7 +533,13 @@ Proof.
           * apply sim_view_join_r. ss.
           * apply sim_view_join_r. ss.
           * apply sim_view_join_r. ss.
-          * admit. (* sim_fwdbank *)
+          * i. rewrite fun_add_spec. condtac; ss.
+            { inversion e. subst. econs 3; ss. clear -LEN0. lia. }
+            { rewrite <- (app_nil_r mem1). apply sim_fwdbank_mon; ss.
+              inv WF1. inv LOCAL. ss. destruct (FWDBANK0 loc). des.
+              exploit Memory.latest_ts_spec. i. des.
+              rewrite TS2, LE. apply COH0.
+            }
           * i. rewrite Promises.unset_o, Promises.set_o. condtac; eauto.
             inversion e. subst. clear -LEN0 TSP. lia.
         + inv MEM. econs; ss. rewrite <- List.app_assoc. ss.
@@ -552,10 +563,16 @@ Proof.
       econs; ss.
       + econs; ss. apply sim_rmap_add; ss.
       + inv LOCAL. econs; ss.
-        * admit. (* sim_time on coh *)
-          (* i. rewrite ? fun_add_spec. condtac; ss. *)
-          (* apply sim_view_above. s. clear -LEN0. lia. *)
-        * admit. (* sim_time on coh *)
+        * i. rewrite ? fun_add_spec. condtac.
+          { s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; [|congr].
+            clear -LEN0. econs. lia.
+          }
+          { rewrite ? Memory_latest_ts_app1; ss.
+            - inv WF2. inv LOCAL. ss.
+            - inv WF1. inv LOCAL. ss.
+          }
+        * i. rewrite ? fun_add_spec. condtac; ss.
+          clear -LEN0. econs. lia.
         * apply sim_view_join; ss.
           apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
@@ -696,6 +713,7 @@ Proof.
                 instantiate (1 := ord). rewrite POST in POST_BELOW. clear -POST_BELOW ABOVE.
                 ss. unfold join, Time.join in *. lia.
               }
+              { rewrite EX, RISCV in E0. ss. }
             * rewrite ELOC1. destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))).
               { destruct (le_lt_dec (View.ts (Local.coh lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
                 - admit. (* latest *)
@@ -721,6 +739,7 @@ Proof.
                     inv WF1. ss. inv LOCAL. apply COH1.
               }
               { eapply Memory.latest_mon2; eauto. inv WF1. ss. inv LOCAL. apply COH1. }
+              { rewrite EX, RISCV in E0. ss. }
             * admit. (* latest *)
               (* rewrite VRNEQ, VRELEQ. *)
               (* destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))). *)
