@@ -96,6 +96,9 @@ Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A
     (COH: forall loc, sim_time ts
                           (Memory.latest_ts loc (lc1.(Local.coh) loc).(View.ts) mem1)
                           (Memory.latest_ts loc (lc2.(Local.coh) loc).(View.ts) mem2))
+    (COH': forall loc, sim_time ts
+                           (lc1.(Local.coh) loc).(View.ts)
+                           (lc2.(Local.coh) loc).(View.ts))
     (VRN: sim_view ts lc1.(Local.vrn) lc2.(Local.vrn))
     (VWN: sim_view ts lc1.(Local.vwn) lc2.(Local.vwn))
     (VRO: sim_view ts lc1.(Local.vro) lc2.(Local.vro))
@@ -515,9 +518,10 @@ Proof.
       + econs; ss. apply sim_rmap_add; ss. econs; ss.
         unfold ifc. condtac; ss. intro Y. clear -Y LEN0. exfalso. lia.
       + inv LOCAL. econs; ss.
-        * admit. (* sime_time on coh *)
+        * admit. (* sim_time on coh *)
           (* i. rewrite ? fun_add_spec. condtac; ss. *)
-          (* apply sim_view_above. s. clear -LEN0. lia. *)
+        (* apply sim_view_above. s. clear -LEN0. lia. *)
+        * admit. (* sim_time on coh *)
         * apply sim_view_join; ss.
           apply sim_view_above. s. clear -LEN0. lia.
         * apply sim_view_join; ss.
@@ -614,6 +618,7 @@ Proof.
             * admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. *)
               (* apply sim_view_join; ss. apply sim_view_above. ss. *)
+            * admit. (* sim_time on coh *)
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_above. ss.
@@ -700,6 +705,7 @@ Proof.
             * admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. *)
               (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
+            * admit. (* sim_time on coh *)
             * destruct ex0; ss. econs. econs 1; ss.
               { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss.
                 apply sim_time_above. inv WF2. ss. inv LOCAL.
@@ -767,6 +773,7 @@ Proof.
             * admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. *)
               (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
+            * admit. (* sim_time on coh *)
             * destruct ex0; ss. econs. econs; ss.
               { clear. ii. lia. }
               { eapply sim_view_below; eauto. rewrite POST.
@@ -805,9 +812,8 @@ Proof.
                 all: try apply sim_view_bot.
                 all: try by apply LOCAL.
                 inv LOCAL. inv EXBANK; ss. inv REL; ss. clear -ABOVE. econs. lia.
-              - admit. (* ? *)
-                (* inv LOCAL. destruct (COH0 (ValA.val (sem_expr rmap2 eloc))). *)
-                (* rewrite TS; ss. rewrite <- TS0. apply Nat.le_lteq. left. ss. *)
+              - inv LOCAL. destruct (COH' (ValA.val (sem_expr rmap2 eloc))).
+                rewrite TS; ss. rewrite <- TS0. apply Nat.le_lteq. left. ss.
               - i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
                 destruct a, eb. ss. esplits; eauto. ss. i. subst. inv REL; ss; subst.
                 + move EX0 at bottom. specialize (EX0 eq_refl).
@@ -823,13 +829,24 @@ Proof.
           all: repeat rewrite fun_add_spec.
           all: repeat apply sim_view_join; ss.
           all: try condtac; ss.
-          * admit. (* sime_time on coh *)
-            (* inversion e. subst. econs; ss. *)
-            (* { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. } *)
-            (* { clear -TS0. lia. } *)
-            (* { erewrite sim_mem_read; eauto. eapply Memory.get_msg_read; eauto. } *)
-            (* { eapply Memory.get_msg_read; eauto. } *)
-          * admit. (* ? *)
+          * inversion e. subst. econs; ss. i. inv MEM.
+
+            Lemma Memory_latest_ts_app1
+                  loc ts mem1 mem2
+                  (TS: ts <= length mem1):
+              Memory.latest_ts loc ts (mem1 ++ mem2) =
+              Memory.latest_ts loc ts mem1.
+            Proof.
+              revert TS. induction ts; ss. i. rewrite IHts; [|lia].
+              rewrite nth_error_app1; ss.
+            Qed.
+
+            rewrite ? Memory_latest_ts_app1; ss.
+          * inversion e. subst. econs; ss.
+            { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
+            { clear -TS0. lia. }
+            { erewrite sim_mem_read; eauto. eapply Memory.get_msg_read; eauto. }
+            { eapply Memory.get_msg_read; eauto. }
           * rewrite ? Promises.unset_o. condtac; ss. eauto.
           * rewrite Promises.unset_o. condtac; ss. eauto.
           * inv MEM. econs; ss.
@@ -879,6 +896,7 @@ Proof.
           + inv LOCAL. econs; ss.
             * admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. apply sim_view_above. ss. *)
+            * admit. (* sim_time on coh *)
             * apply sim_view_join; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss.
             * apply sim_view_join; ss. unfold ifc. condtac; ss. apply sim_view_above. ss.
@@ -957,7 +975,7 @@ Proof.
         * econs 7. ss.
       + econs; ss.
   }
-Admitted.
+Qed.
 
 Lemma sim_eu_promises
       tid ts eu1 eu2
