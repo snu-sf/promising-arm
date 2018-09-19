@@ -54,7 +54,7 @@ Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=unit))): Prop :=
 .
 Hint Constructors sim_state.
 
-Inductive sim_mem (tid:Id.t) (ts:Time.t) (coh1 coh2: Loc.t -> View.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
+Inductive sim_mem (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t): Prop :=
 | sim_mem_intro
     mem mem1' mem2'
     (MEM: ts = length mem)
@@ -116,7 +116,7 @@ Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
     (STATE: sim_state ts eu1.(ExecUnit.state) eu2.(ExecUnit.state))
     (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) eu1.(ExecUnit.local) eu2.(ExecUnit.local))
-    (MEM: sim_mem tid ts eu1.(ExecUnit.local).(Local.coh) eu2.(ExecUnit.local).(Local.coh) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
+    (MEM: sim_mem tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
 .
 Hint Constructors sim_eu.
 
@@ -315,8 +315,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_read
-      tid ts coh1 coh2 mem1 mem2 loc ts0
-      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      tid ts mem1 mem2 loc ts0
+      (SIM: sim_mem tid ts mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.read loc ts0 mem1 = Memory.read loc ts0 mem2.
 Proof.
@@ -324,8 +324,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_get_msg
-      tid ts coh1 coh2 mem1 mem2 ts0
-      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      tid ts mem1 mem2 ts0
+      (SIM: sim_mem tid ts mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.get_msg ts0 mem1 = Memory.get_msg ts0 mem2.
 Proof.
@@ -333,16 +333,16 @@ Proof.
 Qed.
 
 Lemma sim_mem_length
-      tid ts coh1 coh2 mem1 mem2
-      (SIM: sim_mem tid ts coh1 coh2 mem1 mem2):
+      tid ts mem1 mem2
+      (SIM: sim_mem tid ts mem1 mem2):
   ts <= length mem1 /\ ts <= length mem2.
 Proof.
   inv SIM. rewrite ? app_length. lia.
 Qed.
 
 Lemma sim_mem_no_msgs
-      tid ts from to pred coh1 coh2 mem1 mem2
-      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      tid ts from to pred mem1 mem2
+      (MEM: sim_mem tid ts mem1 mem2)
       (TS: to <= ts)
       (NOMSGS: Memory.no_msgs from to pred mem2):
   Memory.no_msgs from to pred mem1.
@@ -367,9 +367,9 @@ Ltac des_eq :=
 
 Lemma sim_fwd_view1 tid ts mem1 mem2 loc coh1 coh2 fwd1 fwd2 o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
-      (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
-      (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
-      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      (WF1: Local.wf_fwdbank loc mem1 coh1 fwd1)
+      (WF2: Local.wf_fwdbank loc mem2 coh2 fwd2)
+      (MEM: sim_mem tid ts mem1 mem2)
       (COND: andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = false):
   sim_view ts (FwdItem.read_view fwd1 fwd1.(FwdItem.ts) o) (FwdItem.read_view fwd2 fwd2.(FwdItem.ts) o).
 Proof.
@@ -389,9 +389,9 @@ Qed.
 
 Lemma sim_fwd_view2 tid ts mem1 mem2 loc coh1 coh2 fwd1 fwd2 t o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
-      (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
-      (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
-      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      (WF1: Local.wf_fwdbank loc mem1 coh1 fwd1)
+      (WF2: Local.wf_fwdbank loc mem2 coh2 fwd2)
+      (MEM: sim_mem tid ts mem1 mem2)
       (TS: t <= ts)
       (FWDTS: fwd2.(FwdItem.ts) <= t)
       (COND: fwd2.(FwdItem.ts) <> t \/ andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = true):
@@ -412,8 +412,8 @@ Proof.
 Qed.
 
 Lemma sim_fwdbank_mon
-      tid ts coh1 coh2 mem1 mem2 loc fwd1 fwd2 mem1' mem2'
-      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      tid ts mem1 mem2 loc fwd1 fwd2 mem1' mem2'
+      (MEM: sim_mem tid ts mem1 mem2)
       (SIM: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (FWD1: fwd1.(FwdItem.ts) <= length mem1)
       (MEM1': Forall (fun msg => msg.(Msg.loc) <> loc) mem1'):
@@ -439,8 +439,8 @@ Proof.
 Qed.
 
 Lemma sim_exbank_mon
-      tid ts coh1 coh2 mem1 mem2 eb1 eb2 mem1' mem2'
-      (MEM: sim_mem tid ts coh1 coh2 mem1 mem2)
+      tid ts mem1 mem2 eb1 eb2 mem1' mem2'
+      (MEM: sim_mem tid ts mem1 mem2)
       (SIM: sim_exbank tid ts mem1 mem2 eb1 eb2):
   sim_exbank tid ts (mem1 ++ mem1') (mem2 ++ mem2') eb1 eb2.
 Proof.
@@ -450,6 +450,16 @@ Proof.
     rewrite nth_error_app1 in MSG; ss. lia.
   - econs 2; ss. ii. eapply EXCLUSIVE; eauto.
     rewrite nth_error_app1 in MSG; ss. lia.
+Qed.
+
+Lemma Memory_latest_ts_app1
+      loc ts mem1 mem2
+      (TS: ts <= length mem1):
+  Memory.latest_ts loc ts (mem1 ++ mem2) =
+  Memory.latest_ts loc ts mem1.
+Proof.
+  revert TS. induction ts; ss. i. rewrite IHts; [|lia].
+  rewrite nth_error_app1; ss.
 Qed.
 
 Lemma sim_eu_step
@@ -477,6 +487,33 @@ Proof.
     intro X. inv X. exploit TS.
     { rewrite <- VCAP, <- join_r. ss. }
     clear TS. intro TS. rewrite <- TS in *.
+    destruct ex.
+    { (* write exclusive *)
+      eexists (ExecUnit.mk _ _ _). esplits.
+      - econs 1. econs. econs; cycle 1.
+        + econs 4; ss.
+        + ss.
+        + econs; ss.
+      - econs; ss.
+        + econs; ss. apply sim_rmap_add; ss. rewrite RISCV. s.
+          econs. s. i. clear -H LEN0. lia.
+        + inv LOCAL. econs; ss.
+          * i. rewrite fun_add_spec. condtac; eauto.
+            { inversion e. subst.
+              apply sim_time_above. s. rewrite nth_error_app2, Nat.sub_diag; ss.
+              condtac; ss. clear -LEN0. lia.
+            }
+            { rewrite Memory_latest_ts_app1; ss. inv WF2. inv LOCAL. ss. }
+          * i. rewrite fun_add_spec. condtac; eauto.
+            apply sim_time_above. s. clear -LEN0. lia.
+          * apply sim_view_above. s. clear -LEN0. unfold join, Time.join. lia.
+          * admit.
+          * admit.
+          * admit.
+          * i. rewrite Promises.unset_o, Promises.set_o. condtac; eauto.
+            inversion e. subst. clear -LEN0 TSP. lia.
+        + inv MEM. econs; ss. rewrite <- List.app_assoc. ss.
+    }
     eexists (ExecUnit.mk _ _ _). esplits.
     - econs 2. econs; ss.
       + econs; ss.
@@ -830,17 +867,6 @@ Proof.
           all: repeat apply sim_view_join; ss.
           all: try condtac; ss.
           * inversion e. subst. econs; ss. i. inv MEM.
-
-            Lemma Memory_latest_ts_app1
-                  loc ts mem1 mem2
-                  (TS: ts <= length mem1):
-              Memory.latest_ts loc ts (mem1 ++ mem2) =
-              Memory.latest_ts loc ts mem1.
-            Proof.
-              revert TS. induction ts; ss. i. rewrite IHts; [|lia].
-              rewrite nth_error_app1; ss.
-            Qed.
-
             rewrite ? Memory_latest_ts_app1; ss.
           * inversion e. subst. econs; ss.
             { rewrite <- TS0. inv WRITABLE. ss. clear -EXT. unfold join, Time.join in *. lia. }
