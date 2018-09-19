@@ -742,17 +742,16 @@ Proof.
                     clear -x1 l TSABOVE. etrans; [apply x1|]. lia.
                 - destruct (le_lt_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts).
                   + apply sim_time_below in TS; ss. rewrite TS in *. ss.
-                    ii. destruct (le_lt_dec (S ts0) ts).
-                    * eapply COH; eauto.
-                      { clear -l1 l. lia. }
-                      { inv MEM. rewrite nth_error_app1 in *; ss. }
-                    * admit. (* latest *)
-                      (* inv MEM. rewrite nth_error_app2 in MSG0; ss; [|clear -l1; lia]. *)
-                      (* exploit MEM1'; eauto. i. des. destruct msg, msg2. ss. subst. *)
-                      (* eapply COH; try exact MSGCOH0; eauto. *)
-                      (* { clear -l0. lia. } *)
-                      (* { rewrite <- MSG1. clear. rewrite nth_error_app2; [|lia]. f_equal. lia. } *)
-                      (* { ss. } *)
+                    exploit COH0.
+                    { rewrite <- POST_BELOW, POST. s.
+                      rewrite <- join_l, <- join_r, <- join_l. ss.
+                    }
+                    instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). i.
+                    apply sim_time_below in x; cycle 1.
+                    { rewrite <- l0. apply Memory.latest_latest_ts. ss. }
+                    eapply Memory.latest_mon1.
+                    * apply Memory.latest_ts_latest. eauto.
+                    * apply Memory.latest_latest_ts. ss.
                   + specialize (TSABOVE l0). des. eapply Memory.latest_mon2; eauto.
                     inv WF1. ss. inv LOCAL. apply COH1.
               }
@@ -835,19 +834,19 @@ Proof.
                 - etrans; [by apply Y|]. ss.
                 - ii. eapply COH; eauto. rewrite TS2. apply Y.
               }
-              ii. destruct (le_lt_dec (S ts1) ts).
-              { eapply COH; eauto.
-                - clear -l0 l. lia.
-                - inv MEM. rewrite nth_error_app1 in *; ss.
+              exploit COH0.
+              { rewrite <- POST_BELOW, POST. s.
+                rewrite <- join_l, <- join_r, <- join_l. ss.
               }
-              { admit.
-                (* inv MEM. rewrite nth_error_app2 in MSG0; ss; [|clear -l0; lia]. *)
-                (* exploit MEM1'; eauto. i. des. destruct msg, msg2. ss. subst. *)
-                (* eapply COH; try exact MSGCOH0; eauto. *)
-                (* - clear -BELOW. lia. *)
-                (* - rewrite <- MSG1. clear. rewrite nth_error_app2; [|lia]. f_equal. lia. *)
-                (* - ss. *)
+              instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). i.
+              destruct (le_lt_dec (Memory.latest_ts (ValA.val (sem_expr rmap2 eloc))
+                                                    (View.ts (Local.coh lc2 (ValA.val (sem_expr rmap2 eloc)))) mem2) ts).
+              { apply sim_time_below in x; ss.
+                eapply Memory.latest_mon1.
+                - apply Memory.latest_ts_latest. eauto.
+                - apply Memory.latest_latest_ts. ss.
               }
+              { move COH at bottom. apply Memory.latest_latest_ts in COH. clear -BELOW l0 COH. lia. }
             * admit.
               (* rewrite VRNEQ, VRELEQ. eapply sim_mem_no_msgs; eauto. *)
               (* rewrite <- POST_BELOW, POST'. s. apply join_l. *)
