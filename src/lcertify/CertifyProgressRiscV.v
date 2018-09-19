@@ -670,7 +670,12 @@ Proof.
         - econs; ss.
           + econs; ss. apply sim_rmap_add; ss. apply sim_val_above. ss.
           + econs; ss.
-            * admit. (* sim_time on coh *)
+            * i. rewrite ? fun_add_spec. condtac; ss. inversion e. subst.
+              apply sim_time_above. eapply lt_le_trans; [exact POST_ABOVE|].
+              rewrite POST. s. clear -
+              
+
+              admit. (* sim_time on coh *)
               (* i. rewrite ? fun_add_spec. condtac; ss. *)
               (* apply sim_view_join; ss. apply sim_view_above. ss. *)
             * admit. (* sim_time on coh *)
