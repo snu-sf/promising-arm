@@ -675,7 +675,14 @@ Proof.
               i. rewrite ? fun_add_spec. condtac; ss. inversion e. subst.
               generalize POST_ABOVE. rewrite POST. s. intro Y.
               apply Nat.max_lt_iff in Y. des; cycle 1.
-              { admit. (* ts < ts0 *) }
+              { apply sim_time_above. eapply lt_le_trans; [by eauto|].
+                rewrite ELOC0 in *. unfold FwdItem.read_view in *. condtac; ss.
+                - apply andb_true_iff in X0. des.
+                  destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc2 (ValA.val (sem_expr rmap2 eloc)))) ts0); ss. inv e0.
+                  inv WF2. inv LOCAL. ss. destruct (FWDBANK0 (ValA.val (sem_expr rmap2 eloc))). des.
+                  etrans; [by apply VIEW|]. etrans; [by apply TS|]. apply Memory.latest_ts_mon. apply join_l.
+                - eapply Memory.latest_ts_read_le; eauto. rewrite <- join_r, <- join_r. ss.
+              }
               apply Nat.max_lt_iff in Y. des.
               { clear -VCAP Y. unfold join, Time.join in *. lia. }
               apply Nat.max_lt_iff in Y. des.
@@ -799,12 +806,11 @@ Proof.
             * apply sim_view_bot.
             * rewrite ELOC0. ss.
           + rewrite ELOC0 in *. econs; ss; try by rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
-            * i. rewrite ? fun_add_spec. condtac; eauto.
-              { inversion e. subst.
-                admit. (* sim_time on coh *)
-                (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
-              }
+            * i. rewrite ? fun_add_spec. condtac; cycle 1.
               { apply COH0. rewrite <- VRN0. apply join_l. }
+              inversion e. subst.
+              admit. (* sim_time on coh *)
+              (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
             * i. rewrite ? fun_add_spec. condtac; eauto.
               inversion e. subst.
               rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
@@ -889,12 +895,11 @@ Proof.
           + econs; ss. apply sim_rmap_add; ss. apply sim_view_val.
             rewrite POST. eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
           + econs; ss; try by rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
-            * i. rewrite ? fun_add_spec. condtac; ss.
-              { inversion e. subst.
-                admit. (* sim_time on coh *)
-                (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
-              }
+            * i. rewrite ? fun_add_spec. condtac; cycle 1.
               { apply COH0. rewrite <- VRN0. apply join_l. }
+              inversion e. subst.
+              admit. (* sim_time on coh *)
+              (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
             * i. rewrite ? fun_add_spec. condtac; ss.
               rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * destruct ex0; ss. econs. econs; ss.
