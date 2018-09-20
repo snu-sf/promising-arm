@@ -798,33 +798,34 @@ Proof.
             rewrite POST. repeat apply sim_view_join; ss.
             * apply sim_view_bot.
             * rewrite ELOC0. ss.
-          + econs; ss; try by rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
-            * admit. (* sim_time on coh *)
-              (* i. rewrite ? fun_add_spec. condtac; ss. *)
-              (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
+          + rewrite ELOC0 in *. econs; ss; try by rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * i. rewrite ? fun_add_spec. condtac; eauto.
-              inversion e. subst. rewrite POST, ELOC0.
-              repeat apply sim_view_join; ss; eauto 10 using sim_view_bot.
-            * admit.
-            * admit.
-            * admit.
+              { inversion e. subst.
+                admit. (* sim_time on coh *)
+                (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
+              }
+              { apply COH0. rewrite <- VRN0. apply join_l. }
+            * i. rewrite ? fun_add_spec. condtac; eauto.
+              inversion e. subst.
+              rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * destruct ex0; ss. econs.
-              admit. (* sim_exbank *)
-              (* econs 1; ss. *)
-              (* { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss. *)
-              (*   apply sim_time_below. inv WF2. ss. inv LOCAL. *)
-              (*   destruct (FWDBANK0 (ValA.val (sem_expr rmap2 eloc))). des. *)
-              (*   clear -ABOVE VIEW. lia. *)
-              (* } *)
-              (* { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); eauto. *)
-              (*   - intro Y. specialize (TSABOVE Y). *)
-              (*     apply Memory.ge_no_msgs. clear -TSABOVE. lia. *)
-              (*   - ii. des. eapply LATEST0; eauto. rewrite TS2. *)
-              (*     inv MEM. rewrite app_length. clear. lia. *)
-              (* } *)
-              (* { eapply sim_view_below; eauto. rewrite POST. *)
-              (*   eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
-              (* } *)
+              econs 1; ss.
+              { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss.
+                - apply sim_time_above. inv WF2. ss. inv LOCAL.
+                  destruct (FWDBANK0 (ValA.val (sem_expr rmap2 eloc))). des.
+                  clear -ABOVE VIEW. lia.
+                - rewrite EX, RISCV in E0. ss.
+              }
+              { destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); eauto.
+                - intro Y. specialize (TSABOVE Y).
+                  apply Memory.ge_no_msgs. clear -TSABOVE. lia.
+                - ii. des. eapply LATEST0; eauto. rewrite TS2.
+                  inv MEM. rewrite app_length. clear. lia.
+                - rewrite EX, RISCV in E0. ss.
+              }
+              { eapply sim_view_inv; eauto. rewrite POST.
+                eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
+              }
       }
       { (* Case 3: Tgt didn't read from fwdbank. Src reads the same msg. *)
         rewrite ELOC0 in *.
@@ -890,7 +891,8 @@ Proof.
           + econs; ss; try by rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot.
             * i. rewrite ? fun_add_spec. condtac; ss.
               { inversion e. subst.
-                admit.
+                admit. (* sim_time on coh *)
+                (* rewrite ? POST; eauto 10 using sim_view_join, sim_view_ifc, sim_view_bot. *)
               }
               { apply COH0. rewrite <- VRN0. apply join_l. }
             * i. rewrite ? fun_add_spec. condtac; ss.
