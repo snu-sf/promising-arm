@@ -37,14 +37,14 @@ and faster operational memory model for ARMv8 and RISC-V".
 
 - `src/axiomatic/Axiomatic.v`: Definition of Axiomatic (Section 8)
 
-- `src/lcertify`: (Work-in-progress) Thread-local certification (Section 3.5, 8.1)
+- `src/lcertify`: Thread-local certification (Section 3.5, 8.1)
 
 - `src/certify`: (Work-in-progress) Certification with ARMv8 store exclusives (Section 7) and the
   definition of Extended-Promising (Section 8.1)
 
 ### Results
 
-The following theorems collectively prove Theorem 8.1 and the observation made in Section 6.1:
+The following theorems collectively prove Theorem 8.1, 8.2, 8.3, and the observation made in Section 6.1:
 
 - The optimisation for exhaustive exploration is sound (Section 6.1).  Or equivalently,
   Global-Promising refines Optimised Global-Promising.  See Theorem `promising_to_promising_pf` in
@@ -63,11 +63,14 @@ The following theorems collectively prove Theorem 8.1 and the observation made i
 - Axiomatic refines Global-Promising (Theorem 8.1).  See Theorem `axiomatic_to_promising` in
   `src/axiomatic/AtoP.v`.
 
+- Global-Promising refines Promising (Theorem 8.2).  See Theorem `certifiec_exec_complete` in
+  `src/lcertify/CertifyComplete.v`.
 
-(Work-in-progress) We are formalising Theorem 8.2 (equivalence of Global-Promising and Promising),
-8.3 (Deadlock-freedom of Promising for RISC-V), 8.4 (equivalence of Global-Promising and
-Extended-Promising), and 8.5 (Deadlock-freedom of Extended-Promising for ARM).  For Theorem 8.2,
-Lemma `interference_certify`, `promise_step_certify`, `state_step_certify` in
-`src/lcertify/Certify.v` will be the key lemmas.  We think it is straightforward to formalise
-Theorem 8.3.  We are planning to formalize Theorem 8.4 and 8.5, which seems technical and
-non-trivial but feasible.
+- Promising refines Global-Promising (Theorem 8.2).  See Theorem `certified_exec_sound` in
+  `src/lcertify/Certify.v`.
+
+- Promising-RISC-V is deadlock-free (Theorem 8.3).  See Theorem `certified_deadlock_free` in
+  `src/lcertify/CertifyProgressRiscV.v`.
+
+
+Theorem 8.4 and 8.5 are unprogressed.
