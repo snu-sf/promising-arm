@@ -51,10 +51,22 @@ Proof.
   destruct eu1 as [st1 lc1 mem1]. eexists (ExecUnit.mk _ _ _). splits; ss.
   { rewrite nth_error_app2, Nat.sub_diag; ss. }
   econs; ss.
-  - admit. (* sim_state refl *)
+  - econs; ss. econs. ii. destruct (IdMap.find id (State.rmap st1)); ss. econs. econs. ss.
   - econs; ss.
-    + admit. (* sim_fwdbank *)
-    + admit. (* sim_exbank *)
+    + inv WF. inv LOCAL. ss. i. specialize (FWDBANK loc0). inv FWDBANK. des.
+      assert (FWD_TS: FwdItem.ts (Local.fwdbank lc1 loc0) <= length mem1).
+      { rewrite TS. apply Memory.latest_latest_ts. apply Memory.ge_latest. ss. }
+      econs 1; eauto.
+      * rewrite VIEW. ss.
+      * lia.
+      * apply Memory.read_mon. ss.
+    + inv WF. inv LOCAL. ss.
+      destruct (Local.exbank lc1); ss. specialize (EXBANK _ eq_refl). inv EXBANK. des. econs.
+      assert (EXBANK_TS: Exbank.ts t <= length mem1).
+      { rewrite TS. apply Memory.latest_latest_ts. apply Memory.ge_latest. ss. }
+      econs; ss.
+      * rewrite VIEW. ss.
+      * lia.
     + i. rewrite Promises.set_o. condtac; ss. clear X. inv e. lia.
     + i. rewrite ? Promises.set_o, Promises.lookup_bot. condtac; ss.
       eapply Local_wf_promises_above; eauto. apply WF.
@@ -69,7 +81,7 @@ Proof.
     + i. apply nth_error_singleton_inv in NTH. des. subst.
       revert PROMISES. rewrite Promises.set_o. condtac; ss.
       exfalso. apply c. rewrite Time.add_0_r. refl.
-Admitted.
+Qed.
 
 Lemma sim_eu_write_step
       tid ts loc val view_pre tsp src_promises eu1 eu2 eu2'
@@ -133,7 +145,14 @@ Proof.
     rewrite Promises.lookup_bot. ss.
   }
   { admit. (* mem monotone *) }
-  { admit. (* vcap *) }
+  { rewrite <- VIEW_PRE.
+    destruct eu2 as [st2 lc2 mem2].
+    destruct eu3 as [st3 lc3 mem3].
+    inv STEP3. inv PROMISE; inv FULFILL; ss. subst. ss.
+    inv WRITABLE. ss. apply join_spec.
+    - rewrite <- join_r, <- join_r, <- join_l. ss.
+    - rewrite <- join_l. ss.
+  }
   replace (Promises.unset (S (length (ExecUnit.mem eu1))) (Promises.set (S (length (ExecUnit.mem eu1))) bot)) with (bot:Promises.t); cycle 1.
   { apply Promises.ext. i. rewrite Promises.unset_o, Promises.set_o. condtac; ss. clear X. inv e.
     apply Promises.lookup_bot.
@@ -161,10 +180,22 @@ Proof.
   destruct eu2 as [st2 lc2 mem2].
   inv STEP. inv LOCAL. inv MEM2. ss. subst. econs; ss.
   econs; ss.
-  - admit. (* sim_state refl *)
+  - econs. ii. destruct (IdMap.find id (State.rmap st2)); ss. econs. econs. ss.
   - econs; ss.
-    + admit. (* sim_fwdbank *)
-    + admit. (* sim_exbank *)
+    + inv WF. inv LOCAL. ss. i. specialize (FWDBANK loc0). inv FWDBANK. des.
+      assert (FWD_TS: FwdItem.ts (Local.fwdbank lc1 loc0) <= length mem1).
+      { rewrite TS. apply Memory.latest_latest_ts. apply Memory.ge_latest. ss. }
+      econs 1; eauto.
+      * rewrite VIEW. ss.
+      * lia.
+      * apply Memory.read_mon. ss.
+    + inv WF. inv LOCAL. ss.
+      destruct (Local.exbank lc1); ss. specialize (EXBANK _ eq_refl). inv EXBANK. des. econs.
+      assert (EXBANK_TS: Exbank.ts t <= length mem1).
+      { rewrite TS. apply Memory.latest_latest_ts. apply Memory.ge_latest. ss. }
+      econs; ss.
+      * rewrite VIEW. ss.
+      * lia.
     + i. rewrite Promises.set_o. condtac; ss. clear X. inv e. lia.
     + i. rewrite ? Promises.set_o, Promises.lookup_bot.
       eapply Local_wf_promises_above; eauto. apply WF.
@@ -172,7 +203,7 @@ Proof.
     + rewrite app_nil_r. ss.
     + i. revert TSP. rewrite Promises.lookup_bot. ss.
     + i. destruct n1; ss.
-Admitted.
+Qed.
 
 Theorem certified_promise_complete
         tid (eu1 eu2:ExecUnit.t (A:=unit)) loc val ts
