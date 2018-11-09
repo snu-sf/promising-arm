@@ -60,7 +60,11 @@ Inductive sim_mem (tid:Id.t) (ts:Time.t) (src_promises:Promises.t) (coh1 coh2: L
     (MEM: ts = length mem)
     (MEM1: mem1 = mem ++ mem1')
     (MEM2: mem2 = mem ++ mem2')
-    (SRC_PROMISES_WF: forall tsp (TSP: Promises.lookup tsp src_promises), length mem < tsp /\ tsp <= length mem1)
+    (SRC_PROMISES_WF: forall tsp (TSP: Promises.lookup (S tsp) src_promises),
+        length mem < S tsp /\
+        exists msg, nth_error mem1 tsp = Some msg /\
+               Memory.exclusive tid msg.(Msg.loc) ts (S tsp) mem1 /\
+               Memory.latest msg.(Msg.loc) (S tsp) (length mem1) mem1)
     (SRC_PROMISES: forall tsp msg
                      (TSP: Promises.lookup (S tsp) src_promises)
                      (MSG: nth_error mem1 tsp = Some msg),
@@ -605,7 +609,14 @@ Proof.
         * ss.
         * rewrite <- app_assoc. ss.
         * rewrite <- app_assoc. ss.
-        * i. exploit SRC_PROMISES_WF; eauto. i. des. splits; ss. rewrite x1, ? app_length. clear. lia.
+        * i. exploit SRC_PROMISES_WF; eauto. i. des. esplits; ss.
+          { apply nth_error_app_mon; eauto. }
+          { ii. eapply x2; eauto. apply nth_error_snoc_inv in MSG0. des; subst; ss. }
+          { rewrite app_length. s. ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
+            - eapply x3; eauto.
+            - exploit SRC_PROMISES_BELOW; eauto. rewrite fun_add_spec. condtac; ss; [|congr].
+              clear. rewrite app_length. lia.
+          }
         * i. apply nth_error_snoc_inv in MSG0. des.
           { exploit SRC_PROMISES; eauto. i. des. subst. splits; ss.
             exploit SRC_PROMISES_BELOW; eauto. rewrite ? fun_add_spec.
@@ -614,7 +625,18 @@ Proof.
           { subst. splits; ss.
             rewrite fun_add_spec. condtac; ss; cycle 1.
             { exfalso. apply c. clear. refl. }
-            apply SRC_PROMISES_WF in TSP. clear -TSP. lia.
+            apply SRC_PROMISES_WF in TSP. des.
+
+            (* TODO *)
+            Lemma nth_error_some A
+                  (l:list A) n a
+                  (SOME: nth_error l n = Some a):
+              n < length l.
+            Proof.
+              apply nth_error_Some. rewrite SOME. ss.
+            Qed.
+
+            apply nth_error_some in TSP0. clear -TSP0. lia.
           }
         * i. apply nth_error_snoc_inv in NTH. des.
           { exploit MEM1'; eauto. i. des. subst. esplits; swap 1 3.
@@ -1080,7 +1102,14 @@ Proof.
             * ss.
             * rewrite <- app_assoc. ss.
             * ss.
-            * i. exploit SRC_PROMISES_WF; eauto. i. des. splits; ss. rewrite x1, ? app_length. clear. lia.
+            * i. exploit SRC_PROMISES_WF; eauto. i. des. esplits; ss.
+              { apply nth_error_app_mon; eauto. }
+              { ii. eapply x2; eauto. apply nth_error_snoc_inv in MSG0. des; subst; ss. }
+              { rewrite app_length. s. ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
+                - eapply x3; eauto.
+                - exploit SRC_PROMISES_BELOW; eauto. rewrite fun_add_spec. condtac; ss; [|congr].
+                  clear -TS0. lia.
+              }
             * i. apply nth_error_snoc_inv in MSG0. des.
               { exploit SRC_PROMISES; eauto. i. des. subst. splits; ss.
                 exploit SRC_PROMISES_BELOW; eauto. rewrite ? fun_add_spec.
@@ -1089,7 +1118,8 @@ Proof.
               { subst. splits; ss.
                 rewrite fun_add_spec. condtac; ss; cycle 1.
                 { exfalso. apply c. clear. refl. }
-                apply SRC_PROMISES_WF in TSP. clear -TSP. lia.
+                apply SRC_PROMISES_WF in TSP. des.
+                apply nth_error_some in TSP0. clear -TSP0. lia.
               }
             * i. apply nth_error_snoc_inv in NTH. des.
               { exploit MEM1'; eauto. i. des. subst. esplits; try exact MSG0; ss.
@@ -1164,15 +1194,19 @@ Proof.
   revert eu1 SIM SRC_PROMISES_BELOW WF1 WF2. induction STEP; eauto.
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0. admit. }
+    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
+      admit. (* coh monotone *)
+    }
     i. des.
     exploit certify_step_wf; try exact H; eauto. i.
     exploit certify_step_wf; eauto. i.
     exploit IHSTEP; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. admit. }
+    { i. exploit SRC_PROMISES_BELOW; eauto.
+      admit. (* mem monotone *)
+    }
     i. des.
     esplits; [|by eauto]. econs; eauto.
-  - admit. (* vcap.. *)
+  - admit. (* vcap monotone *)
 Admitted.
 
 Lemma sim_eu_promises
@@ -1183,7 +1217,8 @@ Lemma sim_eu_promises
 Proof.
   apply Promises.ext. i. inv SIM. inv LOCAL. destruct (le_lt_dec i ts).
   - rewrite PROMISES1, EU2; ss. destruct (Promises.lookup i src_promises) eqn:TSP; ss.
-    inv MEM. exploit SRC_PROMISES_WF; eauto. clear -l. lia.
+    destruct i; ss.
+    inv MEM. exploit SRC_PROMISES_WF; eauto. i. des. clear -l x. lia.
   - rewrite PROMISES2; ss.
 Qed.
 
@@ -1209,12 +1244,16 @@ Proof.
   }
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0. admit. }
+    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
+      admit. (* coh monotone *)
+    }
     i. des.
     exploit certify_step_wf; try exact H; eauto. i.
     exploit certify_step_wf; eauto. i.
     exploit IHSTEP; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. admit. }
+    { i. exploit SRC_PROMISES_BELOW; eauto.
+      admit. (* mem monotone *)
+    }
     i. des.
     esplits; [|by eauto]. econs; eauto.
   - esplits; eauto. eapply sim_eu_promises; eauto. i.

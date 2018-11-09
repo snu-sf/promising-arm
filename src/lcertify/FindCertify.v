@@ -73,7 +73,11 @@ Proof.
   - econs; ss.
     + rewrite app_nil_r. ss.
     + i. revert TSP. rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. clear X. inv e.
-      rewrite app_length. s. clear. lia.
+      rewrite app_length. esplits; ss.
+      * rewrite nth_error_app2, Nat.sub_diag; ss.
+      * ii. assert (ts = length mem1) by (clear -TS1 TS2; lia). subst.
+        ss. des. subst. apply nth_error_snoc_inv in MSG. des; [lia|]. destruct msg. inv MSG0. ss.
+      * apply Memory.ge_latest. clear. lia.
     + i. revert TSP. rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. clear X. inv e.
       apply nth_error_snoc_inv in MSG. des; subst; ss.
       * lia.
@@ -91,7 +95,8 @@ Lemma sim_eu_write_step
                              (TSP': Promises.lookup (S tsp') (Promises.unset (S tsp) src_promises))
                              (MEM: nth_error eu1.(ExecUnit.mem) tsp' = Some msg),
           (eu2'.(ExecUnit.local).(Local.coh) msg.(Msg.loc)).(View.ts) <= ts)
-      (TSP: nth_error eu1.(ExecUnit.mem) tsp = Some (Msg.mk loc val tid))
+      (TSPMSG: nth_error eu1.(ExecUnit.mem) tsp = Some (Msg.mk loc val tid))
+      (TSP: Promises.lookup (S tsp) src_promises)
       (WF1: ExecUnit.wf tid eu1)
       (WF2: ExecUnit.wf tid eu2)
       (VCAP: eu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts)
@@ -101,7 +106,154 @@ Lemma sim_eu_write_step
     <<STEP: certify_step tid eu1 eu1'>> /\
     <<SIM: sim_eu tid ts (Promises.unset (S tsp) src_promises) eu1' eu2'>>.
 Proof.
-Admitted.
+  exploit write_step_wf; eauto. intro WF2'.
+  destruct eu1 as [[stmts1 rmap1] lc1 mem1].
+  destruct eu2 as [[stmts2 rmap2] lc2 mem2].
+  destruct eu2' as [[stmts2' rmap2'] lc2' mem2'].
+  inv SIM. inv STATE. ss. subst.
+  exploit sim_mem_length; eauto. intro LEN. des.
+  inv STEP. ss. inv STATE. inv PROMISE. inv FULFILL. inv MEM2. ss.
+  exploit sim_rmap_expr; eauto. instantiate (1 := eloc).
+  intro X. inv X. exploit TS.
+  { rewrite <- VCAP, <- join_r. ss. }
+  clear TS. intro TS. rewrite <- TS in *.
+  exploit sim_rmap_expr; eauto. instantiate (1 := eval).
+  intro X. inv X. exploit TS0.
+  { rewrite <- VIEW_PRE. inv WRITABLE. ss. rewrite <- join_r, <- join_l. ss. }
+  clear TS0. intro EVAL. rewrite <- EVAL in *.
+  remember view_pre as view_pre' eqn:VIEW_PRE'. guardH VIEW_PRE'. rewrite VIEW_PRE' in VIEW_PRE.
+  inversion MEM. subst. inv LOCAL.
+  exploit SRC_PROMISES_WF; eauto. i. des. rename x into ABOVE, x0 into XMSG, x1 into XCLUSIVE, x2 into XLATEST.
+  rewrite XMSG in TSPMSG. inv TSPMSG. ss.
+  eexists (ExecUnit.mk _ _ _). esplits.
+  - econs 1. econs. econs; ss.
+    + econs; ss.
+    + econs 3; ss. instantiate (3 := S tsp).
+      econs; ss.
+      * inv WF1. ss. inv WRITABLE. ss. econs; ss.
+        { eapply le_lt_trans; [|exact ABOVE].
+
+          (* TODO *)
+          Lemma sim_view_below'
+                ts v1 v2
+                (SIM: sim_view ts v1 v2)
+                (BELOW: v2.(View.ts) <= ts):
+            v1.(View.ts) <= ts.
+          Proof.
+            exploit sim_view_below; eauto. i. subst. ss.
+          Qed.
+
+          eapply sim_view_below'; [|exact COH_PRE]. ss.
+        }
+        { eapply le_lt_trans; [|exact ABOVE].
+          eapply sim_view_below'; [|exact VIEW_PRE]. rewrite <- VIEW_PRE'.
+          repeat apply sim_view_join; ss; eauto using sim_view_ifc.
+          apply sim_view_ifc. inv EXBANK; ss. inv REL; ss. apply sim_view_above. ss.
+        }
+        { intro X. specialize (EX X). des. inv LOCAL. inv EXBANK; [congr|].
+          rewrite TSX in H. inv H. esplits; eauto.
+          destruct a, eb. ss. i. subst.
+
+          Lemma Memory_no_msgs_split'
+                a b c pred mem:
+            Memory.no_msgs a b pred mem /\ Memory.no_msgs b c pred mem ->
+            Memory.no_msgs a c pred mem.
+          Proof.
+            i. des. ii. destruct (le_lt_dec (S ts) b).
+            + eapply H; eauto.
+            + eapply H0; eauto.
+          Qed.
+
+          eapply Memory_no_msgs_split'. instantiate (1 := length mem). split; ss.
+          destruct (le_lt_dec (S (length mem)) ts).
+          { ii. clear -TS1 TS2 l. lia. }
+          inv REL; ss. inv TS0. destruct (le_lt_dec ts0 (length mem)).
+          - specialize (TS1 l0). subst. ii. eapply EX0; eauto.
+            + rewrite TS2, app_length. clear. lia.
+            + apply nth_error_app_inv in MSG0. des; ss.
+              * apply nth_error_app_mon. apply nth_error_app_mon. ss.
+              * clear -TS1 TS2 MSG0. lia.
+          - apply EXCLUSIVE; ss.
+        }
+      * rewrite PROMISES2; ss.
+  - inv WRITABLE. ss.
+    econs; ss.
+    + econs; ss. apply sim_rmap_add; ss. econs; ss.
+      unfold ifc. condtac; ss. intro Y. clear -Y LEN0. exfalso. lia.
+    + econs; ss.
+      * i. rewrite ? fun_add_spec. condtac; ss.
+        apply sim_view_above. s. clear -LEN0. lia.
+      * apply sim_view_join; ss.
+        apply sim_view_above. s. clear -LEN0. lia.
+      * apply sim_view_join; ss.
+      * apply sim_view_join; ss. unfold ifc. condtac; ss.
+        apply sim_view_above. s. clear -LEN0. lia.
+      * i. rewrite ? fun_add_spec. condtac; ss.
+        { clear X. inv e.
+          destruct (le_lt_dec (View.ts (ValA.annot (sem_expr rmap2 eval))) (length mem)).
+          - rewrite <- EVAL in *.
+            econs 1; ss.
+            + apply join_spec; ss. rewrite <- VCAP, <- join_r. ss.
+            + apply sim_time_above. clear -LEN0. lia.
+            + unfold Memory.read. s. rewrite XMSG. s. condtac; [|congr]. ss.
+            + eapply Memory.get_msg_read; eauto.
+          - econs 2; ss.
+            eapply lt_le_trans; eauto. rewrite <- EVAL, <- join_r. ss.
+        }
+        { replace (mem ++ mem1') with ((mem ++ mem1') ++ []) by apply app_nil_r.
+          eapply sim_fwdbank_mon; eauto.
+          inv WF1. ss. inv LOCAL. destruct (FWDBANK0 loc). des.
+          rewrite TS0, <- COH1. apply Memory.latest_ts_spec.
+        }
+      * destruct ex; ss. inv EXBANK; econs; ss.
+        replace (mem ++ mem1') with ((mem ++ mem1') ++ []) by apply app_nil_r.
+        eapply sim_exbank_mon; eauto.
+      * i. rewrite ? Promises.unset_o, ? Promises.set_o.
+        condtac; clear X.
+        { inv e. clear -ABOVE TSP0. lia. }
+        condtac; clear X.
+        { inv e. clear -TSP0. rewrite app_length in TSP0. lia. }
+        apply PROMISES1. ss.
+      * i. rewrite ? Promises.unset_o. condtac; ss.
+        rewrite PROMISES2; ss.
+    + econs.
+      * ss.
+      * ss.
+      * rewrite <- app_assoc. ss.
+      * i. revert TSP0. rewrite Promises.unset_o. condtac; ss. i. exploit SRC_PROMISES_WF; eauto.
+      * i. revert TSP0. rewrite Promises.unset_o. condtac; ss. i. exploit SRC_PROMISES; eauto. i. des. subst.
+        exploit SRC_PROMISES_BELOW; eauto.
+        { rewrite Promises.unset_o. condtac; ss. }
+        rewrite ? fun_add_spec. condtac; ss. clear X0. inv e.
+        exploit SRC_PROMISES_WF; eauto. i. des. rewrite MSG0 in x1. inv x1. splits; ss.
+        destruct (Time.compare_spec (S tsp) (S tsp0)).
+        { subst. congr. }
+        { clear -H. lia. }
+        exfalso. eapply x3; eauto. apply nth_error_some in XMSG. ss.
+      * i. revert PROMISES. rewrite Promises.unset_o. condtac; clear X; ss.
+        { inv e. i.
+          move XMSG at bottom. apply nth_error_app_inv in XMSG. des.
+          { clear -XMSG. lia. }
+          replace (length mem + n1 - length mem) with n1 in XMSG0 by lia. rewrite XMSG0 in NTH. inv NTH.
+          s. esplits; ss.
+          - rewrite fun_add_spec. condtac; [|congr]. refl.
+          - rewrite nth_error_app2, Nat.sub_diag; ss.
+          - ss.
+          - s. rewrite fun_add_spec. condtac; [|congr]. s. rewrite app_length. ss.
+        }
+        { i. exploit MEM1'; eauto. i. des. subst. esplits; swap 1 3.
+          { apply nth_error_app_mon. eauto. }
+          all: ss.
+          - rewrite fun_add_spec. condtac; ss. clear X. inv e.
+            destruct (le_lt_dec (S (length mem + n1)) (S tsp)); ss.
+            exfalso. eapply XLATEST; eauto.
+            + s. apply nth_error_some in NTH. clear -NTH. rewrite app_length. lia.
+            + rewrite nth_error_app2; [|clear; lia].
+              replace (length mem + n1 - length mem) with n1; ss. clear. lia.
+          - s. rewrite MSGCOH0, fun_add_spec. condtac; ss.
+            inv WF2. ss. inv LOCAL. rewrite COH1. clear. lia.
+        }
+Qed.
 
 Theorem certified_promise_sound
         tid (eu1:ExecUnit.t (A:=unit)) loc val
@@ -145,6 +297,7 @@ Proof.
     rewrite Promises.lookup_bot. ss.
   }
   { admit. (* mem monotone *) }
+  { rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. congr. }
   { rewrite <- VIEW_PRE.
     destruct eu2 as [st2 lc2 mem2].
     destruct eu3 as [st3 lc3 mem3].
@@ -201,7 +354,6 @@ Proof.
       eapply Local_wf_promises_above; eauto. apply WF.
   - econs; ss.
     + rewrite app_nil_r. ss.
-    + i. revert TSP. rewrite Promises.lookup_bot. ss.
     + i. destruct n1; ss.
 Qed.
 

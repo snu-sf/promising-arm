@@ -65,7 +65,6 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
-      + i. rewrite Promises.lookup_bot in *. ss.
       + i. destruct n1; ss.
   }
 
@@ -135,7 +134,6 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
-      + i. rewrite Promises.lookup_bot in *. ss.
       + i. destruct n1; ss.
   }
 
