@@ -22,13 +22,15 @@ Require Import PromisingArch.promising.Promising.
 Set Implicit Arguments.
 
 
-Inductive write_step (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
+Inductive write_step (tid:Id.t) (loc:Loc.t) (val:Val.t) (view_pre:View.t (A:=unit)) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | write_step_intro
     ex ord vloc vval res ts e lc
+    (LOC: loc = vloc.(ValA.val))
+    (VAL: val = vval.(ValA.val))
     (EVENT: e = Event.write ex ord vloc vval res)
     (STATE: State.step e eu1.(ExecUnit.state) eu2.(ExecUnit.state))
     (PROMISE: Local.promise vloc.(ValA.val) vval.(ValA.val) ts tid eu1.(ExecUnit.local) eu1.(ExecUnit.mem) lc eu2.(ExecUnit.mem))
-    (FULFILL: Local.fulfill ex ord vloc vval res ts tid lc eu2.(ExecUnit.mem) eu2.(ExecUnit.local))
+    (FULFILL: Local.fulfill ex ord vloc vval res ts tid view_pre lc eu2.(ExecUnit.mem) eu2.(ExecUnit.local))
 .
 Hint Constructors write_step.
 
@@ -36,7 +38,8 @@ Inductive certify_step (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | certify_step_state
     (STEP: ExecUnit.state_step tid eu1 eu2)
 | certify_step_write
-    (STEP: write_step tid eu1 eu2)
+    loc val view_pre
+    (STEP: write_step tid loc val view_pre eu1 eu2)
 .
 Hint Constructors certify_step.
 
@@ -50,8 +53,8 @@ Hint Constructors certify.
 
 
 Lemma write_step_wf
-      tid eu1 eu2
-      (STEP: write_step tid eu1 eu2)
+      tid loc val view_pre eu1 eu2
+      (STEP: write_step tid loc val view_pre eu1 eu2)
       (WF: ExecUnit.wf tid eu1):
   ExecUnit.wf tid eu2.
 Proof.

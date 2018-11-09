@@ -73,7 +73,8 @@ Proof.
             inv STATE0. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
         }
-        { econs 3; eauto. instantiate (1 := ts). inv STEP. inv WRITABLE. ss.
+        { econs 3; eauto. instantiate (1 := view_pre). instantiate (1 := ts).
+          inv STEP. inv WRITABLE. ss.
           exploit ExecUnit.get_msg_wf; try exact MSG. i.
           econs; eauto; ss.
           - econs; eauto.
@@ -84,7 +85,6 @@ Proof.
           - rewrite <- MSG. unfold Memory.get_msg. destruct ts; ss.
             rewrite nth_error_app1; [|lia]. ss.
           - rewrite Promises.set_o. condtac; ss. inversion e0. subst. ss.
-          - ss.
           - f_equal. apply Promises.set_unset.
             ii. subst. lia.
         }

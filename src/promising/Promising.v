@@ -619,6 +619,26 @@ Module Promises.
     f_equal. apply SuccNat2Pos.inj. ss.
   Qed.
 
+  Lemma id_of_time_le ts ts' p p'
+        (P: id_of_time ts = Some p)
+        (P': id_of_time ts' = Some p')
+        (LE: (p <= p')%positive):
+    ts <= ts'.
+  Proof.
+    revert P P' LE. unfold id_of_time, Time.pred_opt.
+    destruct ts, ts'; ss. i. inv P. inv P'. lia.
+  Qed.
+
+  Lemma id_of_time_lt ts ts' p p'
+        (P: id_of_time ts = Some p)
+        (P': id_of_time ts' = Some p')
+        (LE: (p < p')%positive):
+    ts < ts'.
+  Proof.
+    revert P P' LE. unfold id_of_time, Time.pred_opt.
+    destruct ts, ts'; ss. i. inv P. inv P'. lia.
+  Qed.
+
   Definition lookup (ts:Time.t) (promises:t): bool :=
     match id_of_time ts with
     | None => false
@@ -665,6 +685,31 @@ Module Promises.
     - inv e. rewrite X in X'. inv X'. condtac; intuition.
     - condtac; ss. inversion e. subst.
       rewrite <- X' in X. apply id_of_time_inj in X. inv X. intuition.
+  Qed.
+
+  Definition clear_below (ts:Time.t) (promises:t): t :=
+    match id_of_time ts with
+    | None => promises
+    | Some ts => fun i =>
+                  if Pos.leb i ts
+                  then false
+                  else promises i
+    end.
+
+  Lemma clear_below_o ts' ts promises:
+    lookup ts' (clear_below ts promises) = lookup ts' promises && Time.ltb ts ts'.
+  Proof.
+    unfold lookup, clear_below.
+    destruct (id_of_time ts') eqn:X', (id_of_time ts) eqn:X; destruct ts, ts'; ss.
+    - destruct (Pos.leb_spec0 p p0); ss.
+      + exploit id_of_time_le; try exact l; eauto.
+        destruct (promises p), (S ts <? S ts') eqn:CMP; ss.
+        apply Time.ltb_lt in CMP. lia.
+      + assert ((p0 < p)%positive) by lia.
+        exploit id_of_time_lt; try exact H; eauto.
+        destruct (promises p), (S ts <? S ts') eqn:CMP; ss.
+        apply Time.ltb_ge in CMP. lia.
+    - destruct (promises p); ss.
   Qed.
 
   Lemma set_unset a b promises
@@ -762,32 +807,32 @@ Section Local.
   Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
       loc val view
-      view_ext1 view_msg view_ext2
+      view_pre view_msg view_post
       (LOC: loc = vloc.(ValA.val))
       (VIEW: view = vloc.(ValA.annot))
-      (VIEW_EXT1: view_ext1 = joins [view; lc1.(vrn); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
+      (VIEW_PRE: view_pre = joins [view; lc1.(vrn); (ifc (OrdR.ge ord OrdR.acquire) lc1.(vrel))])
       (COH: Memory.latest loc ts (lc1.(coh) loc).(View.ts) mem1)
-      (LATEST: Memory.latest loc ts view_ext1.(View.ts) mem1)
+      (LATEST: Memory.latest loc ts view_pre.(View.ts) mem1)
       (MSG: Memory.read loc ts mem1 = Some val)
       (VIEW_MSG: view_msg = (lc1.(fwdbank) loc).(FwdItem.read_view) ts ord)
-      (VIEW_EXT2: view_ext2 = join view_ext1 view_msg)
-      (RES: res = ValA.mk _ val view_ext2)
+      (VIEW_POST: view_post = join view_pre view_msg)
+      (RES: res = ValA.mk _ val view_post)
       (LC2: lc2 =
             mk
-              (fun_add loc (join (lc1.(coh) loc) view_ext2) lc1.(coh))
-              (join lc1.(vrn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
-              (join lc1.(vwn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_ext2))
-              (join lc1.(vro) view_ext2)
+              (fun_add loc (join (lc1.(coh) loc) view_post) lc1.(coh))
+              (join lc1.(vrn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_post))
+              (join lc1.(vwn) (ifc (OrdR.ge ord OrdR.acquire_pc) view_post))
+              (join lc1.(vro) view_post)
               lc1.(vwo)
               (join lc1.(vcap) view)
               lc1.(vrel)
               lc1.(fwdbank)
-              (if ex then Some (Exbank.mk loc ts view_ext2) else lc1.(exbank))
+              (if ex then Some (Exbank.mk loc ts view_post) else lc1.(exbank))
               lc1.(promises))
   .
   Hint Constructors read.
 
-  Inductive writable (ex:bool) (ord:OrdW.t) (vloc vval:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (ts:Time.t) (view_ext:View.t (A:=A)): Prop :=
+  Inductive writable (ex:bool) (ord:OrdW.t) (vloc vval:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (ts:Time.t) (view_pre:View.t (A:=A)): Prop :=
   | writable_intro
       loc val
       view_loc view_val
@@ -795,7 +840,7 @@ Section Local.
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
       (VAL: val = vval.(ValA.val))
       (VIEW_VAL: view_val = vval.(ValA.annot))
-      (VIEW_EXT: view_ext = joins [
+      (VIEW_PRE: view_pre = joins [
                                 view_loc; view_val; lc1.(vcap); lc1.(vwn);
                                 ifc (OrdW.ge ord OrdW.release_pc) lc1.(vro);
                                 ifc (OrdW.ge ord OrdW.release_pc) lc1.(vwo);
@@ -806,25 +851,25 @@ Section Local.
                                      end)
                              ])
       (COH: lt (lc1.(coh) loc).(View.ts) ts)
-      (EXT: lt view_ext.(View.ts) ts)
+      (EXT: lt view_pre.(View.ts) ts)
       (EX: ex -> exists eb,
            <<TSX: lc1.(exbank) = Some eb>> /\
            <<EX: eb.(Exbank.loc) = loc -> Memory.exclusive tid loc eb.(Exbank.ts) ts mem1>>)
   .
   Hint Constructors writable.
 
-  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (tid:Id.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
+  Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (tid:Id.t) (view_pre:View.t (A:=A)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | fulfill_intro
       loc val
-      view_loc view_val view_ext
+      view_loc view_val
       (LOC: loc = vloc.(ValA.val))
       (VIEW_LOC: view_loc = vloc.(ValA.annot))
       (VAL: val = vval.(ValA.val))
       (VIEW_VAL: view_val = vval.(ValA.annot))
-      (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_ext)
+      (WRITABLE: writable ex ord vloc vval tid lc1 mem1 ts view_pre)
       (MSG: Memory.get_msg ts mem1 = Some (Msg.mk loc val tid))
       (PROMISE: Promises.lookup ts lc1.(promises))
-      (RES: res = ValA.mk _ 0 (View.mk (ifc (ex && (arch == riscv)) ts) view_ext.(View.annot)))
+      (RES: res = ValA.mk _ 0 (View.mk (ifc (ex && (arch == riscv)) ts) view_pre.(View.annot)))
       (LC2: lc2 =
             mk
               (fun_add loc (View.mk ts bot) lc1.(coh))
@@ -902,9 +947,9 @@ Section Local.
       (EVENT: event = Event.read ex ord vloc res)
       (STEP: read ex ord vloc res ts lc1 mem lc2)
   | step_fulfill
-      ex ord vloc vval res ts
+      ex ord vloc vval res ts view_pre
       (EVENT: event = Event.write ex ord vloc vval res)
-      (STEP: fulfill ex ord vloc vval res ts tid lc1 mem lc2)
+      (STEP: fulfill ex ord vloc vval res ts tid view_pre lc1 mem lc2)
   | step_write_failure
       ex ord vloc vval res
       (EVENT: event = Event.write ex ord vloc vval res)
