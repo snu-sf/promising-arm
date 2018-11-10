@@ -357,6 +357,46 @@ Proof.
     + i. destruct n1; ss.
 Qed.
 
+Lemma identify_fulfill
+      tid (eu1:ExecUnit.t (A:=unit)) tsp loc val
+      (WF1: ExecUnit.wf tid eu1)
+      (PROMISE: Promises.lookup tsp eu1.(ExecUnit.local).(Local.promises))
+      (MEM: Memory.read loc tsp eu1.(ExecUnit.mem) = Some val)
+      (CERTIFY: certify tid eu1):
+  exists eu2 eu3 eu4 ex ord vloc vval res view_pre,
+    <<STEP2: rtc (certify_step tid) eu1 eu2>> /\
+    <<ST3: State.step (Event.write ex ord vloc vval res) eu2.(ExecUnit.state) eu3.(ExecUnit.state)>> /\
+    <<LC3: Local.fulfill ex ord vloc vval res tsp tid view_pre eu2.(ExecUnit.local) eu2.(ExecUnit.mem) eu3.(ExecUnit.local)>> /\
+    <<MEM3: eu2.(ExecUnit.mem) = eu3.(ExecUnit.mem)>> /\
+    <<VLOC3: vloc.(ValA.val) = loc>> /\
+    <<VVAL3: vval.(ValA.val) = val>> /\
+    <<STEP4: rtc (certify_step tid) eu3 eu4>> /\
+    <<PROMISES: eu4.(ExecUnit.local).(Local.promises) = bot>>.
+Proof.
+  inv CERTIFY. revert WF1 NOPROMISE MEM PROMISE. induction STEPS.
+  { i. rewrite NOPROMISE, Promises.lookup_bot in PROMISE. ss. }
+  i. exploit certify_step_wf; try exact H; eauto. intro WF2.
+  destruct (Promises.lookup tsp (Local.promises (ExecUnit.local y))) eqn:PROMISE2.
+  { exploit IHSTEPS; eauto.
+    { admit. (* memory monotone *) }
+    i. des. subst. esplits; try exact LC3; try exact PROMISES; eauto.
+  }
+  destruct x as [st1 lc1 mem1].
+  destruct y as [st2 lc2 mem2].
+  ss. inv H; cycle 1.
+  { inv STEP. inv PROMISE0. inv FULFILL. ss. inv MEM2. ss.
+    revert PROMISE2. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
+    - clear X. inv e. revert PROMISE. erewrite Local_wf_promises_above; ss. apply WF1.
+    - rewrite PROMISE. ss.
+  }
+  inv STEP. inv STEP0. ss. subst. revert PROMISE PROMISE2. inv LOCAL; (try inv STEP); (try inv LC); ss.
+  all: try congr.
+  rewrite Promises.unset_o. condtac; [|congr]. clear X. inv e.
+  i. exploit Memory.read_get_msg; eauto. i. des; subst; ss.
+  rewrite MSG in x0. inv x0. eexists (ExecUnit.mk st1 _ _), (ExecUnit.mk st2 _ _). s. esplits; eauto.
+  econs; eauto.
+Admitted.
+
 Theorem certified_promise_complete
         tid (eu1 eu2:ExecUnit.t (A:=unit)) loc val ts
         (WF1: ExecUnit.wf tid eu1)
@@ -375,9 +415,38 @@ Proof.
   { econs; eauto. }
   intro WF2.
 
-  (* TODO: simulate the certified steps before fulfilling the message. *)
+  (* identify the fulfill step. *)
+  exploit identify_fulfill; try exact CERTIFY; eauto.
+  { instantiate (1 := ts). inv LOCAL. inv MEM2.
+    rewrite LC2. s. rewrite Promises.set_o. condtac; ss. congr.
+  }
+  { instantiate (1 := val). instantiate (1 := loc). inv LOCAL. inv MEM2.
+    unfold Memory.read. s. rewrite nth_error_app2, Nat.sub_diag; ss. condtac; ss. congr.
+  }
+  i. des. subst. rename eu0 into eu3, eu3 into eu4, eu4 into eu5.
+  rename STEP2 into STEP3, ST3 into ST4, LC3 into LC4, MEM3 into MEM4, STEP4 into STEP5, PROMISES into PROMISES5.
+  exploit rtc_certify_step_wf; try exact STEP3; eauto. intro WF3.
+  exploit (ExecUnit.state_step0_wf (A:=unit)); eauto.
+  { econs; eauto. econs 3; eauto. }
+  { econs; ss. }
+  intro WF4.
+  exploit rtc_certify_step_wf; try exact STEP4; eauto. intro WF5.
+
+  (* TODO: simulate the certified steps before fulfill step. *)
+  exploit sim_eu_rtc_step; try exact STEP3; eauto.
+  { i. revert TSP. rewrite Promises.lookup_bot. ss. }
+  { destruct eu1 as [st1 lc1 mem1].
+    destruct eu2 as [st2 lc2 mem2].
+    inv LOCAL. inv MEM2. ss. subst.
+    destruct eu3 as [st3 lc3 mem3].
+    destruct eu4 as [st4 lc4 mem4].
+    inv LC4. inv WRITABLE. ss. subst.
+    clear -EXT. unfold join, Time.join in *. lia.
+  }
+  i. des. rename eu1' into eu3', STEP into STEP3', SIM into SIM3.
+  exploit rtc_certify_step_wf; try exact STEP3'; eauto. intro WF3'.
 
   (* TODO: simulate the fulfill step. *)
 
-  (* TODO: simulate the certified steps after fulfilling the message. *)
+  (* TODO: simulate the certified steps after fulfill step. *)
 Admitted.
