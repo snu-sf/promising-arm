@@ -26,13 +26,11 @@ Set Implicit Arguments.
 
 Inductive certified_promise (tid:Id.t) (eu1:ExecUnit.t (A:=unit)) (loc:Loc.t) (val:Val.t): Prop :=
 | certified_promise_intro
-    eu2 eu3 eu4 mem2' view_pre
+    eu2 eu3 eu4 view_pre
     (STEP2: rtc (certify_step tid) eu1 eu2)
     (STEP3: write_step tid loc val view_pre eu2 eu3)
     (STEP4: rtc (certify_step tid) eu3 eu4)
     (PROMISES: Local.promises (ExecUnit.local eu4) = bot)
-    (MEM: eu2.(ExecUnit.mem) = eu1.(ExecUnit.mem) ++ mem2')
-    (MEM2': Forall (fun msg => msg.(Msg.loc) <> loc) mem2')
     (COH_PRE: (eu2.(ExecUnit.local).(Local.coh) loc).(View.ts) <= length eu1.(ExecUnit.mem))
     (VIEW_PRE: view_pre.(View.ts) <= length eu1.(ExecUnit.mem))
 .
@@ -280,7 +278,7 @@ Proof.
   (* simulate the certified steps before writing the message. *)
   exploit sim_eu_rtc_step; try exact SIM1; eauto.
   { i. revert TSP. rewrite Promises.set_o. condtac; ss. clear X. inv e.
-    rewrite MSG in MEM0. inv MEM0. s. i. apply COH_PRE.
+    rewrite MSG in MEM. inv MEM. s. i. apply COH_PRE.
   }
   { rewrite <- VIEW_PRE.
     destruct eu2 as [st2 lc2 mem2].
@@ -486,6 +484,5 @@ Proof.
   i. des. rename eu1' into eu5', STEP into STEP5', PROMISES into PROMISES5'.
   exploit rtc_certify_step_wf; try exact STEP5'; eauto. intro WF5'.
 
-  econs; try exact STEP4. 6: M. all: Mskip eauto.
-  admit. (* messages before fulfill step doesn't have message of loc. *)
-Admitted.
+  econs; try exact STEP4; eauto.
+Qed.
