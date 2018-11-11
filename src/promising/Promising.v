@@ -365,6 +365,15 @@ Module Memory.
       + eapply X0; eauto.
   Qed.
 
+  Lemma no_msgs_full
+        pred from to mem1 mem2
+        (TO: to <= length mem1)
+        (NOMSGS: no_msgs from to pred mem1):
+    no_msgs from to pred (mem1 ++ mem2).
+  Proof.
+    ii. eapply NOMSGS; eauto.
+    apply nth_error_app_inv in MSG. des; subst; ss. lia.
+  Qed.
 
   Lemma no_msgs_weaken
         a b c pred mem1 mem2
@@ -375,15 +384,6 @@ Module Memory.
     ii. eapply NOMSGS; eauto.
     - lia.
     - rewrite nth_error_app1; ss. apply nth_error_Some. congr.
-  Qed.
-
-  Lemma no_msgs_full
-        a pred mem1 mem2
-        (NOMSGS: no_msgs a (length mem1) pred mem1):
-    no_msgs a (length mem1) pred (mem1 ++ mem2).
-  Proof.
-    ii. eapply NOMSGS; eauto.
-    rewrite nth_error_app1 in MSG; ss.
   Qed.
 
   Lemma ge_no_msgs
@@ -489,6 +489,13 @@ Section View.
     bot.(View.ts) = bot.
   Proof. ss. Qed.
 
+  Lemma eq_time_eq
+        (v1 v2:t)
+        (EQ: v1 = v2):
+    v1.(ts) = v2.(ts).
+  Proof.
+    subst. ss.
+  Qed.
 End View.
 End View.
 
@@ -1102,6 +1109,16 @@ Section Local.
       + eapply PROMISES0; eauto.
       + apply nth_error_In in MSG0. eapply Forall_forall in INTERFERENCE; eauto.
         subst. destruct (nequiv_dec (Msg.tid msg) (Msg.tid msg)); ss. congr.
+  Qed.
+
+  Lemma wf_promises_above
+        tid mem (lc:t) ts
+        (WF: wf tid mem lc)
+        (ABOVE: length mem < ts):
+    Promises.lookup ts lc.(promises) = false.
+  Proof.
+    destruct (Promises.lookup ts (Local.promises lc)) eqn:X; ss.
+    inv WF. exploit PROMISES; eauto. clear -ABOVE. lia.
   Qed.
 End Local.
 End Local.

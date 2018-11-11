@@ -434,7 +434,7 @@ Proof.
   - econs 2; ss. eapply Memory.no_msgs_split; eauto.
     { rewrite app_length. clear. lia. }
     splits.
-    + apply Memory.no_msgs_full. ss.
+    + apply Memory.no_msgs_full; ss.
     + ii. subst. rewrite nth_error_app2 in MSG; [|lia].
       apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto.
       destruct (nequiv_dec (Msg.loc msg) (Msg.loc msg)); ss. congr.

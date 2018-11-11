@@ -253,6 +253,15 @@ Proof.
   econs. lia.
 Qed.
 
+Lemma sim_val_below
+      ts v1 v2
+      (SIM: sim_val ts v1 v2)
+      (BELOW: v2.(ValA.annot).(View.ts) <= ts):
+  v1 = v2.
+Proof.
+  apply SIM. ss.
+Qed.
+
 Lemma sim_view_refl
       ts v:
   sim_view ts v v.
@@ -304,6 +313,15 @@ Lemma sim_view_below
   v1 = v2.
 Proof.
   apply SIM. ss.
+Qed.
+
+Lemma sim_view_below_weak
+      ts v1 v2
+      (SIM: sim_view ts v1 v2)
+      (BELOW: v2.(View.ts) <= ts):
+  v1.(View.ts) <= ts.
+Proof.
+  exploit sim_view_below; eauto. i. subst. ss.
 Qed.
 
 Lemma sim_rmap_expr
@@ -467,7 +485,7 @@ Proof.
   - econs 2; ss. eapply Memory.no_msgs_split; eauto.
     { rewrite app_length. clear. lia. }
     splits.
-    + apply Memory.no_msgs_full. ss.
+    + apply Memory.no_msgs_full; ss.
     + ii. subst. rewrite nth_error_app2 in MSG; [|lia].
       apply nth_error_In in MSG. eapply Forall_forall in MEM1'; eauto.
       destruct (nequiv_dec (Msg.loc msg) (Msg.loc msg)); ss. congr.
@@ -539,7 +557,7 @@ Proof.
               rewrite TS0, <- COH. apply Memory.latest_ts_spec.
             }
             split.
-            - apply Memory.no_msgs_full. eapply sim_mem1_exclusive; eauto.
+            - apply Memory.no_msgs_full; ss. eapply sim_mem1_exclusive; eauto.
               inv REL; ss. subst. destruct (le_lt_dec ts1 ts); eauto.
               inv TS0. rewrite TS1 in *; ss.
               eapply sim_mem_no_msgs; eauto.
@@ -594,19 +612,7 @@ Proof.
           apply PROMISES1. ss.
         * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
           { clear X. inv e. rewrite <- PROMISES2; ss.
-
-            (* TODO *)
-            Lemma Local_wf_promises_above
-                  tid mem (lc:Local.t (A:=unit)) ts
-                  (WF: Local.wf tid mem lc)
-                  (ABOVE: length mem < ts):
-              Promises.lookup ts lc.(Local.promises) = false.
-            Proof.
-              destruct (Promises.lookup ts (Local.promises lc)) eqn:X; ss.
-              inv WF. exploit PROMISES; eauto. clear - ABOVE. lia.
-            Qed.
-
-            erewrite Local_wf_promises_above; eauto. apply WF1.
+            erewrite Local.wf_promises_above; eauto. apply WF1.
           }
           { eauto. }
       + inv MEM. ss. econs.
@@ -630,16 +636,6 @@ Proof.
             rewrite fun_add_spec. condtac; ss; cycle 1.
             { exfalso. apply c. clear. refl. }
             apply SRC_PROMISES_WF in TSP. des.
-
-            (* TODO *)
-            Lemma nth_error_some A
-                  (l:list A) n a
-                  (SOME: nth_error l n = Some a):
-              n < length l.
-            Proof.
-              apply nth_error_Some. rewrite SOME. ss.
-            Qed.
-
             apply nth_error_some in TSP0. clear -TSP0. lia.
           }
         * i. apply Memory.get_msg_snoc_inv in READ. des; eauto. subst. ss.
@@ -841,17 +837,7 @@ Proof.
               exploit sim_view_below.
               { apply sim_view_join; [apply COH0|apply SIM_POST]. }
               { s. eauto. }
-              i.
-
-              (* TODO *)
-              Lemma view_eq_time_eq
-                (v1 v2:View.t (A:=unit))
-                (EQ: v1 = v2):
-                v1.(View.ts) = v2.(View.ts).
-              Proof.
-                subst. ss.
-              Qed.
-              apply view_eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
+              i. apply View.eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
               eapply le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
             * i. exploit MEM1'; eauto. i. des. subst.
               esplits; try exact MSG0; ss.
@@ -931,7 +917,7 @@ Proof.
               exploit sim_view_below.
               { apply sim_view_join; [apply COH0|apply SIM_POST]. }
               { s. eauto. }
-              i. apply view_eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
+              i. apply View.eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
               eapply le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
             * i. exploit MEM1'; eauto. i. des. subst.
               esplits; try exact MSG0; ss.
@@ -1047,7 +1033,7 @@ Proof.
                   rewrite TS, <- COH. apply Memory.latest_ts_spec.
                 }
                 split.
-                - apply Memory.no_msgs_full. eapply sim_mem1_exclusive; eauto.
+                - apply Memory.no_msgs_full; ss. eapply sim_mem1_exclusive; eauto.
                   inv REL; ss. subst. destruct (le_lt_dec ts2 ts); eauto.
                   inv TS. rewrite TS1 in *; ss.
                   eapply sim_mem_no_msgs; eauto.
@@ -1100,7 +1086,7 @@ Proof.
               apply PROMISES1. ss.
             * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
               { clear X. inv e. rewrite <- PROMISES2; ss.
-                erewrite Local_wf_promises_above; eauto. apply WF1.
+                erewrite Local.wf_promises_above; eauto. apply WF1.
               }
               { eauto. }
           + inv MEM. ss. econs.

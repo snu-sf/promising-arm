@@ -131,21 +131,10 @@ Proof.
       econs; ss.
       * inv WF1. ss. inv WRITABLE. ss. econs; ss.
         { eapply le_lt_trans; [|exact ABOVE].
-
-          (* TODO *)
-          Lemma sim_view_below'
-                ts v1 v2
-                (SIM: sim_view ts v1 v2)
-                (BELOW: v2.(View.ts) <= ts):
-            v1.(View.ts) <= ts.
-          Proof.
-            exploit sim_view_below; eauto. i. subst. ss.
-          Qed.
-
-          eapply sim_view_below'; [|exact COH_PRE]. ss.
+          eapply sim_view_below_weak; [|exact COH_PRE]. ss.
         }
         { eapply le_lt_trans; [|exact ABOVE].
-          eapply sim_view_below'; [|exact VIEW_PRE]. rewrite <- VIEW_PRE'.
+          eapply sim_view_below_weak; [|exact VIEW_PRE]. rewrite <- VIEW_PRE'.
           repeat apply sim_view_join; ss; eauto using sim_view_ifc.
           apply sim_view_ifc. inv EXBANK; ss. inv REL; ss. apply sim_view_above. ss.
         }
@@ -432,16 +421,6 @@ Proof.
     clear -EXT. unfold join, Time.join in *. lia.
   }
 
-  (* TODO *)
-  Lemma sim_val_below
-        ts v1 v2
-        (SIM: sim_val ts v1 v2)
-        (BELOW: v2.(ValA.annot).(View.ts) <= ts):
-    v1 = v2.
-  Proof.
-    apply SIM. ss.
-  Qed.
-
   inv SIM. inv STATE. inv ST. inv LC. ss. subst.
   exploit sim_rmap_expr; eauto. instantiate (1 := eloc). intro ELOC. apply sim_val_below in ELOC; ss.
   exploit sim_rmap_expr; eauto. instantiate (1 := eval). intro EVAL. apply sim_val_below in EVAL; ss.
@@ -472,27 +451,15 @@ Proof.
           { ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
             apply H2. inv MEM. eapply TS_PRIVATE; eauto.
           }
-
-          (* TODO *)
-          Lemma Memory_no_msgs_full
-          pred from to mem1 mem2
-          (TO: to <= length mem1)
-          (NOMSGS: Memory.no_msgs from to pred mem1):
-            Memory.no_msgs from to pred (mem1 ++ mem2).
-          Proof.
-            ii. eapply NOMSGS; eauto.
-            apply nth_error_app_inv in MSG. des; subst; ss. lia.
-          Qed.
-
           inv REL; ss; subst.
           + destruct (le_lt_dec ts1 ts); cycle 1.
-            { apply Memory_no_msgs_full; ss. apply EXCLUSIVE. ss. }
+            { apply Memory.no_msgs_full; ss. apply EXCLUSIVE. ss. }
             apply sim_time_below in TS. subst.
-            apply Memory_no_msgs_full. all: ss.
+            apply Memory.no_msgs_full. all: ss.
             specialize (EX0 eq_refl). ii. eapply EX0; eauto.
             inv MEM. apply nth_error_app_inv in MSG0. des; subst; [|lia].
             rewrite nth_error_app1; ss.
-          + apply Memory_no_msgs_full; ss.
+          + apply Memory.no_msgs_full; ss.
         }
       * unfold Memory.get_msg. s. rewrite nth_error_app2, Nat.sub_diag; ss.
       * rewrite Promises.set_o. condtac; ss. congr.
@@ -607,7 +574,7 @@ Proof.
   intro WF4.
   exploit rtc_certify_step_wf; try exact STEP4; eauto. intro WF5.
 
-  (* TODO: simulate the certified steps before fulfill step. *)
+  (* simulate the certified steps before fulfill step. *)
   exploit sim_eu_rtc_step; try exact STEP3; eauto.
   { i. revert TSP. rewrite Promises.lookup_bot. ss. }
   { destruct eu1 as [st1 lc1 mem1].
@@ -626,12 +593,12 @@ Proof.
     inv LC4. inv WRITABLE. ss. clear -EXT. lia.
   }
 
-  (* TODO: simulate the fulfill step. *)
+  (* simulate the fulfill step. *)
   exploit sim_eu_fulfill_step; try exact LC4; eauto.
   i. des. rename eu1' into eu4', STEP into STEP4', SIM into SIM4.
   exploit write_step_wf; try exact STEP4'; eauto. intro WF4'.
 
-  (* TODO: simulate the certified steps after fulfill step. *)
+  (* simulate the certified steps after the fulfill step. *)
   exploit sim_eu_rtc_step_bot; try exact STEP5; eauto.
   { i. revert TSP. rewrite Promises.lookup_bot. ss. }
   i. des. rename eu1' into eu5', STEP into STEP5', PROMISES into PROMISES5'.

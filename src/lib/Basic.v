@@ -228,6 +228,14 @@ Proof.
   - destruct (f a0); eauto. s. lia.
 Qed.
 
+Lemma nth_error_some A
+      (l:list A) n a
+      (SOME: nth_error l n = Some a):
+  n < length l.
+Proof.
+  apply nth_error_Some. rewrite SOME. ss.
+Qed.
+
 Lemma nth_error_filter_map_inv A B
       f (l:list A) n (fa:B)
       (NTH: List.nth_error (filter_map f l) n = Some fa):
