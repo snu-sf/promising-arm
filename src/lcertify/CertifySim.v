@@ -1187,19 +1187,24 @@ Proof.
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
     { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
-      admit. (* coh monotone *)
+      eapply rtc_certify_step_incr. eauto.
     }
     i. des.
     exploit certify_step_wf; try exact H; eauto. i.
     exploit certify_step_wf; eauto. i.
     exploit IHSTEP; eauto.
     { i. exploit SRC_PROMISES_BELOW; eauto.
-      admit. (* mem monotone *)
+      exploit certify_step_incr; eauto. intro LE. inv LE.
+      rewrite MEM0 in *. apply nth_error_app_inv in MEM. des; subst; ss.
+      inv SIM. inv MEM2. exploit SRC_PROMISES_WF; eauto. i. des.
+      exploit nth_error_some; eauto. rewrite MEM4, MEM5 in *.
+      clear -MEM. lia.
     }
     i. des.
     esplits; [|by eauto]. econs; eauto.
-  - admit. (* vcap monotone *)
-Admitted.
+  - exploit rtc_certify_step_incr; eauto. intro LE. inv LE. inv LC.
+    clear -VCAP l VCAP0. unfold le in *. lia.
+Qed.
 
 Lemma sim_eu_promises
       tid ts ts_private src_promises eu1 eu2
@@ -1237,14 +1242,18 @@ Proof.
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
     { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
-      admit. (* coh monotone *)
+      eapply rtc_certify_step_incr. eauto.
     }
     i. des.
     exploit certify_step_wf; try exact H; eauto. i.
     exploit certify_step_wf; eauto. i.
     exploit IHSTEP; eauto.
     { i. exploit SRC_PROMISES_BELOW; eauto.
-      admit. (* mem monotone *)
+      exploit certify_step_incr; eauto. intro LE. inv LE.
+      rewrite MEM0 in *. apply nth_error_app_inv in MEM. des; subst; ss.
+      inv SIM. inv MEM2. exploit SRC_PROMISES_WF; eauto. i. des.
+      exploit nth_error_some; eauto. rewrite MEM4, MEM5 in *.
+      clear -MEM. lia.
     }
     i. des.
     esplits; [|by eauto]. econs; eauto.
@@ -1270,4 +1279,4 @@ Proof.
     + inv STEP0. ss. inv STATE. inv PROMISE. inv FULFILL. ss.
       generalize (PROMISES' tsp TSP). rewrite Promises.unset_o, Promises.set_o. condtac; ss. inversion e. subst.
       inv WRITABLE. ss. clear -l TSP EXT. unfold join, Time.join in *. lia.
-Admitted.
+Qed.

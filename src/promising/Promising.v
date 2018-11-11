@@ -1120,6 +1120,97 @@ Section Local.
     destruct (Promises.lookup ts (Local.promises lc)) eqn:X; ss.
     inv WF. exploit PROMISES; eauto. clear -ABOVE. lia.
   Qed.
+
+  Inductive le (lhs rhs:t): Prop :=
+  | le_intro
+      (COH: forall loc, Order.le (lhs.(coh) loc).(View.ts) (rhs.(coh) loc).(View.ts))
+      (VRN: Order.le lhs.(vrn).(View.ts) rhs.(vrn).(View.ts))
+      (VWN: Order.le lhs.(vwn).(View.ts) rhs.(vwn).(View.ts))
+      (VRO: Order.le lhs.(vro).(View.ts) rhs.(vro).(View.ts))
+      (VWO: Order.le lhs.(vwo).(View.ts) rhs.(vwo).(View.ts))
+      (VCAP: Order.le lhs.(vcap).(View.ts) rhs.(vcap).(View.ts))
+      (VREL: Order.le lhs.(vrel).(View.ts) rhs.(vrel).(View.ts))
+  .
+
+  Global Program Instance le_partial_order: PreOrder le.
+  Next Obligation. econs; refl. Qed.
+  Next Obligation. ii. inv H1. inv H2. econs; etrans; eauto. Qed.
+
+  Lemma promise_incr
+        loc val ts tid lc1 mem1 lc2 mem2
+        (LC: promise loc val ts tid lc1 mem1 lc2 mem2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+  Qed.
+
+  Lemma control_incr
+        ctrl lc1 lc2
+        (LC: control ctrl lc1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+  Qed.
+
+  Lemma read_incr
+        ex ord vloc res ts lc1 mem1 lc2
+        (LC: read ex ord vloc res ts lc1 mem1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+    i. rewrite fun_add_spec. condtac; try refl.
+    clear X. inv e. s. apply join_l.
+  Qed.
+
+  Lemma fulfill_incr
+        ex ord vloc vval res ts tid view_pre lc1 mem1 lc2
+        (LC: fulfill ex ord vloc vval res ts tid view_pre lc1 mem1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+    i. rewrite fun_add_spec. condtac; try refl.
+    clear X. inv e. s.
+    (* TODO: fulfill should update COH's taint, too. *)
+    inv WRITABLE. unfold Order.le. clear -COH. lia.
+  Qed.
+  
+  Lemma write_failure_incr
+        ex res lc1 lc2
+        (LC: write_failure ex res lc1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+  Qed.
+
+  Lemma isb_incr
+        lc1 lc2
+        (LC: isb lc1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+  Qed.
+
+  Lemma dmb_incr
+        rr rw wr ww lc1 lc2
+        (LC: dmb rr rw wr ww lc1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC. econs; ss; try refl; try apply join_l.
+  Qed.
+
+  Lemma step_incr
+        e tid mem lc1 lc2
+        (LC: step e tid mem lc1 lc2):
+    le lc1 lc2.
+  Proof.
+    inv LC; try refl.
+    - eapply read_incr. eauto.
+    - eapply fulfill_incr. eauto.
+    - eapply write_failure_incr. eauto.
+    - eapply isb_incr. eauto.
+    - eapply dmb_incr. eauto.
+    - eapply control_incr. eauto.
+  Qed.
 End Local.
 End Local.
 
@@ -1374,6 +1465,51 @@ Section ExecUnit.
     inv STEP.
     - eapply state_step_wf; eauto.
     - eapply promise_step_wf; eauto.
+  Qed.
+
+  Inductive le (eu1 eu2:t): Prop :=
+  | le_intro
+      mem'
+      (LC: Local.le eu1.(local) eu2.(local))
+      (MEM: eu2.(mem) = eu1.(mem) ++ mem')
+  .
+
+  Global Program Instance le_partial_order: PreOrder le.
+  Next Obligation.
+    econs.
+    - refl.
+    - rewrite app_nil_r. ss.
+  Qed.
+  Next Obligation.
+    ii. inv H1. inv H2. econs; etrans; eauto.
+    rewrite MEM, app_assoc. eauto.
+  Qed.
+
+  Lemma state_step_incr tid eu1 eu2
+        (STEP: state_step tid eu1 eu2):
+    le eu1 eu2.
+  Proof.
+    inv STEP. inv STEP0. econs.
+    - eapply Local.step_incr. eauto.
+    - rewrite MEM, app_nil_r. ss.
+  Qed.
+
+  Lemma promise_step_incr tid eu1 eu2
+        (STEP: promise_step tid eu1 eu2):
+    le eu1 eu2.
+  Proof.
+    inv STEP. econs.
+    - eapply Local.promise_incr. eauto.
+    - inv LOCAL. inv MEM2. ss.
+  Qed.
+
+  Lemma step_incr tid eu1 eu2
+        (STEP: step tid eu1 eu2):
+    le eu1 eu2.
+  Proof.
+    inv STEP.
+    - eapply state_step_incr. eauto.
+    - eapply promise_step_incr. eauto.
   Qed.
 End ExecUnit.
 End ExecUnit.

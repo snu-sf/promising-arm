@@ -67,7 +67,7 @@ Proof.
       * lia.
     + i. rewrite Promises.set_o. condtac; ss. clear X. inv e. lia.
     + i. rewrite ? Promises.set_o, Promises.lookup_bot. condtac; ss.
-      eapply Local_wf_promises_above; eauto. apply WF.
+      eapply Local.wf_promises_above; eauto. apply WF.
   - econs; ss.
     + rewrite app_nil_r. ss.
     + i. revert TSP. rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. clear X. inv e.
@@ -285,7 +285,10 @@ Proof.
   { i. revert TSP'. rewrite Promises.unset_o, Promises.set_o. condtac; ss. rewrite X. clear X.
     rewrite Promises.lookup_bot. ss.
   }
-  { admit. (* mem monotone *) }
+  { exploit rtc_certify_step_incr; eauto. intro LE. inv LE.
+    rewrite MEM. rewrite nth_error_app1; eauto.
+    inv STEP1'. inv MEM2. rewrite app_length. clear. s. lia.
+  }
   { rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. congr. }
   { rewrite <- VIEW_PRE.
     destruct eu2 as [st2 lc2 mem2].
@@ -309,7 +312,7 @@ Proof.
 
   esplits; try exact STEP1'; ss. econs; [|exact PROMISES0].
   etrans; eauto.
-Admitted.
+Qed.
 
 
 Lemma promise_tgt_sim_eu
@@ -340,7 +343,7 @@ Proof.
       * lia.
     + i. rewrite Promises.set_o. condtac; ss. clear X. inv e. lia.
     + i. rewrite ? Promises.set_o, Promises.lookup_bot.
-      eapply Local_wf_promises_above; eauto. apply WF.
+      eapply Local.wf_promises_above; eauto. apply WF.
   - econs; ss.
     + rewrite app_nil_r. ss.
     + i. exploit ExecUnit.get_msg_wf; eauto. lia.
@@ -368,7 +371,9 @@ Proof.
   i. exploit certify_step_wf; try exact H; eauto. intro WF2.
   destruct (Promises.lookup tsp (Local.promises (ExecUnit.local y))) eqn:PROMISE2.
   { exploit IHSTEPS; eauto.
-    { admit. (* memory monotone *) }
+    { exploit certify_step_incr; eauto. intro LE. inv LE. rewrite MEM0 in *.
+      eapply Memory.read_mon. ss.
+    }
     i. des. subst. esplits; try exact LC3; try exact PROMISES; eauto.
   }
   destruct x as [st1 lc1 mem1].
@@ -376,7 +381,7 @@ Proof.
   ss. inv H; cycle 1.
   { inv STEP. inv PROMISE0. inv FULFILL. ss. inv MEM2. ss.
     revert PROMISE2. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
-    - clear X. inv e. revert PROMISE. erewrite Local_wf_promises_above; ss. apply WF1.
+    - clear X. inv e. revert PROMISE. erewrite Local.wf_promises_above; ss. apply WF1.
     - rewrite PROMISE. ss.
   }
   inv STEP. inv STEP0. ss. subst. revert PROMISE PROMISE2. inv LOCAL; (try inv STEP); (try inv LC); ss.
@@ -385,7 +390,7 @@ Proof.
   i. exploit Memory.read_get_msg; eauto. i. des; subst; ss.
   rewrite MSG in x0. inv x0. eexists (ExecUnit.mk st1 _ _), (ExecUnit.mk st2 _ _). s. esplits; eauto.
   econs; eauto.
-Admitted.
+Qed.
 
 Lemma sim_eu_fulfill_step
       tid ts loc val ex ord vloc vval res view_pre (eu1 eu2 eu2':ExecUnit.t (A:=unit))
@@ -503,7 +508,7 @@ Proof.
         apply PROMISES1. ss.
       * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
         { clear X. inv e. rewrite <- PROMISES2; ss.
-          erewrite Local_wf_promises_above; eauto. apply WF1.
+          erewrite Local.wf_promises_above; eauto. apply WF1.
         }
         { eauto. }
     + inv MEM. ss. econs.

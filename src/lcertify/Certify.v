@@ -89,6 +89,38 @@ Proof.
   i. apply IHSTEP. eapply certify_step_wf; eauto.
 Qed.
 
+Lemma write_step_incr
+      tid loc val view_pre eu1 eu2
+      (STEP: write_step tid loc val view_pre eu1 eu2):
+  ExecUnit.le eu1 eu2.
+Proof.
+  inv STEP. econs.
+  - etrans.
+    + eapply Local.promise_incr. eauto.
+    + eapply Local.fulfill_incr. eauto.
+  - inv PROMISE. inv MEM2. inv FULFILL. ss.
+Qed.
+
+Lemma certify_step_incr
+      tid eu1 eu2
+      (STEP: certify_step tid eu1 eu2):
+  ExecUnit.le eu1 eu2.
+Proof.
+  inv STEP.
+  - eapply ExecUnit.state_step_incr. eauto.
+  - eapply write_step_incr. eauto.
+Qed.
+
+Lemma rtc_certify_step_incr
+      tid eu1 eu2
+      (STEP: rtc (certify_step tid) eu1 eu2):
+  ExecUnit.le eu1 eu2.
+Proof.
+  induction STEP.
+  - refl.
+  - etrans; eauto. eapply certify_step_incr. eauto.
+Qed.
+
 Lemma certify_step_vcap
       tid eu eu'
       (STEP: certify_step tid eu eu')
