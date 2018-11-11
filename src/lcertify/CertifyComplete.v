@@ -35,7 +35,7 @@ Proof.
   { econs; eauto. }
   rename H into PROMISES.
 
-  assert (SIM: sim_eu tid (length eu1.(ExecUnit.mem)) bot eu1 eu2).
+  assert (SIM: sim_eu tid (length eu1.(ExecUnit.mem)) (length eu1.(ExecUnit.mem)) bot eu1 eu2).
   { destruct eu1 as [st1 lc1 mem1].
     destruct eu2 as [st2 lc2 mem2].
     inv STEP. inv LOCAL. ss. subst. inv MEM2. subst. econs; ss.
@@ -65,6 +65,7 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
+      + i. exploit ExecUnit.get_msg_wf; eauto. lia.
       + i. destruct n1; ss.
   }
 
@@ -108,7 +109,7 @@ Proof.
   { econs; eauto. }
   rename H into PROMISES.
 
-  assert (SIM: sim_eu tid (length mem) bot (ExecUnit.mk st lc mem) (ExecUnit.mk st lc (mem ++ mem_interference))).
+  assert (SIM: sim_eu tid (length mem) (length mem) bot (ExecUnit.mk st lc mem) (ExecUnit.mk st lc (mem ++ mem_interference))).
   { econs; ss.
     - econs; ss. econs. ii.
       destruct (IdMap.find id (State.rmap st)) eqn:FIND; ss. econs.
@@ -134,6 +135,7 @@ Proof.
       }
     - econs; ss.
       + rewrite app_nil_r. ss.
+      + i. exploit ExecUnit.get_msg_wf; eauto. lia.
       + i. destruct n1; ss.
   }
 

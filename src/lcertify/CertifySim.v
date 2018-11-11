@@ -54,7 +54,7 @@ Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=unit))): Prop :=
 .
 Hint Constructors sim_state.
 
-Inductive sim_mem (tid:Id.t) (ts:Time.t) (src_promises:Promises.t) (coh1 coh2: Loc.t -> View.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
+Inductive sim_mem (tid:Id.t) (ts ts_private:Time.t) (src_promises:Promises.t) (coh1 coh2: Loc.t -> View.t (A:=unit)) (mem1 mem2:Memory.t): Prop :=
 | sim_mem_intro
     mem mem1' mem2'
     (MEM: ts = length mem)
@@ -70,6 +70,10 @@ Inductive sim_mem (tid:Id.t) (ts:Time.t) (src_promises:Promises.t) (coh1 coh2: L
                      (MSG: nth_error mem1 tsp = Some msg),
         <<MSG: msg.(Msg.tid) = tid>> /\
         <<MSGCOH: (coh1 msg.(Msg.loc)).(View.ts) < S tsp>>)
+    (TS_PRIVATE: forall tsp msg
+                   (TSP: ts_private < tsp)
+                   (READ: Memory.get_msg tsp mem1 = Some msg),
+        msg.(Msg.tid) = tid)
     (MEM1': forall n1 msg1
               (NTH: nth_error mem1' n1 = Some msg1)
               (PROMISES: Promises.lookup (S (length mem) + n1) src_promises = false),
@@ -126,11 +130,11 @@ Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (src_promises:Promi
 .
 Hint Constructors sim_lc.
 
-Inductive sim_eu (tid:Id.t) (ts:Time.t) (src_promises:Promises.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
+Inductive sim_eu (tid:Id.t) (ts ts_private:Time.t) (src_promises:Promises.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
     (STATE: sim_state ts eu1.(ExecUnit.state) eu2.(ExecUnit.state))
     (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) src_promises eu1.(ExecUnit.local) eu2.(ExecUnit.local))
-    (MEM: sim_mem tid ts src_promises eu1.(ExecUnit.local).(Local.coh) eu2.(ExecUnit.local).(Local.coh) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
+    (MEM: sim_mem tid ts ts_private src_promises eu1.(ExecUnit.local).(Local.coh) eu2.(ExecUnit.local).(Local.coh) eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
 .
 Hint Constructors sim_eu.
 
@@ -329,8 +333,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_read
-      tid ts src_promises coh1 coh2 mem1 mem2 loc ts0
-      (SIM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises coh1 coh2 mem1 mem2 loc ts0
+      (SIM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.read loc ts0 mem1 = Memory.read loc ts0 mem2.
 Proof.
@@ -338,8 +342,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_get_msg
-      tid ts src_promises coh1 coh2 mem1 mem2 ts0
-      (SIM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises coh1 coh2 mem1 mem2 ts0
+      (SIM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (TS0: ts0 <= ts):
   Memory.get_msg ts0 mem1 = Memory.get_msg ts0 mem2.
 Proof.
@@ -347,16 +351,16 @@ Proof.
 Qed.
 
 Lemma sim_mem_length
-      tid ts src_promises coh1 coh2 mem1 mem2
-      (SIM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2):
+      tid ts ts_private src_promises coh1 coh2 mem1 mem2
+      (SIM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2):
   ts <= length mem1 /\ ts <= length mem2.
 Proof.
   inv SIM. rewrite ? app_length. lia.
 Qed.
 
 Lemma sim_mem1_exclusive
-      tid ts src_promises loc from to coh1 coh2 mem1 mem2
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises loc from to coh1 coh2 mem1 mem2
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (EXCLUSIVE: Memory.exclusive tid loc from ts mem1):
   Memory.exclusive tid loc from to mem1.
 Proof.
@@ -372,8 +376,8 @@ Proof.
 Qed.
 
 Lemma sim_mem_no_msgs
-      tid ts src_promises from to pred coh1 coh2 mem1 mem2
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises from to pred coh1 coh2 mem1 mem2
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (TS: to <= ts)
       (NOMSGS: Memory.no_msgs from to pred mem2):
   Memory.no_msgs from to pred mem1.
@@ -396,11 +400,11 @@ Ltac des_eq :=
          end;
      ss; des; subst; try congr).
 
-Lemma sim_fwd_view1 tid ts src_promises mem1 mem2 loc coh1 coh2 fwd1 fwd2 o
+Lemma sim_fwd_view1 tid ts ts_private src_promises mem1 mem2 loc coh1 coh2 fwd1 fwd2 o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
       (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (COND: andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = false):
   sim_view ts (FwdItem.read_view fwd1 fwd1.(FwdItem.ts) o) (FwdItem.read_view fwd2 fwd2.(FwdItem.ts) o).
 Proof.
@@ -418,11 +422,11 @@ Proof.
   all: try by econs; ss; ii; lia.
 Qed.
 
-Lemma sim_fwd_view2 tid ts src_promises mem1 mem2 loc coh1 coh2 fwd1 fwd2 t o
+Lemma sim_fwd_view2 tid ts ts_private src_promises mem1 mem2 loc coh1 coh2 fwd1 fwd2 t o
       (FWD: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (WF1: Local.wf_fwdbank loc mem1 (coh1 loc).(View.ts) fwd1)
       (WF2: Local.wf_fwdbank loc mem2 (coh2 loc).(View.ts) fwd2)
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (TS: t <= ts)
       (FWDTS: fwd2.(FwdItem.ts) <= t)
       (COND: fwd2.(FwdItem.ts) <> t \/ andb fwd2.(FwdItem.ex) (equiv_dec arch riscv || OrdR.ge o OrdR.acquire_pc) = true):
@@ -443,8 +447,8 @@ Proof.
 Qed.
 
 Lemma sim_fwdbank_mon
-      tid ts src_promises coh1 coh2 mem1 mem2 loc fwd1 fwd2 mem1' mem2'
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises coh1 coh2 mem1 mem2 loc fwd1 fwd2 mem1' mem2'
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (SIM: sim_fwdbank tid ts mem1 mem2 loc fwd1 fwd2)
       (FWD1: fwd1.(FwdItem.ts) <= length mem1)
       (MEM1': Forall (fun msg => msg.(Msg.loc) <> loc) mem1'):
@@ -470,8 +474,8 @@ Proof.
 Qed.
 
 Lemma sim_exbank_mon
-      tid ts src_promises coh1 coh2 mem1 mem2 eb1 eb2 mem1' mem2'
-      (MEM: sim_mem tid ts src_promises coh1 coh2 mem1 mem2)
+      tid ts ts_private src_promises coh1 coh2 mem1 mem2 eb1 eb2 mem1' mem2'
+      (MEM: sim_mem tid ts ts_private src_promises coh1 coh2 mem1 mem2)
       (SIM: sim_exbank tid ts mem1 mem2 eb1 eb2):
   sim_exbank tid ts (mem1 ++ mem1') (mem2 ++ mem2') eb1 eb2.
 Proof.
@@ -484,8 +488,8 @@ Proof.
 Qed.
 
 Lemma sim_eu_step
-      tid ts src_promises eu1 eu2 eu2'
-      (SIM: sim_eu tid ts src_promises eu1 eu2)
+      tid ts ts_private src_promises eu1 eu2 eu2'
+      (SIM: sim_eu tid ts ts_private src_promises eu1 eu2)
       (STEP: certify_step tid eu2 eu2')
       (SRC_PROMISES_BELOW: forall tsp msg
                              (TSP: Promises.lookup (S tsp) src_promises)
@@ -496,7 +500,7 @@ Lemma sim_eu_step
       (VCAP: eu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts):
   exists eu1',
     <<STEP: certify_step tid eu1 eu1'>> /\
-    <<SIM: sim_eu tid ts src_promises eu1' eu2'>>.
+    <<SIM: sim_eu tid ts ts_private src_promises eu1' eu2'>>.
 Proof.
   exploit certify_step_wf; eauto. i.
   destruct eu1 as [[stmts1 rmap1] lc1 mem1].
@@ -638,6 +642,7 @@ Proof.
 
             apply nth_error_some in TSP0. clear -TSP0. lia.
           }
+        * i. apply Memory.get_msg_snoc_inv in READ. des; eauto. subst. ss.
         * i. apply nth_error_snoc_inv in NTH. des.
           { exploit MEM1'; eauto. i. des. subst. esplits; swap 1 3.
             { apply nth_error_app_mon. eauto. }
@@ -1121,6 +1126,7 @@ Proof.
                 apply SRC_PROMISES_WF in TSP. des.
                 apply nth_error_some in TSP0. clear -TSP0. lia.
               }
+            * i. apply Memory.get_msg_snoc_inv in READ. des; eauto. subst. ss.
             * i. apply nth_error_snoc_inv in NTH. des.
               { exploit MEM1'; eauto. i. des. subst. esplits; try exact MSG0; ss.
                 - rewrite fun_add_spec. condtac; ss. rewrite app_length.
@@ -1177,8 +1183,8 @@ Proof.
 Qed.
 
 Lemma sim_eu_rtc_step
-      tid ts src_promises eu1 eu2 eu2'
-      (SIM: sim_eu tid ts src_promises eu1 eu2)
+      tid ts ts_private src_promises eu1 eu2 eu2'
+      (SIM: sim_eu tid ts ts_private src_promises eu1 eu2)
       (STEP: rtc (certify_step tid) eu2 eu2')
       (SRC_PROMISES_BELOW: forall tsp msg
                              (TSP: Promises.lookup (S tsp) src_promises)
@@ -1189,7 +1195,7 @@ Lemma sim_eu_rtc_step
       (VCAP: eu2'.(ExecUnit.local).(Local.vcap).(View.ts) <= ts):
   exists eu1',
     <<STEP: rtc (certify_step tid) eu1 eu1'>> /\
-    <<SIM: sim_eu tid ts src_promises eu1' eu2'>>.
+    <<SIM: sim_eu tid ts ts_private src_promises eu1' eu2'>>.
 Proof.
   revert eu1 SIM SRC_PROMISES_BELOW WF1 WF2. induction STEP; eauto.
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
@@ -1210,8 +1216,8 @@ Proof.
 Admitted.
 
 Lemma sim_eu_promises
-      tid ts src_promises eu1 eu2
-      (SIM: sim_eu tid ts src_promises eu1 eu2)
+      tid ts ts_private src_promises eu1 eu2
+      (SIM: sim_eu tid ts ts_private src_promises eu1 eu2)
       (EU2: forall tsp (TSP: tsp <= ts), Promises.lookup tsp eu2.(ExecUnit.local).(Local.promises) = false):
   eu1.(ExecUnit.local).(Local.promises) = src_promises.
 Proof.
@@ -1223,8 +1229,8 @@ Proof.
 Qed.
 
 Lemma sim_eu_rtc_step_bot
-      tid ts src_promises eu1 eu2 eu2'
-      (SIM: sim_eu tid ts src_promises eu1 eu2)
+      tid ts ts_private src_promises eu1 eu2 eu2'
+      (SIM: sim_eu tid ts ts_private src_promises eu1 eu2)
       (STEP: rtc (certify_step tid) eu2 eu2')
       (SRC_PROMISES_BELOW: forall tsp msg
                              (TSP: Promises.lookup (S tsp) src_promises)

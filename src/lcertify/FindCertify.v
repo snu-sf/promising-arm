@@ -44,7 +44,7 @@ Lemma promise_src_sim_eu
                           eu1.(ExecUnit.local) eu1.(ExecUnit.mem)
                           eu2.(ExecUnit.local) eu2.(ExecUnit.mem)>> /\
     <<MSG: nth_error eu2.(ExecUnit.mem) (length eu1.(ExecUnit.mem)) = Some (Msg.mk loc val tid)>> /\
-    <<SIM: sim_eu tid (length eu1.(ExecUnit.mem)) (Promises.set (S (length eu1.(ExecUnit.mem))) bot) eu2 eu1>>.
+    <<SIM: sim_eu tid (length eu1.(ExecUnit.mem)) (length eu1.(ExecUnit.mem)) (Promises.set (S (length eu1.(ExecUnit.mem))) bot) eu2 eu1>>.
 Proof.
   destruct eu1 as [st1 lc1 mem1]. eexists (ExecUnit.mk _ _ _). splits; ss.
   { rewrite nth_error_app2, Nat.sub_diag; ss. }
@@ -80,6 +80,7 @@ Proof.
       apply nth_error_snoc_inv in MSG. des; subst; ss.
       * lia.
       * splits; ss. inv WF. inv LOCAL. ss. eapply le_lt_trans; [apply COH|]. ss.
+    + i. apply Memory.get_msg_snoc_inv in READ. des; subst; ss. lia.
     + i. apply nth_error_singleton_inv in NTH. des. subst.
       revert PROMISES. rewrite Promises.set_o. condtac; ss.
       exfalso. apply c. rewrite Time.add_0_r. refl.
@@ -87,7 +88,7 @@ Qed.
 
 Lemma sim_eu_write_step
       tid ts loc val view_pre tsp src_promises eu1 eu2 eu2'
-      (SIM: sim_eu tid ts src_promises eu1 eu2)
+      (SIM: sim_eu tid ts ts src_promises eu1 eu2)
       (STEP: write_step tid loc val view_pre eu2 eu2')
       (SRC_PROMISES_BELOW: forall tsp' msg
                              (TSP': Promises.lookup (S tsp') (Promises.unset (S tsp) src_promises))
@@ -102,7 +103,7 @@ Lemma sim_eu_write_step
       (VIEW_PRE: view_pre.(View.ts) <= ts):
   exists eu1',
     <<STEP: certify_step tid eu1 eu1'>> /\
-    <<SIM: sim_eu tid ts (Promises.unset (S tsp) src_promises) eu1' eu2'>>.
+    <<SIM: sim_eu tid ts ts (Promises.unset (S tsp) src_promises) eu1' eu2'>>.
 Proof.
   exploit write_step_wf; eauto. intro WF2'.
   destruct eu1 as [[stmts1 rmap1] lc1 mem1].
@@ -228,6 +229,7 @@ Proof.
         { subst. congr. }
         { clear -H. lia. }
         exfalso. eapply x3; eauto. apply nth_error_some in XMSG. ss.
+      * ss.
       * i. revert PROMISES. rewrite Promises.unset_o. condtac; clear X; ss.
         { inv e. i.
           move XMSG at bottom. apply nth_error_app_inv in XMSG. des.
@@ -325,7 +327,7 @@ Lemma promise_tgt_sim_eu
       tid (eu1 eu2:ExecUnit.t (A:=unit))
       (WF: ExecUnit.wf tid eu1)
       (STEP: ExecUnit.promise_step tid eu1 eu2):
-  sim_eu tid (length eu1.(ExecUnit.mem)) bot eu1 eu2.
+  sim_eu tid (length eu1.(ExecUnit.mem)) (length eu1.(ExecUnit.mem)) bot eu1 eu2.
 Proof.
   destruct eu1 as [st1 lc1 mem1].
   destruct eu2 as [st2 lc2 mem2].
@@ -352,6 +354,7 @@ Proof.
       eapply Local_wf_promises_above; eauto. apply WF.
   - econs; ss.
     + rewrite app_nil_r. ss.
+    + i. exploit ExecUnit.get_msg_wf; eauto. lia.
     + i. destruct n1; ss.
 Qed.
 
@@ -397,7 +400,7 @@ Admitted.
 
 Lemma sim_eu_fulfill_step
       tid ts loc val ex ord vloc vval res view_pre (eu1 eu2 eu2':ExecUnit.t (A:=unit))
-      (SIM: sim_eu tid ts bot eu1 eu2)
+      (SIM: sim_eu tid ts ts bot eu1 eu2)
       (ST: State.step (Event.write ex ord vloc vval res) eu2.(ExecUnit.state) eu2'.(ExecUnit.state))
       (LC: Local.fulfill ex ord vloc vval res (S ts) tid view_pre eu2.(ExecUnit.local) eu2.(ExecUnit.mem) eu2'.(ExecUnit.local))
       (MEM: eu2'.(ExecUnit.mem) = eu2.(ExecUnit.mem))
@@ -408,10 +411,160 @@ Lemma sim_eu_fulfill_step
       (VIEW_PRE: view_pre.(View.ts) <= ts):
   exists eu1',
     <<STEP: write_step tid loc val view_pre eu1 eu1'>> /\
-    <<SIM: sim_eu tid ts bot eu1' eu2'>> /\
+    <<SIM: sim_eu tid ts ts bot eu1' eu2'>> /\
     <<COH_PRE: (eu1.(ExecUnit.local).(Local.coh) loc).(View.ts) <= ts>>.
 Proof.
-Admitted.
+  destruct eu1 as [[stmt1 rmap1] lc1 mem1].
+  destruct eu2 as [[stmt2 rmap2] lc2 mem2].
+  destruct eu2' as [[stmt2' rmap2'] lc2' mem2'].
+  ss. subst.
+
+  assert (VCAP_BELOW: lc2.(Local.vcap).(View.ts) <= ts).
+  { inv LC. inv WRITABLE. ss. subst. ss.
+    clear -EXT. unfold join, Time.join in *. lia.
+  }
+  assert (LOC_BELOW: vloc.(ValA.annot).(View.ts) <= ts).
+  { inv LC. inv WRITABLE. ss. subst. ss.
+    clear -EXT. unfold join, Time.join in *. lia.
+  }
+  assert (VAL_BELOW: vval.(ValA.annot).(View.ts) <= ts).
+  { inv LC. inv WRITABLE. ss. subst. ss.
+    clear -EXT. unfold join, Time.join in *. lia.
+  }
+
+  (* TODO *)
+  Lemma sim_val_below
+        ts v1 v2
+        (SIM: sim_val ts v1 v2)
+        (BELOW: v2.(ValA.annot).(View.ts) <= ts):
+    v1 = v2.
+  Proof.
+    apply SIM. ss.
+  Qed.
+
+  inv SIM. inv STATE. inv ST. inv LC. ss. subst.
+  exploit sim_rmap_expr; eauto. instantiate (1 := eloc). intro ELOC. apply sim_val_below in ELOC; ss.
+  exploit sim_rmap_expr; eauto. instantiate (1 := eval). intro EVAL. apply sim_val_below in EVAL; ss.
+  exploit sim_mem_length; eauto. intro LEN. des.
+
+  eexists (ExecUnit.mk _ _ _). esplits.
+  - econs; ss.
+    + econs; ss.
+    + econs; ss.
+      * inv WRITABLE. econs; ss.
+        { symmetry. eapply sim_view_eq; cycle 1.
+          { instantiate (1 := ts). clear -EXT. ss. lia. }
+          repeat apply sim_view_join; ss.
+          all: try apply sim_view_ifc.
+          all: try apply sim_view_bot.
+          all: try by apply LOCAL.
+          inv LOCAL. inv EXBANK; ss. inv REL; ss. clear -ABOVE. econs. lia.
+        }
+        { inv LOCAL. destruct (COH0 (ValA.val (sem_expr rmap2 eloc))).
+          rewrite TS; ss.
+          - eapply lt_le_trans; [exact COH|]. exploit sim_mem_length; eauto. clear. lia.
+          - clear -COH. lia.
+        }
+        { eapply lt_le_trans; [exact EXT|]. exploit sim_mem_length; eauto. clear. lia. }
+        { i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
+          destruct a, eb. ss. esplits; eauto. ss. i. subst.
+          eapply Memory_no_msgs_split'. instantiate (1 := ts). split; cycle 1.
+          { ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
+            apply H2. inv MEM. eapply TS_PRIVATE; eauto.
+          }
+
+          (* TODO *)
+          Lemma Memory_no_msgs_full
+          pred from to mem1 mem2
+          (TO: to <= length mem1)
+          (NOMSGS: Memory.no_msgs from to pred mem1):
+            Memory.no_msgs from to pred (mem1 ++ mem2).
+          Proof.
+            ii. eapply NOMSGS; eauto.
+            apply nth_error_app_inv in MSG. des; subst; ss. lia.
+          Qed.
+
+          inv REL; ss; subst.
+          + destruct (le_lt_dec ts1 ts); cycle 1.
+            { apply Memory_no_msgs_full; ss. apply EXCLUSIVE. ss. }
+            apply sim_time_below in TS. subst.
+            apply Memory_no_msgs_full. all: ss.
+            specialize (EX0 eq_refl). ii. eapply EX0; eauto.
+            inv MEM. apply nth_error_app_inv in MSG0. des; subst; [|lia].
+            rewrite nth_error_app1; ss.
+          + apply Memory_no_msgs_full; ss.
+        }
+      * unfold Memory.get_msg. s. rewrite nth_error_app2, Nat.sub_diag; ss.
+      * rewrite Promises.set_o. condtac; ss. congr.
+  - econs; ss.
+    + econs; ss. apply sim_rmap_add; ss.
+      destruct (ex && equiv_dec arch riscv); ss. apply sim_val_above. ss.
+    + inv LOCAL. econs; ss.
+      * i. rewrite ? fun_add_spec. condtac; ss. apply sim_view_above. ss.
+      * apply sim_view_join; ss. apply sim_view_above. ss.
+      * apply sim_view_join; ss.
+      * apply sim_view_join; ss. unfold ifc. condtac; ss. apply sim_view_above. ss.
+      * i. rewrite ? fun_add_spec. condtac; ss.
+        { inversion e. subst.
+          destruct (le_lt_dec (View.ts (ValA.annot (sem_expr rmap2 eval))) ts).
+          - rewrite <- EVAL in *.
+            econs 1; ss.
+            + apply join_spec; ss.
+            + apply sim_time_above. ss.
+            + splits.
+              * clear -LEN. lia.
+              * apply Memory.ge_no_msgs. clear. rewrite app_length. s. lia.
+            + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
+            + eapply Memory.get_msg_read; eauto.
+          - econs 2; ss.
+            + eapply lt_le_trans; eauto. apply join_r.
+            + rewrite app_length. s. ii. lia.
+        }
+        { exploit sim_fwdbank_mon; try exact MEM; cycle 3.
+          - rewrite (@app_nil_r _ mem2). eauto.
+          - ss.
+          - inv WF1. ss. inv LOCAL. destruct (FWDBANK0 loc). des.
+            rewrite TS, <- COH0. apply Memory.latest_ts_spec.
+          - econs; ss. destruct (nequiv_dec (ValA.val (sem_expr rmap2 eloc)) loc); ss. congr.
+        }
+      * destruct ex; ss. inv EXBANK; econs; ss.
+        exploit sim_exbank_mon; eauto. rewrite (@app_nil_r _ mem2). eauto.
+      * i. rewrite ? Promises.unset_o, ? Promises.set_o. condtac.
+        { inversion e. subst. clear -TSP MEM. inv MEM. rewrite app_length in TSP. lia. }
+        condtac.
+        { inversion e. subst. clear -TSP. lia. }
+        apply PROMISES1. ss.
+      * i. rewrite Promises.unset_o, Promises.set_o. condtac; ss.
+        { clear X. inv e. rewrite <- PROMISES2; ss.
+          erewrite Local_wf_promises_above; eauto. apply WF1.
+        }
+        { eauto. }
+    + inv MEM. ss. econs.
+      * ss.
+      * rewrite <- app_assoc. ss.
+      * ss.
+      * i. revert TSP. rewrite Promises.lookup_bot. ss.
+      * i. apply nth_error_snoc_inv in MSG0. des.
+        { exploit SRC_PROMISES; eauto. i. des. subst. splits; ss. }
+        { subst. splits; ss. }
+      * i. apply Memory.get_msg_snoc_inv in READ. des; eauto. subst. ss.
+      * i. apply nth_error_snoc_inv in NTH. des.
+        { exploit MEM1'; eauto. i. des. subst. esplits; try exact MSG0; ss.
+          - rewrite fun_add_spec. condtac; ss. rewrite app_length.
+            exploit nth_error_Some. rewrite NTH0. intros [Y _]. clear -Y.
+            exploit Y; [congr|]. lia.
+          - rewrite fun_add_spec. condtac; ss. inversion e. destruct msg1, msg2. ss. subst.
+            rewrite MSGCOH0. inv WRITABLE. clear -COH. lia.
+        }
+        { subst. ss. apply Memory.get_msg_app_inv in MSG. des.
+          { clear -MSG. lia. }
+          esplits; try exact MSG0; eauto.
+          - rewrite fun_add_spec. condtac; [|congr]. s. rewrite app_length. ss.
+          - s. rewrite fun_add_spec. condtac; [|congr]. s. clear. lia.
+        }
+  - inv LOCAL. inv WRITABLE.
+    rewrite (sim_view_below (COH (ValA.val (sem_expr rmap2 eloc)))); clear -COH0; lia.
+Qed.
 
 Theorem certified_promise_complete
         tid (eu1 eu2:ExecUnit.t (A:=unit)) loc val ts
