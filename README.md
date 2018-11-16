@@ -37,7 +37,7 @@ and faster operational memory model for ARMv8 and RISC-V".
 
 - `src/axiomatic/Axiomatic.v`: Definition of Axiomatic
 
-- `src/lcertify`: Thread-local certification (Section 3.5, 8.1)
+- `src/lcertify`: Thread-local certification
 
 - `src/certify`: Certification with ARMv8 store exclusives (Extended certification)
 
