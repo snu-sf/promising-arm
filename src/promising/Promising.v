@@ -365,6 +365,16 @@ Module Memory.
       + eapply X0; eauto.
   Qed.
 
+  Lemma no_msgs_split'
+        a b c pred mem:
+    no_msgs a b pred mem /\ no_msgs b c pred mem ->
+    no_msgs a c pred mem.
+  Proof.
+    i. des. ii. destruct (le_lt_dec (S ts) b).
+    + eapply H; eauto.
+    + eapply H0; eauto.
+  Qed.
+
   Lemma no_msgs_full
         pred from to mem1 mem2
         (TO: to <= length mem1)

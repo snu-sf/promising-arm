@@ -488,6 +488,25 @@ Proof.
   - apply sim_view_above. ss.
 Qed.
 
+Lemma read_coh_latest_ts
+      tid ex ord loc val ts (lc1:Local.t (A:=unit)) mem lc2
+      (WF: Local.wf tid mem lc1)
+      (READ: Local.read ex ord loc val ts lc1 mem lc2):
+  Memory.latest_ts loc.(ValA.val) (lc2.(Local.coh) loc.(ValA.val)).(View.ts) mem = ts.
+Proof.
+  inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. apply antisymmetry.
+  - apply Memory.latest_latest_ts. apply Memory.latest_join; ss. apply Memory.latest_join; ss.
+    apply Memory.ge_latest. eapply Local.fwd_read_view_le; eauto.
+  - unfold FwdItem.read_view. condtac; ss; cycle 1.
+    { eapply Memory.latest_ts_read_le; eauto. s.
+      rewrite <- join_r, <- join_r. ss.
+    }
+    apply andb_true_iff in X0. des.
+    destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val loc))) ts); ss. inv e0.
+    inv WF. destruct (FWDBANK (ValA.val loc)).
+    rewrite TS. apply Memory.latest_ts_mon. apply join_l.
+Qed.
+
 Lemma sim_eu_step
       tid ts eu1 eu2 eu2'
       (SIM: sim_eu tid ts eu1 eu2)
@@ -634,27 +653,6 @@ Proof.
       + econs; ss. econs; ss; try by apply LOCAL.
         apply sim_rmap_add; ss. apply sim_rmap_expr. ss.
     - (* read *)
-
-
-      Lemma read_coh_latest_ts
-            tid ex ord loc val ts (lc1:Local.t (A:=unit)) mem lc2
-            (WF: Local.wf tid mem lc1)
-            (READ: Local.read ex ord loc val ts lc1 mem lc2):
-        Memory.latest_ts loc.(ValA.val) (lc2.(Local.coh) loc.(ValA.val)).(View.ts) mem = ts.
-      Proof.
-        inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. apply antisymmetry.
-        - apply Memory.latest_latest_ts. apply Memory.latest_join; ss. apply Memory.latest_join; ss.
-          apply Memory.ge_latest. eapply Local.fwd_read_view_le; eauto.
-        - unfold FwdItem.read_view. condtac; ss; cycle 1.
-          { eapply Memory.latest_ts_read_le; eauto. s.
-            rewrite <- join_r, <- join_r. ss.
-          }
-          apply andb_true_iff in X0. des.
-          destruct (equiv_dec (FwdItem.ts (Local.fwdbank lc1 (ValA.val loc))) ts); ss. inv e0.
-          inv WF. destruct (FWDBANK (ValA.val loc)).
-          rewrite TS. apply Memory.latest_ts_mon. apply join_l.
-      Qed.
-
       exploit read_coh_latest_ts; eauto.
       { apply WF2. }
       intro COH_LATEST2. guardH COH_LATEST2.

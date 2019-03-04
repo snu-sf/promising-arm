@@ -141,18 +141,7 @@ Proof.
         { intro X. specialize (EX X). des. inv LOCAL. inv EXBANK; [congr|].
           rewrite TSX in H. inv H. esplits; eauto.
           destruct a, eb. ss. i. subst.
-
-          Lemma Memory_no_msgs_split'
-                a b c pred mem:
-            Memory.no_msgs a b pred mem /\ Memory.no_msgs b c pred mem ->
-            Memory.no_msgs a c pred mem.
-          Proof.
-            i. des. ii. destruct (le_lt_dec (S ts) b).
-            + eapply H; eauto.
-            + eapply H0; eauto.
-          Qed.
-
-          eapply Memory_no_msgs_split'. instantiate (1 := length mem). split; ss.
+          eapply Memory.no_msgs_split'. instantiate (1 := length mem). split; ss.
           destruct (le_lt_dec (S (length mem)) ts).
           { ii. clear -TS1 TS2 l. lia. }
           inv REL; ss. inv TS0. destruct (le_lt_dec ts0 (length mem)).
@@ -452,7 +441,7 @@ Proof.
         { eapply lt_le_trans; [exact EXT|]. exploit sim_mem_length; eauto. clear. lia. }
         { i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
           destruct a, eb. ss. esplits; eauto. ss. i. subst.
-          eapply Memory_no_msgs_split'. instantiate (1 := ts). split; cycle 1.
+          eapply Memory.no_msgs_split'. instantiate (1 := ts). split; cycle 1.
           { ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
             apply H2. inv MEM. eapply TS_PRIVATE; eauto.
           }
