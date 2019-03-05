@@ -5,7 +5,7 @@ This is the Coq development for PLDI 2019 submission #368:
 
 ## Build
 
-- Requirement: [Coq 8.8](https://coq.inria.fr/download), Make, Rsync.
+- Requirement: [Coq 8.9](https://coq.inria.fr/download), Make, Rsync.
 
 - Initialization
 
