@@ -1,7 +1,10 @@
-# Promising-ARM/RISC-V
+# Promising-ARM/RISC-V: a simpler and faster operational concurrency model
 
-This is the Coq development for PLDI 2019 submission #368:
-"Promising-ARM/RISC-V: a simpler and faster operational memory model for ARMv8 and RISC-V".
+Christopher Pulte, Jean Pichon-Pharabod, Jeehoon Kang, Sung-Hwan Lee, Chung-Kil Hur.
+
+40th annual ACM SIGPLAN conference on Programming Languages Design and Implementation ([PLDI 2019](https://pldi19.sigplan.org/)).
+
+Please visit the [project website](https://sf.snu.ac.kr/promising-arm-riscv/) for more information.
 
 ## Build
 
