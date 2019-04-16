@@ -1,7 +1,7 @@
 # Promising-ARM/RISC-V
 
 This is the Coq development for PLDI 2019 submission #368:
-"Promising-ARM/RISC-V:a simpler and faster operational memory model for ARMv8 and RISC-V".
+"Promising-ARM/RISC-V: a simpler and faster operational memory model for ARMv8 and RISC-V".
 
 ## Build
 
