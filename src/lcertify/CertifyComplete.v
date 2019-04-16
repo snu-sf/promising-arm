@@ -184,3 +184,11 @@ Proof.
       congr.
     + eapply x0. ss.
 Qed.
+
+Theorem certified_exec_equivalent p m:
+  Machine.exec p m <-> certified_exec p m.
+Proof.
+  split.
+  - apply certified_exec_complete.
+  - apply certified_exec_sound.
+Qed.

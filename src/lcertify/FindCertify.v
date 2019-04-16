@@ -600,3 +600,19 @@ Proof.
 
   econs; try exact STEP4; eauto.
 Qed.
+
+Theorem certified_promise_correct
+        tid (eu1:ExecUnit.t (A:=unit)) loc val
+        (WF1: ExecUnit.wf tid eu1):
+  certified_promise tid eu1 loc val <->
+  exists eu2 ts,
+    <<STATE: eu1.(ExecUnit.state) = eu2.(ExecUnit.state)>> /\
+    <<LOCAL: Local.promise loc val ts tid
+                           eu1.(ExecUnit.local) eu1.(ExecUnit.mem)
+                           eu2.(ExecUnit.local) eu2.(ExecUnit.mem)>> /\
+    <<CERTIFY: certify tid eu2>>.
+Proof.
+  split; i; des.
+  - eapply certified_promise_sound; eauto.
+  - eapply certified_promise_complete; eauto.
+Qed.

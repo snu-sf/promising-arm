@@ -29,49 +29,60 @@ This is the Coq development for PLDI 2019 submission #368:
 
 ### Model
 
-- `lib` and `src/lib` contains libraries not necessarily related to relaxed-memory concurrency.
+- `lib` and `src/lib` contains libraries not necessarily related to
+  relaxed-memory concurrency.
 
 - `src/lib/Lang.v`: Definition of assembly-like language and its interpretation
 
-- `src/promising/Promising.v`: Definition of Global-Promising
+- `src/promising/Promising.v`: Definition of Promising-ARM/RISC-V without
+  certification (corresponding to the rules on Figure 3)
 
 - `src/axiomatic/Axiomatic.v`: Definition of Axiomatic
 
 - `src/lcertify`: Thread-local certification
 
-- `src/certify`: Certification with ARMv8 store exclusives (Extended certification)
-
 ### Results
 
-- The optimisation for exhaustive exploration is sound.  Or equivalently, for
-  every Promising trace, there exists a trace with the same final state, which
-  can be split into a sequence of promise transitions followed by only
-  non-promise transitions.
-  See Theorem `promising_to_promising_pf` in `src/promising/PtoPF.v`.
+- Theorem 6.1: Equivalence between Promising-ARM/RISC-V and Axiomatic
+  + Theorem `axiomatic_to_promising` in `src/axiomatic/AtoP.v`:
+    Axiomatic refines Promising-ARM/RISC-V without certification.
+  + Theorem `promising_to_axiomatic` in `src/axiomatic/PFtoA.v`:
+    Promising-ARM/RISC-V without certification refines Axiomatic.
+    * `PFtoA1.v`: construction of axiomatic execution from promising execution
+    * `PFtoA2.v`, `PFtoA3.v`: definitions and lemmas for main proof
+    * `PFtoA4*.v`: proof for validity of constructed axiomatic execution
+      * `PFtoA4SL.v`: simulation between promising and axiomatic execution
+      * `PFtoA4OBR.v`, `PFtoA4OBW.v`, `PFtoA4FR.v`: proof for "external" axiom
+      * `PFtoA4Atomic.v`: proof for "atomic" axiom
+  + Since Promising-ARM/RISC-V without certification is equivalent to
+    Promising-ARM/RISC-V by Theorem 6.2, Promising-ARM/RISC-V is equivalent to
+    Axiomatic.
 
-- Optimised Global-Promising refines Axiomatic.
-  See Theorem `promising_pf_to_axiomatic` in `src/axiomatic/PFtoA.v`.
-  The proof consists of:
+- Theorem 6.2: Equivalence between Promising-ARM/RISC-V and Promising-ARM/RISC-V
+  without certification
+  + Theorem `certified_exec_equivalent` in `src/lcertify/CertifyComplete.v`:
+    Promising-ARM/RISC-V and Promising-ARM/RISC-V without certification are
+    equivalent.
 
-    + `PFtoA1.v`: construction of axiomatic execution from promising execution
-    + `PFtoA2.v`, `PFtoA3.v`: definitions and lemmas for main proof
-    + `PFtoA4*.v`: proof for validity of constructed axiomatic execution
-        * `PFtoA4SL.v`: simulation between promising and axiomatic execution
-        * `PFtoA4OBR.v`, `PFtoA4OBW.v`, `PFtoA4FR.v`: proof for "external" axiom
-        * `PFtoA4Atomic.v`: proof for "atomic" axiom
+- Theorem 6.3: Deadlock freedom of Promising-RISC-V
+  + Theorem `certified_deadlock_free` in `src/lcertify/CertifyProgressRiscV.v`:
+    Promising-RISC-V is deadlock-free.
 
-- Axiomatic refines Global-Promising.
-  See Theorem `axiomatic_to_promising` in `src/axiomatic/AtoP.v`.
+- Theorem 6.4: Correctness of `find_and_certify`
+  + Theorem `certified_promise_correct` in `src/lcertify/FindCertify.v`:
+    `find_and_certify` is correct.
+    * Theorem `certified_promise_sound` in `src/lcertify/FindCertify.v`:
+      Assume the thread configuration `<T, M>` is certified, and promising
+      `p` leads to `<T', M'>`. Then `<T'. M'>` is certified if `p` is in
+      `find_and_certify <T, M>`.
+    * Theorem `certified_promise_complete` in `src/lcertify/FindCertify.v`:
+      Assume the thread configuration `<T, M>` is certified, and promising
+      `p` leads to `<T', M'>`. Then `p` is in `find_and_certify <T, M>` if
+      `<T', M'>` is certified.
 
-- Global-Promising refines Promising.
-  See Theorem `certifiec_exec_complete` in `src/lcertify/CertifyComplete.v`.
-
-- Promising refines Global-Promising.
-  See Theorem `certified_exec_sound` in `src/lcertify/Certify.v`.
-
-- Promising-RISC-V is deadlock-free.
-  See Theorem `certified_deadlock_free` in `src/lcertify/CertifyProgressRiscV.v`.
-
-- The algorithm for computing promises is sound and complete.
-  See Theorems `certified_promise_sound` and `certified_promise_complete` in
-  `src/lcertify/FindCertify.v`.
+- Theorem 7.1: For every Promising `tr`, there exists a trace `tr'` with same
+  final state such that `tr'` can be split into a sequence of promise
+  transitions followed by only non-promise transitions.
+  + Theorem `promising_to_promising_pf` in `src/promising/PtoPF.v`:
+    Promising-ARM/RISC-V refines Promising-PF, which promises all the writes at
+    first.

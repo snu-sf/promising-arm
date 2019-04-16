@@ -19,6 +19,7 @@ Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
 Require Import PromisingArch.promising.Promising.
 Require Import PromisingArch.promising.StateExecFacts.
+Require Import PromisingArch.promising.PtoPF.
 Require Import PromisingArch.axiomatic.Axiomatic.
 Require Import PromisingArch.axiomatic.CommonAxiomatic.
 Require Import PromisingArch.axiomatic.PFtoA1.
@@ -594,4 +595,17 @@ Grab Existential Variables.
   clear - INTERNAL.
   eapply internal_acyclic. auto.
 }
+Qed.
+
+Theorem promising_to_axiomatic
+        p m
+        (STEP: Machine.exec p m):
+  exists ex (EX: Valid.ex p ex),
+    <<TERMINAL: Machine.is_terminal m -> EX.(Valid.is_terminal)>> /\
+    <<STATE: IdMap.Forall2
+               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               m.(Machine.tpool) EX.(Valid.aeus)>>.
+Proof.
+  apply promising_to_promising_pf in STEP.
+  apply promising_pf_to_axiomatic; auto.
 Qed.

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-egrep -i "(admit)" src/*.v src/*/*.v
+find src -name "*.v" | xargs grep -i "admit"
