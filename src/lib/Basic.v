@@ -13,7 +13,7 @@ Require Import Permutation.
 Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import sflib.
-Require Import paco.
+Require Import PacoNotation.
 Require Import HahnRelationsBasic.
 
 Set Implicit Arguments.
