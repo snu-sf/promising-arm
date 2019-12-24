@@ -28,10 +28,10 @@ Set Implicit Arguments.
 Inductive co_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (eid1 eid2: eidT): Prop :=
 | co_gen_intro
     w1 wl1 ts1 loc1 w2 wl2 ts2 loc2
-    (WS1: IdMap.find eid1.(fst) ws = Some (w1::wl1))
-    (W1: w1 eid1.(snd) = Some (loc1, ts1))
-    (WS2: IdMap.find eid2.(fst) ws = Some (w2::wl2))
-    (W2: w2 eid2.(snd) = Some (loc2, ts2))
+    (WS1: IdMap.find (fst eid1) ws = Some (w1::wl1))
+    (W1: w1 (snd eid1) = Some (loc1, ts1))
+    (WS2: IdMap.find (fst eid2) ws = Some (w2::wl2))
+    (W2: w2 (snd eid2) = Some (loc2, ts2))
     (LOC: loc1 = loc2)
     (TS: Time.lt ts1 ts2)
 .
@@ -39,17 +39,17 @@ Inductive co_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (eid1 eid
 Inductive rf_gen (ws: IdMap.t (list (nat -> option (Loc.t * Time.t)))) (rs: IdMap.t (list (nat -> option (Loc.t *Time.t)))) (eid1 eid2: eidT): Prop :=
 | rf_gen_intro
     w wl ts1 loc1 r rl loc2 ts2
-    (WS: IdMap.find eid1.(fst) ws = Some (w::wl))
-    (W: w eid1.(snd) = Some (loc1, ts1))
-    (RS: IdMap.find eid2.(fst) rs = Some (r::rl))
-    (R: r eid2.(snd) = Some (loc2, ts2))
+    (WS: IdMap.find (fst eid1) ws = Some (w::wl))
+    (W: w (snd eid1) = Some (loc1, ts1))
+    (RS: IdMap.find (fst eid2) rs = Some (r::rl))
+    (R: r (snd eid2) = Some (loc2, ts2))
     (LOC: loc1 = loc2)
     (TS: ts1 = ts2)
 .
 
 Definition v_gen (vs: IdMap.t (list (nat -> Time.t))) (eid: eidT): Time.t :=
-  match IdMap.find eid.(fst) vs with
-  | Some (v::vl) => v eid.(snd)
+  match IdMap.find (fst eid) vs with
+  | Some (v::vl) => v (snd eid)
   | _ => Time.bot
   end
 .
@@ -139,7 +139,7 @@ Lemma sim_traces_rf1_aux
       (NOPROMISE: Machine.no_promise m)
       (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -147,7 +147,7 @@ Lemma sim_traces_rf1_aux
   forall eid1 ex1 ord1 loc val
      (LABEL: Execution.label eid1 ex = Some (Label.read ex1 ord1 loc val)),
     (<<NORF: ~ codom_rel (rf_gen ws rs) eid1>> /\ <<VAL: val = Val.default >> /\
-     <<R: exists r rl loc, IdMap.find eid1.(fst) rs = Some (r::rl) /\ r eid1.(snd) = Some (loc, Time.bot)>>) \/
+     <<R: exists r rl loc, IdMap.find (fst eid1) rs = Some (r::rl) /\ r (snd eid1) = Some (loc, Time.bot)>>) \/
     (exists eid2 ex2 ord2,
         <<LABEL: Execution.label eid2 ex = Some (Label.write ex2 ord2 loc val)>> /\
         <<RF: (rf_gen ws rs) eid2 eid1>>).
@@ -196,7 +196,7 @@ Lemma sim_traces_rf1
       (NOPROMISE: Machine.no_promise m)
       (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -325,14 +325,14 @@ Lemma sim_traces_cov_fr
       (PRE: Valid.pre_ex p ex)
       (NOPROMISE: Machine.no_promise m)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
               atrs PRE.(Valid.aeus)):
   <<FR:
     forall eid1 eid2
-      (FR: ex.(Execution.fr) eid1 eid2),
+      (FR: Execution.fr ex eid1 eid2),
       Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>>.
 Proof.
   ii. inv FR.
@@ -372,7 +372,7 @@ Lemma sim_traces_cov_po_loc
       (ATR: IdMap.Forall2
               (fun tid atr aeu => exists l, atr = aeu :: l)
               atrs PRE.(Valid.aeus)):
-  forall eid1 eid2 (PO_LOC: ex.(Execution.po_loc) eid1 eid2),
+  forall eid1 eid2 (PO_LOC: Execution.po_loc ex eid1 eid2),
      <<PO_LOC_WRITE:
        ex.(Execution.label_is) Label.is_write eid2 ->
        Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2)>> /\

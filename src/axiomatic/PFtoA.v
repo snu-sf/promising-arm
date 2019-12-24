@@ -42,14 +42,14 @@ Lemma sim_traces_sim_th'_step
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (INTERNAL: acyclic ex.(Execution.internal))
+      (INTERNAL: acyclic (Execution.internal ex))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -88,14 +88,14 @@ Lemma sim_traces_sim_th'
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (INTERNAL: acyclic ex.(Execution.internal))
+      (INTERNAL: acyclic (Execution.internal ex))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -227,37 +227,37 @@ Lemma sim_traces_vext_valid
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (INTERNAL: acyclic ex.(Execution.internal))
+      (INTERNAL: acyclic (Execution.internal ex))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
   <<FR:
     forall eid1 eid2
-      (FR: ex.(Execution.fr) eid1 eid2),
+      (FR: Execution.fr ex eid1 eid2),
       Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
   <<OB_WRITE:
     forall eid1 eid2
-      (OB: ex.(ob') eid1 eid2)
+      (OB: ob' ex eid1 eid2)
       (EID2: ex.(Execution.label_is) Label.is_write eid2),
       Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
   <<OB_READ:
     forall eid1 eid2
-      (OB: ex.(ob') eid1 eid2)
+      (OB: ob' ex eid1 eid2)
       (EID2: ex.(Execution.label_is) Label.is_read eid2),
       Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2)>> /\
   <<ATOMIC:
     forall eid1 eid2 eid
       (ATOMIC: ex.(Execution.rmw) eid1 eid2)
-      (FRE: ex.(Execution.fre) eid1 eid)
-      (COE: ex.(Execution.coe) eid eid2),
+      (FRE: Execution.fre ex eid1 eid)
+      (COE: Execution.coe ex eid eid2),
       False>>.
 Proof.
   splits; i.
@@ -342,14 +342,14 @@ Lemma sim_traces_valid_internal
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
   <<INTERNAL:
     forall eid1 eid2
-      (INTERNAL: ex.(Execution.internal) eid1 eid2),
+      (INTERNAL: Execution.internal ex eid1 eid2),
       (Time.lt ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
       (Time.le ((v_gen covs) eid1) ((v_gen covs) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>>.
 Proof.
@@ -381,26 +381,26 @@ Lemma sim_traces_valid_external_atomic
       (PRE: Valid.pre_ex p ex)
       (CO: ex.(Execution.co) = co_gen ws)
       (RF: ex.(Execution.rf) = rf_gen ws rs)
-      (INTERNAL: acyclic ex.(Execution.internal))
+      (INTERNAL: acyclic (Execution.internal ex))
       (CO1: Valid.co1 ex)
       (CO2: Valid.co2 ex)
       (RF1: Valid.rf1 ex)
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
               atrs (Valid.aeus PRE)):
   <<EXTERNAL:
     forall eid1 eid2
-      (OB: ex.(Execution.ob) eid1 eid2)
+      (OB: Execution.ob ex eid1 eid2)
       (LABEL1: Execution.label_is ex Label.is_access eid1)
       (LABEL2: Execution.label_is ex Label.is_access eid2),
       (Time.lt ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_write eid2) \/
       (Time.le ((v_gen vexts) eid1) ((v_gen vexts) eid2) /\ ex.(Execution.label_is) Label.is_read eid2)>> /\
-  <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>>.
+  <<ATOMIC: le (ex.(Execution.rmw) ∩ ((Execution.fre ex) ⨾ (Execution.coe ex))) bot>>.
 Proof.
   generalize STEP. intro X. inv X. splits.
   - exploit sim_traces_vext_valid; eauto. i. des.
@@ -421,7 +421,7 @@ Qed.
 
 Lemma internal_acyclic
       ex cov
-      (INTERNAL: forall eid1 eid2 (INTERNAL: ex.(Execution.internal)⁺ eid1 eid2),
+      (INTERNAL: forall eid1 eid2 (INTERNAL: (Execution.internal ex)⁺ eid1 eid2),
           Time.lt (cov eid1) (cov eid2) \/
           (Time.le (cov eid1) (cov eid2) /\
            Execution.po eid1 eid2 /\
@@ -430,7 +430,7 @@ Lemma internal_acyclic
           (Time.le (cov eid1) (cov eid2) /\
            ex.(Execution.label_is) Label.is_write eid1 /\
            ex.(Execution.label_is) Label.is_read eid2)):
-  acyclic ex.(Execution.internal).
+  acyclic (Execution.internal ex).
 Proof.
   ii. exploit INTERNAL; eauto. i. des.
   - inv x0; lia.
@@ -449,7 +449,7 @@ Lemma promising_pf_valid
     <<RF_WF: Valid.rf_wf ex>> /\
     <<INTERNAL:
       forall eid1 eid2
-        (INTERNAL: ex.(Execution.internal)⁺ eid1 eid2),
+        (INTERNAL: (Execution.internal ex)⁺ eid1 eid2),
         Time.lt (cov eid1) (cov eid2) \/
         (Time.le (cov eid1) (cov eid2) /\
          Execution.po eid1 eid2 /\
@@ -460,7 +460,7 @@ Lemma promising_pf_valid
          ex.(Execution.label_is) Label.is_read eid2)>> /\
     <<EXTERNAL:
       forall eid1 eid2
-        (OB: (ex.(Execution.ob) ∩ (ex.(Execution.label_is_rel) Label.is_access))⁺ eid1 eid2),
+        (OB: (Execution.ob ex ∩ (ex.(Execution.label_is_rel) Label.is_access))⁺ eid1 eid2),
         Time.lt (vext eid1) (vext eid2) \/
         (Time.le (vext eid1) (vext eid2) /\
          Execution.po eid1 eid2 /\
@@ -469,9 +469,9 @@ Lemma promising_pf_valid
         (Time.le (vext eid1) (vext eid2) /\
          ex.(Execution.label_is) Label.is_write eid1 /\
          ex.(Execution.label_is) Label.is_read eid2)>> /\
-    <<ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot>> /\
+    <<ATOMIC: le (ex.(Execution.rmw) ∩ ((Execution.fre ex) ⨾ (Execution.coe ex))) bot>> /\
     <<STATE: IdMap.Forall2
-               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               (fun tid sl aeu => sim_state_weak (fst sl) aeu.(AExecUnit.state))
                m.(Machine.tpool) PRE.(Valid.aeus)>>.
 Proof.
   exploit promising_pf_sim_traces; eauto. i. des.
@@ -494,7 +494,7 @@ Proof.
   replace (co_gen ws) with (ex'.(Execution.co)) in CO1, CO2;[|subst; ss].
   replace (rf_gen ws rs) with (ex'.(Execution.rf)) in RF1, RF2, RF_WF; [|subst; ss].
   hexploit sim_traces_valid_internal; eauto; try by (subst; ss). intro INTERNAL.
-  assert (INTERNAL': forall eid1 eid2 (INTERNAL: ex'.(Execution.internal)⁺ eid1 eid2),
+  assert (INTERNAL': forall eid1 eid2 (INTERNAL: (Execution.internal ex')⁺ eid1 eid2),
              Time.lt (v_gen covs eid1) (v_gen covs eid2) \/
              (Time.le (v_gen covs eid1) (v_gen covs eid2) /\
               Execution.po eid1 eid2 /\
@@ -571,9 +571,9 @@ Theorem promising_pf_to_axiomatic
         p m
         (STEP: Machine.pf_exec p m):
   exists ex (EX: Valid.ex p ex),
-    <<TERMINAL: Machine.is_terminal m -> EX.(Valid.is_terminal)>> /\
+    <<TERMINAL: Machine.is_terminal m -> Valid.is_terminal EX>> /\
     <<STATE: IdMap.Forall2
-               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               (fun tid sl aeu => sim_state_weak (fst sl) aeu.(AExecUnit.state))
                m.(Machine.tpool) EX.(Valid.aeus)>>.
 Proof.
   exploit promising_pf_valid; eauto. i. des.
@@ -601,9 +601,9 @@ Theorem promising_to_axiomatic
         p m
         (STEP: Machine.exec p m):
   exists ex (EX: Valid.ex p ex),
-    <<TERMINAL: Machine.is_terminal m -> EX.(Valid.is_terminal)>> /\
+    <<TERMINAL: Machine.is_terminal m -> Valid.is_terminal EX>> /\
     <<STATE: IdMap.Forall2
-               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               (fun tid sl aeu => sim_state_weak (fst sl) aeu.(AExecUnit.state))
                m.(Machine.tpool) EX.(Valid.aeus)>>.
 Proof.
   apply promising_to_promising_pf in STEP.

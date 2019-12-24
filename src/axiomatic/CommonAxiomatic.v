@@ -154,13 +154,13 @@ Hint Constructors sim_event.
 
 Definition sim_local_coh ex loc :=
   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾
-  ex.(Execution.rfe)^? ⨾
+  (Execution.rfe ex)^? ⨾
   Execution.po.
 
 Lemma sim_local_coh_step ex loc:
   sim_local_coh ex loc =
   (sim_local_coh ex loc ∪
-   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾ ex.(Execution.rfe)^?) ⨾
+   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾ (Execution.rfe ex)^?) ⨾
   Execution.po_adj.
 Proof.
   unfold sim_local_coh. rewrite Execution.po_po_adj at 1.
@@ -174,7 +174,7 @@ Lemma sim_local_coh_spec
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex (Label.is_accessing loc) eid2)
       (COH: sim_local_coh ex loc eid1 eid2):
-  <<INTERNAL: ex.(Execution.internal)⁺ eid1 eid2>> /\
+  <<INTERNAL: (Execution.internal ex)⁺ eid1 eid2>> /\
   <<LABEL: Execution.label_is ex (Label.is_writing loc) eid1>>.
 Proof.
   inv COH. des. inv H. inv H0. des. inv EID2. inv H2. destruct l0; ss. inv H.
@@ -201,7 +201,7 @@ Definition sim_local_vrn ex :=
    ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘ ⨾
    Execution.po) ∪
 
-  (((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
+  (((Execution.ctrl ex ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
    ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾
    Execution.po) ∪
 
@@ -219,7 +219,7 @@ Lemma sim_local_vrn_step ex:
      Execution.po ⨾
      ⦗ex.(Execution.label_is) (Label.is_barrier_c Barrier.is_dmb_wr)⦘) ∪
 
-    (((ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
+    (((Execution.ctrl ex ∪ (ex.(Execution.addr) ⨾ Execution.po))) ⨾
      ⦗ex.(Execution.label_is) (eq (Label.barrier Barrier.isb))⦘) ∪
 
     (⦗ex.(Execution.label_is) (Label.is_acquire_pc)⦘))) ⨾
@@ -245,7 +245,7 @@ Lemma sim_local_vrn_spec
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex Label.is_read eid2)
       (VRN: sim_local_vrn ex eid1 eid2):
-  <<OB: ex.(Execution.ob) eid1 eid2>>.
+  <<OB: Execution.ob ex eid1 eid2>>.
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vrn in VRN.
   repeat match goal with
@@ -314,7 +314,7 @@ Lemma sim_local_vwn_spec
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex Label.is_write eid2)
       (VWN: sim_local_vwn ex eid1 eid2):
-  <<OB: ex.(Execution.ob) eid1 eid2>>.
+  <<OB: Execution.ob ex eid1 eid2>>.
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vwn in VWN.
   repeat match goal with
@@ -363,7 +363,7 @@ Proof.
 Qed.
 
 Definition sim_local_vcap ex :=
-  ex.(Execution.ctrl) ∪ (ex.(Execution.addr) ⨾ Execution.po).
+  Execution.ctrl ex ∪ (ex.(Execution.addr) ⨾ Execution.po).
 
 Lemma sim_local_vcap_step ex:
   sim_local_vcap ex =
@@ -399,7 +399,7 @@ Lemma sim_local_vrel_spec
       (EX: Valid.ex p ex)
       (EID2: Execution.label_is ex Label.is_acquire eid2)
       (VREL: sim_local_vrel ex eid1 eid2):
-  <<OB: ex.(Execution.ob) eid1 eid2>>.
+  <<OB: Execution.ob ex eid1 eid2>>.
 Proof.
   inv EID2. destruct l; inv LABEL. unfold sim_local_vrel in VREL.
   right. left. left. left. right.
@@ -466,7 +466,7 @@ Lemma rfi_sim_local_fwd
       loc eid1 eid2
       (EID1: ex.(Execution.label_is) (Label.is_writing loc) eid1)
       (EID2: ex.(Execution.label_is) (Label.is_reading loc) eid2)
-      (RFI: ex.(Execution.rfi) eid1 eid2):
+      (RFI: Execution.rfi ex eid1 eid2):
   sim_local_fwd ex loc eid1 eid2.
 Proof.
   destruct eid1 as [tid1 n1].

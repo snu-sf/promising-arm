@@ -53,8 +53,8 @@ Proof.
              exists sl2,
                IdMap.find tid m2.(Machine.tpool) = Some sl2 /\
                rtc (ExecUnit.state_step tid)
-                   (ExecUnit.mk sl1.(fst) sl1.(snd) m1.(Machine.mem))
-                   (ExecUnit.mk sl2.(fst) sl2.(snd) m1.(Machine.mem))).
+                   (ExecUnit.mk (fst sl1) (snd sl1) m1.(Machine.mem))
+                   (ExecUnit.mk (fst sl2) (snd sl2) m1.(Machine.mem))).
   { i. specialize (TPOOL tid). rewrite FIND1 in TPOOL. inv TPOOL. esplits; ss. }
   assert (OUT: forall tid
                  (FIND1: IdMap.find tid m1.(Machine.tpool) = None),
@@ -81,7 +81,7 @@ Proof.
   i. des. destruct p. ss.
 
   cut (exists m2', rtc (Machine.step ExecUnit.state_step)
-                 (Machine.mk (IdMap.add k (sl2.(fst), sl2.(snd)) m1.(Machine.tpool)) m1.(Machine.mem))
+                 (Machine.mk (IdMap.add k (fst sl2, snd sl2) m1.(Machine.tpool)) m1.(Machine.mem))
                  m2' /\
              Machine.equiv m2 m2').
   { i. des. esplits; [|by eauto]. etrans; [|by eauto].

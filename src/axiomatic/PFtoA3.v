@@ -28,7 +28,7 @@ Set Implicit Arguments.
 
 
 Definition ob' (ex: Execution.t): relation eidT :=
-  ex.(Execution.rfe) ∪ ex.(Execution.dob) ∪ ex.(Execution.aob) ∪ ex.(Execution.bob).
+  Execution.rfe ex ∪ Execution.dob ex ∪ Execution.aob ex ∪ Execution.bob ex.
 
 Ltac des_union :=
   repeat
@@ -41,8 +41,8 @@ Ltac des_union :=
 
 Lemma ob_ob'
       ex eid1 eid2:
-  ex.(Execution.ob) eid1 eid2 <->
-  (ex.(Execution.fr) ∪ ex.(Execution.co) ∪ ex.(ob')) eid1 eid2.
+  Execution.ob ex eid1 eid2 <->
+  (Execution.fr ex ∪ ex.(Execution.co) ∪ ob' ex) eid1 eid2.
 Proof.
   split; i.
   - des_union.
@@ -97,7 +97,7 @@ Definition sim_view_eq (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop
 Inductive sim_val (tid:Id.t) (vext:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat -> Prop)): Prop :=
 | sim_val_intro
     (VAL: vala.(ValA.val) = avala.(ValA.val))
-    (VIEW: sim_view vext vala.(ValA.annot).(View.ts) (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)))
+    (VIEW: sim_view vext vala.(ValA.annot).(View.ts) (fun eid => (fst eid) = tid /\ avala.(ValA.annot) (snd eid)))
 .
 Hint Constructors sim_val.
 
@@ -212,7 +212,7 @@ Definition sim_ob_write
            (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
   forall eid1 eid2
     (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-    (OB: ex.(ob') eid1 (tid, eid2))
+    (OB: ob' ex eid1 (tid, eid2))
     (EID2: ex.(Execution.label_is) Label.is_write (tid, eid2)),
     Time.lt (vext eid1) (vext (tid, eid2)).
 
@@ -221,7 +221,7 @@ Definition sim_ob_read
            (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
   forall eid1 eid2
     (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-    (AOB: ex.(ob') eid1 (tid, eid2))
+    (AOB: ob' ex eid1 (tid, eid2))
     (EID2: ex.(Execution.label_is) Label.is_read (tid, eid2)),
     Time.le (vext eid1) (vext (tid, eid2)).
 
@@ -230,7 +230,7 @@ Definition sim_fr
            (eu:ExecUnit.t (A:=unit)) (aeu:AExecUnit.t): Prop :=
   forall eid1 eid2
     (LABEL: eid1 < List.length aeu.(AExecUnit.local).(ALocal.labels))
-    (FR: ex.(Execution.fr) (tid, eid1) eid2),
+    (FR: Execution.fr ex (tid, eid1) eid2),
     Time.lt (vext (tid, eid1)) (vext eid2).
 
 Definition sim_atomic
@@ -239,8 +239,8 @@ Definition sim_atomic
   forall eid1 eid2 eid
     (LABEL: eid2 < List.length aeu.(AExecUnit.local).(ALocal.labels))
     (ATOMIC: ex.(Execution.rmw) eid1 (tid, eid2))
-    (FRE: ex.(Execution.fre) eid1 eid)
-    (COE: ex.(Execution.coe) eid (tid, eid2)),
+    (FRE: Execution.fre ex eid1 eid)
+    (COE: Execution.coe ex eid (tid, eid2)),
     False.
 
 Inductive sim_th'

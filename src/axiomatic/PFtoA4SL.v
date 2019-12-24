@@ -42,7 +42,7 @@ Lemma sim_traces_sim_th'_sl
       (RF2: Valid.rf2 ex)
       (RF_WF: Valid.rf_wf ex)
       (TR: IdMap.Forall2
-             (fun _ tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun _ tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (ATR: IdMap.Forall2
               (fun _ atr aeu => exists l, atr = aeu :: l)
@@ -514,9 +514,9 @@ Proof.
         - destruct ex0; econs; i; ss.
           + exploit EX2.(LABELS_REV); ss.
             { apply nth_error_last. apply Nat.eqb_eq. ss. }
-            i. eapply PRE.(Valid.write_ex_codom_rmw). econs; eauto.
+            i. eapply (Valid.write_ex_codom_rmw PRE). econs; eauto.
           + inv H.
-            exploit PRE.(Valid.rmw_is_po); eauto. i. inv x1. destruct x. ss. subst.
+            exploit (Valid.rmw_is_po PRE); eauto. i. inv x1. destruct x. ss. subst.
             exploit EX2.(RMW); ss; eauto.
             { rewrite List.app_length. s. clear. lia. }
             i. inv x0; ss. 

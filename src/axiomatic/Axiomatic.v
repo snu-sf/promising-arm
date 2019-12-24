@@ -652,9 +652,9 @@ Module Execution.
   Hint Constructors t.
 
   Definition label (eid:eidT) (ex:t): option Label.t :=
-    match IdMap.find eid.(fst) ex.(labels) with
+    match IdMap.find (fst eid) ex.(labels) with
     | None => None
-    | Some labels => List.nth_error labels eid.(snd)
+    | Some labels => List.nth_error labels (snd eid)
     end.
 
   Definition eids (ex:t): list eidT :=
@@ -748,32 +748,32 @@ Module Execution.
   .
   Hint Constructors label_loc.
 
-(* let obs = rfe | fr | co *)
+  (* let obs = rfe | fr | co *)
 
-(* let dob = *)
-(* 	| (addr | data); rfi? *)
-(* 	| (ctrl | (addr; po)); ([W] | [ISB]; po; [R]) *)
+  (* let dob = *)
+  (* 	| (addr | data); rfi? *)
+  (* 	| (ctrl | (addr; po)); ([W] | [ISB]; po; [R]) *)
 
-(* let aob = [range(rmw)]; rfi; [A | Q] *)
+  (* let aob = [range(rmw)]; rfi; [A | Q] *)
 
-(* let bob = *)
-(* 	| [R|W]; po; [dmb.full]; po; [R|W] *)
-(* 	| [L]; po; [A] *)
-(* 	| [R]; po; [dmb.ld]; po; [R|W] *)
-(* 	| [A | Q]; po; [R|W] *)
-(* 	| [W]; po; [dmb.st]; po; [W] *)
-(* 	| [R|W]; po; [L] *)
+  (* let bob = *)
+  (* 	| [R|W]; po; [dmb.full]; po; [R|W] *)
+  (* 	| [L]; po; [A] *)
+  (* 	| [R]; po; [dmb.ld]; po; [R|W] *)
+  (* 	| [A | Q]; po; [R|W] *)
+  (* 	| [W]; po; [dmb.st]; po; [W] *)
+  (* 	| [R|W]; po; [L] *)
 
-(* let ob = obs | dob | aob | bob *)
+  (* let ob = obs | dob | aob | bob *)
 
-(* acyclic po-loc | fr | co | rf as internal *)
-(* acyclic ob as external *)
-(* empty rmw & (fre; coe) as atomic *)
+  (* acyclic po-loc | fr | co | rf as internal *)
+  (* acyclic ob as external *)
+  (* empty rmw & (fre; coe) as atomic *)
 
   Inductive po (eid1 eid2:eidT): Prop :=
   | po_intro
-      (TID: eid1.(fst) = eid2.(fst))
-      (N: eid1.(snd) < eid2.(snd))
+      (TID: fst eid1 = fst eid2)
+      (N: snd eid1 < snd eid2)
   .
   Hint Constructors po.
 
@@ -784,8 +784,8 @@ Module Execution.
 
   Inductive po_adj (eid1 eid2:eidT): Prop :=
   | po_adj_intro
-      (TID: eid1.(fst) = eid2.(fst))
-      (N: eid2.(snd) = S eid1.(snd))
+      (TID: fst eid1 = fst eid2)
+      (N: snd eid2 = S (snd eid1))
   .
   Hint Constructors po_adj.
 
@@ -816,15 +816,16 @@ Module Execution.
 
   Inductive i (eid1 eid2:eidT): Prop :=
   | i_intro
-      (TID: eid1.(fst) = eid2.(fst))
+      (TID: fst eid1 = fst eid2)
   .
   Hint Constructors i.
 
   Inductive e (eid1 eid2:eidT): Prop :=
   | e_intro
-      (TID: eid1.(fst) <> eid2.(fst))
+      (TID: fst eid1 <> fst eid2)
   .
   Hint Constructors e.
+
 
   Definition ctrl (ex: t): relation eidT := ex.(ctrl0) ⨾ po.
   Definition po_loc (ex:t): relation eidT := po ∩ ex.(label_rel) label_loc.
@@ -834,22 +835,21 @@ Module Execution.
      ((ex.(label_is) Label.is_read) \₁ codom_rel ex.(rf)) × (ex.(label_is) Label.is_write)).
   Definition rfi (ex:t): relation eidT := ex.(rf) ∩ i.
   Definition rfe (ex:t): relation eidT := ex.(rf) ∩ e.
-  Definition fre (ex:t): relation eidT := ex.(fr) ∩ e.
+  Definition fre (ex:t): relation eidT := (fr ex) ∩ e.
   Definition coe (ex:t): relation eidT := ex.(co) ∩ e.
 
-  Definition internal (ex:t): relation eidT := ex.(po_loc) ∪ ex.(fr) ∪ ex.(co) ∪ ex.(rf).
+  Definition internal (ex:t): relation eidT := (po_loc ex) ∪ (fr ex) ∪ ex.(co) ∪ ex.(rf).
 
-  Definition obs (ex:t): relation eidT := ex.(rfe) ∪ ex.(fr) ∪ ex.(co).
+  Definition obs (ex:t): relation eidT := (rfe ex) ∪ (fr ex) ∪ ex.(co).
 
   Definition dob (ex:t): relation eidT :=
-    ((ex.(addr) ∪ ex.(data)) ⨾ ex.(rfi)^?) ∪
-
-    ((ex.(ctrl) ∪ (ex.(addr) ⨾ po)) ⨾
+    ((ex.(addr) ∪ ex.(data)) ⨾ (rfi ex)^?) ∪
+    (((ctrl ex) ∪ (ex.(addr) ⨾ po)) ⨾
      (⦗ex.(label_is) Label.is_write⦘ ∪
       (⦗ex.(label_is) (eq (Label.barrier Barrier.isb))⦘ ⨾ po ⨾ ⦗ex.(label_is) Label.is_read⦘))).
 
   Definition aob (ex:t): relation eidT :=
-    ⦗codom_rel ex.(rmw)⦘ ⨾ ex.(rfi) ⨾ ⦗fun eid => arch = riscv \/ ex.(label_is) Label.is_acquire_pc eid⦘.
+    ⦗codom_rel ex.(rmw)⦘ ⨾ (rfi ex) ⨾ ⦗fun eid => arch = riscv \/ ex.(label_is) Label.is_acquire_pc eid⦘.
 
   Definition bob (ex:t): relation eidT :=
     (⦗ex.(label_is) Label.is_read⦘ ⨾
@@ -889,14 +889,14 @@ Module Execution.
     (ifc (arch == riscv) ex.(rmw)).
 
   Definition ob (ex:t): relation eidT :=
-    ex.(obs) ∪ ex.(dob) ∪ ex.(aob) ∪ ex.(bob).
+    (obs ex) ∪ (dob ex) ∪ (aob ex) ∪ (bob ex).
 End Execution.
 
 Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
 | tid_lift_intro
-    (TID1: eid1.(fst) = tid)
-    (TID1: eid2.(fst) = tid)
-    (REL: rel eid1.(snd) eid2.(snd))
+    (TID1: fst eid1 = tid)
+    (TID1: fst eid2 = tid)
+    (REL: rel (snd eid1) (snd eid2))
 .
 Hint Constructors tid_lift.
 
@@ -915,6 +915,7 @@ Inductive tid_join (rels: IdMap.t (relation nat)) (eid1 eid2:eidT): Prop :=
     (REL: tid_lift tid rel eid1 eid2)
 .
 Hint Constructors tid_join.
+
 
 Module Valid.
   Inductive pre_ex (p:program) (ex:Execution.t) := mk_pre_ex {
@@ -975,9 +976,9 @@ Module Valid.
     RF1: rf1 ex;
     RF2: rf2 ex;
     RF_WF: rf_wf ex;
-    INTERNAL: acyclic ex.(Execution.internal);
-    EXTERNAL: acyclic ex.(Execution.ob);
-    ATOMIC: le (ex.(Execution.rmw) ∩ (ex.(Execution.fre) ⨾ ex.(Execution.coe))) bot;
+    INTERNAL: acyclic (Execution.internal ex);
+    EXTERNAL: acyclic (Execution.ob ex);
+    ATOMIC: le (ex.(Execution.rmw) ∩ ((Execution.fre ex) ⨾ (Execution.coe ex))) bot;
   }.
   Hint Constructors ex.
   Coercion PRE: ex >-> pre_ex.
@@ -1020,7 +1021,7 @@ Module Valid.
   Lemma ctrl_is_po
         p exec
         (EX: pre_ex p exec):
-    exec.(Execution.ctrl) ⊆ Execution.po.
+    Execution.ctrl exec ⊆ Execution.po.
   Proof.
     ii. inv H. des. etrans; eauto.
     eapply ctrl0_is_po; eauto.
@@ -1380,7 +1381,7 @@ Module Valid.
         p exec
         eid1 eid2
         (EX: pre_ex p exec)
-        (CTRL: exec.(Execution.ctrl) eid1 eid2):
+        (CTRL: Execution.ctrl exec eid1 eid2):
     <<EID1: Execution.label_is exec (Label.is_access) eid1>>.
   Proof.
     inv CTRL. des. exploit ctrl0_label; eauto. i. des. auto.
@@ -1393,7 +1394,7 @@ Module Valid.
         (CO2: co2 exec)
         (RF2: rf2 exec)
         (EID1: Execution.label_is exec Label.is_barrier eid1)
-        (OB: exec.(Execution.ob) eid1 eid2):
+        (OB: Execution.ob exec eid1 eid2):
     Execution.po eid1 eid2.
   Proof.
     inv EID1. destruct l; ss. unfold co2, rf2 in *.
@@ -1421,9 +1422,9 @@ Module Valid.
         (CO2: co2 exec)
         (RF2: rf2 exec)
         (EID2: Execution.label_is exec Label.is_barrier eid2)
-        (OB1: exec.(Execution.ob) eid1 eid2)
-        (OB2: exec.(Execution.ob) eid2 eid3):
-    <<OB: exec.(Execution.ob) eid1 eid3>>.
+        (OB1: Execution.ob exec eid1 eid2)
+        (OB2: Execution.ob exec eid2 eid3):
+    <<OB: Execution.ob exec eid1 eid3>>.
   Proof.
     inv EID2. destruct l; ss. exploit barrier_ob_po; eauto. i.
     unfold co2, rf2 in *. clear OB2.
@@ -1453,7 +1454,7 @@ Module Valid.
         (CO2: co2 exec)
         (RF2: rf2 exec)
         (EID1: Execution.label_is exec Label.is_ctrl eid1)
-        (OB: exec.(Execution.ob) eid1 eid2):
+        (OB: Execution.ob exec eid1 eid2):
     Execution.po eid1 eid2.
   Proof.
     inv EID1. destruct l; ss. unfold co2, rf2 in *.
@@ -1481,9 +1482,9 @@ Module Valid.
         (CO2: co2 exec)
         (RF2: rf2 exec)
         (EID2: Execution.label_is exec Label.is_ctrl eid2)
-        (OB1: exec.(Execution.ob) eid1 eid2)
-        (OB2: exec.(Execution.ob) eid2 eid3):
-    <<OB: exec.(Execution.ob) eid1 eid3>>.
+        (OB1: Execution.ob exec eid1 eid2)
+        (OB2: Execution.ob exec eid2 eid3):
+    <<OB: Execution.ob exec eid1 eid3>>.
   Proof.
     inv EID2. destruct l; ss. exploit ctrl_ob_po; eauto. i.
     unfold co2, rf2 in *. clear OB2.
@@ -1512,7 +1513,7 @@ Module Valid.
         (PRE: pre_ex p exec)
         (CO2: co2 exec)
         (RF2: rf2 exec)
-        (OB: exec.(Execution.ob) eid1 eid2)
+        (OB: Execution.ob exec eid1 eid2)
         (EID1: Execution.label eid1 exec = None):
     False.
   Proof.
@@ -1536,9 +1537,9 @@ Module Valid.
         (PRE: pre_ex p exec)
         (CO2: co2 exec)
         (RF2: rf2 exec)
-        (CYCLE: exec.(Execution.ob)⁺ eid eid):
+        (CYCLE: (Execution.ob exec)⁺ eid eid):
     exists eid_nb,
-      (exec.(Execution.ob) ∩ (Execution.label_is_rel exec Label.is_access))⁺ eid_nb eid_nb.
+      (Execution.ob exec ∩ (Execution.label_is_rel exec Label.is_access))⁺ eid_nb eid_nb.
   Proof.
     exploit minimalize_cycle; eauto.
     { instantiate (1 := Execution.label_is exec Label.is_access).
@@ -1564,7 +1565,7 @@ Module Valid.
         (PRE: pre_ex p ex)
         (CO2: co2 ex)
         (RF2: rf2 ex)
-        (INTERNAL: ex.(Execution.internal) eid1 eid2):
+        (INTERNAL: Execution.internal ex eid1 eid2):
     <<EID1: ex.(Execution.label_is) Label.is_access eid1>> /\
     <<EID2: ex.(Execution.label_is) Label.is_access eid2>>.
   Proof.
@@ -1590,7 +1591,7 @@ Module Valid.
         (PRE: pre_ex p ex)
         (CO2: co2 ex)
         (RF2: rf2 ex)
-        (INTERNAL: ex.(Execution.internal) eid1 eid2)
+        (INTERNAL: Execution.internal ex eid1 eid2)
         (EID1: ex.(Execution.label_is) Label.is_read eid1)
         (EID2: ex.(Execution.label_is) Label.is_read eid2):
     Execution.po eid1 eid2.
@@ -1615,8 +1616,8 @@ Module Valid.
         (RF1: rf1 ex)
         (RF2: rf2 ex)
         (RF_WF: rf_wf ex)
-        (INTERNAL: acyclic ex.(Execution.internal))
-        (OB: ex.(Execution.ob) eid1 eid2)
+        (INTERNAL: acyclic (Execution.internal ex))
+        (OB: Execution.ob ex eid1 eid2)
         (EID1: ex.(Execution.label_is) Label.is_read eid1)
         (EID2: ex.(Execution.label_is) Label.is_read eid2):
     Execution.po eid1 eid2.
@@ -1671,8 +1672,8 @@ Module Valid.
   Lemma rfi_is_po
         ex eid1 eid2
         (RF2: Valid.rf2 ex)
-        (INTERNAL: acyclic ex.(Execution.internal))
-        (RFI: ex.(Execution.rfi) eid1 eid2):
+        (INTERNAL: acyclic (Execution.internal ex))
+        (RFI: Execution.rfi ex eid1 eid2):
     Execution.po eid1 eid2.
   Proof.
     destruct eid1 as [tid1 eid1], eid2 as [tid2 eid2].
@@ -1695,7 +1696,7 @@ Module Valid.
   Lemma po_loc_write_is_co
         ex eid1 eid2 loc
         (CO1: Valid.co1 ex)
-        (INTERNAL: acyclic ex.(Execution.internal))
+        (INTERNAL: acyclic (Execution.internal ex))
         (PO: Execution.po eid1 eid2)
         (LABEL1: ex.(Execution.label_is) (Label.is_writing loc) eid1)
         (LABEL2: ex.(Execution.label_is) (Label.is_writing loc) eid2):

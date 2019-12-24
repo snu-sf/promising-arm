@@ -148,7 +148,7 @@ Lemma sim_traces_memory
       (STEP: Machine.pf_exec p m)
       (SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts)
       (TR: IdMap.Forall2
-             (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+             (fun tid tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
              trs m.(Machine.tpool))
       (GET: Memory.get_msg ts m.(Machine.mem) = Some (Msg.mk loc val tid)):
   exists eu, IdMap.find tid trs = Some eu.
@@ -287,7 +287,7 @@ Lemma promising_pf_sim_traces
   exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
     <<SIM: sim_traces p m.(Machine.mem) trs atrs ws rs covs vexts>> /\
     <<TR: IdMap.Forall2
-            (fun tid tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) m.(Machine.mem)) :: l)
+            (fun tid tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) m.(Machine.mem)) :: l)
             trs m.(Machine.tpool)>> /\
     <<ATR: IdMap.Forall2
              (fun tid atr aeu => exists l, atr = aeu :: l)
@@ -298,7 +298,7 @@ Proof.
   cut (exists trs atrs ws rs covs vexts ex (PRE: Valid.pre_ex p ex),
     <<SIM: sim_traces p (Machine.mem m2') trs atrs ws rs covs vexts>> /\
     <<TR: forall tid, opt_rel
-            (fun tr sl => exists l, tr = (ExecUnit.mk sl.(fst) sl.(snd) (Machine.mem m2')) :: l)
+            (fun tr sl => exists l, tr = (ExecUnit.mk (fst sl) (snd sl) (Machine.mem m2')) :: l)
             (IdMap.find tid trs)
             (IdMap.find tid (Machine.tpool m2'))>> /\
     <<ATR: IdMap.Forall2

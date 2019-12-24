@@ -831,7 +831,7 @@ Section Local.
       (COH: Memory.latest loc ts (lc1.(coh) loc).(View.ts) mem1)
       (LATEST: Memory.latest loc ts view_pre.(View.ts) mem1)
       (MSG: Memory.read loc ts mem1 = Some val)
-      (VIEW_MSG: view_msg = (lc1.(fwdbank) loc).(FwdItem.read_view) ts ord)
+      (VIEW_MSG: view_msg = FwdItem.read_view (lc1.(fwdbank) loc) ts ord)
       (VIEW_POST: view_post = join view_pre view_msg)
       (RES: res = ValA.mk _ val view_post)
       (LC2: lc2 =
@@ -1052,7 +1052,7 @@ Section Local.
         (WF: wf tid mem lc)
         (COH: Memory.latest loc ts (lc.(coh) loc).(View.ts) mem):
     (lc.(fwdbank) loc).(FwdItem.view).(View.ts) <=
-    ((lc.(fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts).
+    (FwdItem.read_view (lc.(fwdbank) loc) ts ord).(View.ts).
   Proof.
     unfold FwdItem.read_view. condtac; ss.
     inv WF. exploit FWDBANK. intro Y. inv Y.
@@ -1063,7 +1063,7 @@ Section Local.
         tid mem lc loc ts ord
         (WF: wf tid mem lc)
         (COH: Memory.latest loc ts (lc.(coh) loc).(View.ts) mem):
-    ((lc.(fwdbank) loc).(FwdItem.read_view) ts ord).(View.ts) <= ts.
+    (FwdItem.read_view (lc.(fwdbank) loc) ts ord).(View.ts) <= ts.
   Proof.
     inv WF. destruct (FWDBANK loc). des.
     unfold FwdItem.read_view. condtac; ss.
@@ -1728,8 +1728,8 @@ Module Machine.
       (TPOOL: IdMap.Forall2
                 (fun tid sl1 sl2 =>
                    rtc (ExecUnit.state_step tid)
-                       (ExecUnit.mk sl1.(fst) sl1.(snd) m1.(mem))
-                       (ExecUnit.mk sl2.(fst) sl2.(snd) m1.(mem)))
+                       (ExecUnit.mk (fst sl1) (snd sl1) m1.(mem))
+                       (ExecUnit.mk (fst sl2) (snd sl2) m1.(mem)))
                 m1.(tpool) m2.(tpool))
       (MEM: m1.(mem) = m2.(mem))
   .

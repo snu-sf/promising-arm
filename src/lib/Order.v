@@ -126,6 +126,12 @@ Next Obligation.
   - ii. antisym; apply H1.
 Qed.
 
+Variable A: Type.
+Variable B: Type.
+
+Check fun_partialorder.
+Check orderC.
+
 Program Instance fun_order A B `{_: orderC B}:
   @orderC
     (A -> B)
@@ -133,9 +139,9 @@ Program Instance fun_order A B `{_: orderC B}:
     (fun_le (A:=A) (B:=B))
     (fun_join (A:=A) (B:=B))
     (fun_bot (A:=A) (B:=B))
-    (fun_equiv A B)
-    (fun_preorder A B)
-    (fun_partialorder A B).
+    (fun_equiv A)
+    (fun_preorder A)
+    (fun_partialorder (A:=A) (B:=B)).
 Next Obligation.
   unfold fun_le, fun_join, fun_bot.
   ii. apply join_l.
@@ -176,8 +182,8 @@ Program Instance fun_eq_order A B `{_: orderC B eq}:
     (fun_join (A:=A) (B:=B))
     (fun_bot (A:=A) (B:=B))
     eq_equivalence
-    (fun_preorder A B)
-    (fun_eq_partialorder A B).
+    (fun_preorder A)
+    (fun_eq_partialorder (A:=A) (B:=B)).
 Next Obligation.
   unfold fun_le, fun_join, fun_bot.
   ii. apply join_l.
@@ -261,9 +267,9 @@ Program Instance opt_order X `{_: orderC X}:
     (opt_le (X:=X))
     (opt_join (X:=X))
     (opt_bot (X:=X))
-    (opt_equiv X)
-    (opt_preorder X)
-    (opt_partialorder X).
+    (opt_equiv)
+    (opt_preorder)
+    (opt_partialorder (X:=X)).
 Next Obligation.
   destruct a, b; ss; econs.
   - apply join_l.

@@ -30,7 +30,7 @@ Definition mem_of_ex
   filter_map
     (fun eid =>
        match Execution.label eid ex with
-       | Some (Label.write ex ord loc val) => Some (Msg.mk loc val eid.(fst))
+       | Some (Label.write ex ord loc val) => Some (Msg.mk loc val (fst eid))
        | _ => None
        end)
     ob.
@@ -194,7 +194,7 @@ Qed.
 Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=nat -> Prop)) (vala:ValA.t (A:=View.t (A:=unit))): Prop :=
 | sim_val_intro
     (VAL: avala.(ValA.val) = vala.(ValA.val))
-    (VIEW: sim_view ex ob (fun eid => eid.(fst) = tid /\ avala.(ValA.annot) eid.(snd)) vala.(ValA.annot).(View.ts))
+    (VIEW: sim_view ex ob (fun eid => (fst eid) = tid /\ avala.(ValA.annot) (snd eid)) vala.(ValA.annot).(View.ts))
 .
 Hint Constructors sim_val.
 
@@ -337,7 +337,7 @@ Lemma label_write_mem_of_ex_msg
       (LABEL: Execution.label eid ex = Some (Label.write exm ord loc val)):
   exists n,
     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
-    <<MSG: List.nth_error (mem_of_ex ex ob) n = Some (Msg.mk loc val eid.(fst))>>.
+    <<MSG: List.nth_error (mem_of_ex ex ob) n = Some (Msg.mk loc val (fst eid))>>.
 Proof.
   generalize (Execution.eids_spec ex). i. des. rename NODUP into NODUP0.
   specialize (LABEL0 eid). rewrite LABEL in LABEL0.
@@ -365,7 +365,7 @@ Lemma label_write_mem_of_ex
   exists n,
     <<VIEW: view_of_eid ex ob eid = Some (S n)>> /\
     <<READ: Memory.read loc (S n) (mem_of_ex ex ob) = Some val>> /\
-    <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val eid.(fst))>>.
+    <<MSG: Memory.get_msg (S n) (mem_of_ex ex ob) = Some (Msg.mk loc val (fst eid))>>.
 Proof.
   exploit label_write_mem_of_ex_msg; eauto. i. des.
   esplits; eauto.
@@ -392,7 +392,7 @@ Lemma sim_eu_step
       p ex ob tid aeu1 eu1 aeu2
       (EX: Valid.ex p ex)
       (OB: Permutation ob (Execution.eids ex))
-      (LINEARIZED: linearized ex.(Execution.ob) ob)
+      (LINEARIZED: linearized (Execution.ob ex) ob)
       (SIM: sim_eu tid ex ob aeu1 eu1)
       (WF: ExecUnit.wf tid eu1)
       (STEP: AExecUnit.step aeu1 aeu2)
@@ -434,7 +434,7 @@ Proof.
     exploit label_read_mem_of_ex; eauto. i. des.
 
     assert (SIM_LOC: sim_view ex ob
-                              (eq (tid, alocal1.(ALocal.next_eid)))
+                              (eq (tid, ALocal.next_eid alocal1))
                               (ValA.annot (sem_expr rmap1 eloc)).(View.ts)).
     { econs 2; eauto; ss.
       inv VIEW.
@@ -445,7 +445,7 @@ Proof.
     }
 
     assert (SIM_VRN: sim_view ex ob
-                              (eq (tid, alocal1.(ALocal.next_eid)))
+                              (eq (tid, ALocal.next_eid alocal1))
                               local1.(Local.vrn).(View.ts)).
     { econs 2; eauto; ss.
       generalize SIM_LOCAL.(VRN). intro VRN.
@@ -456,7 +456,7 @@ Proof.
     }
 
     assert (SIM_VREL: sim_view ex ob
-                               (eq (tid, alocal1.(ALocal.next_eid)))
+                               (eq (tid, ALocal.next_eid alocal1))
                                (ifc (OrdR.ge ord OrdR.acquire) (Local.vrel local1)).(View.ts)).
     { econs 2; eauto; ss.
       generalize SIM_LOCAL.(VREL). intro VREL.
@@ -474,13 +474,13 @@ Proof.
                       exists eid2,
                         <<RF: ex.(Execution.rf) eid2 (tid, length (ALocal.labels alocal1))>> /\
                         <<VIEW: view_of_eid ex ob eid2 = Some n>> /\
-                        <<MSG: Memory.get_msg n (mem_of_ex ex ob) = Some (Msg.mk (ValA.val (sem_expr armap1 eloc)) res0 eid2.(fst))>>>> /\
+                        <<MSG: Memory.get_msg n (mem_of_ex ex ob) = Some (Msg.mk (ValA.val (sem_expr armap1 eloc)) res0 (fst eid2))>>>> /\
                <<FWD: n = 0 ->
                       <<RF: ~ codom_rel ex.(Execution.rf) (tid, length (ALocal.labels alocal1))>> /\
                       <<FWD: Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc)) = FwdItem.init>>>> /\
                <<SIM_FWD: sim_view ex ob
-                                   (eq (tid, alocal1.(ALocal.next_eid)))
-                                   ((Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))).(FwdItem.read_view) n ord).(View.ts)>>).
+                                   (eq (tid, ALocal.next_eid alocal1))
+                                   (FwdItem.read_view (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) n ord).(View.ts)>>).
     { exploit EX.(Valid.RF1); eauto. i. des.
       { (* read from uninit *)
         subst. exists 0.
@@ -539,7 +539,7 @@ Proof.
           inv WRITE. inv WRITE0. apply Label.is_writing_inv in LABEL1. des. subst.
           rewrite EID in LABEL0. inv LABEL0.
           exploit EX0; eauto. clear EX0. intro Y. inv Y. rewrite EID in EID0. inv EID0.
-          exploit EX.(Valid.write_ex_codom_rmw); eauto.
+          exploit (Valid.write_ex_codom_rmw EX); eauto.
           intro Y. inv Y. left. right. econs. splits.
           { econs; eauto. econs; eauto. }
           econs. splits.
@@ -562,7 +562,7 @@ Proof.
     des.
 
     assert (SIM_EXT1: sim_view ex ob
-                               (eq (tid, alocal1.(ALocal.next_eid)))
+                               (eq (tid, ALocal.next_eid alocal1))
                                (joins [
                                     (ValA.annot (sem_expr rmap1 eloc));
                                     local1.(Local.vrn);
@@ -571,14 +571,14 @@ Proof.
     { repeat apply sim_view_join; ss. econs; ss. }
 
     assert (SIM_EXT2: sim_view ex ob
-                               (eq (tid, alocal1.(ALocal.next_eid)))
+                               (eq (tid, ALocal.next_eid alocal1))
                                (join
                                   (joins [
                                        (ValA.annot (sem_expr rmap1 eloc));
                                        local1.(Local.vrn);
                                        (ifc (OrdR.ge ord OrdR.acquire) (Local.vrel local1))
                                    ])
-                                  ((Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))).(FwdItem.read_view) n ord)).(View.ts)).
+                                  (FwdItem.read_view (Local.fwdbank local1 (ValA.val (sem_expr armap1 eloc))) n ord)).(View.ts)).
     { apply sim_view_join; ss. }
 
     assert (READ_STEP: exists res1 local2, Local.read ex1 ord (sem_expr rmap1 eloc) res1 n local1 (mem_of_ex ex ob) local2).
@@ -1265,7 +1265,7 @@ Lemma sim_eu_rtc_step
       p ex ob tid aeu1 eu1 aeu2
       (EX: Valid.ex p ex)
       (OB: Permutation ob (Execution.eids ex))
-      (LINEARIZED: linearized ex.(Execution.ob) ob)
+      (LINEARIZED: linearized (Execution.ob ex) ob)
       (SIM: sim_eu tid ex ob aeu1 eu1)
       (WF_EU: ExecUnit.wf tid eu1)
       (WF_AEU: AExecUnit.wf aeu1)
@@ -1313,9 +1313,9 @@ Theorem axiomatic_to_promising
       (EX: Valid.ex p ex):
   exists m,
     <<STEP: Machine.exec p m>> /\
-    <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m>> /\
+    <<TERMINAL: Valid.is_terminal EX -> Machine.is_terminal m>> /\
     <<STATE: IdMap.Forall2
-               (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+               (fun tid sl aeu => sim_state_weak (fst sl) aeu.(AExecUnit.state))
                m.(Machine.tpool) EX.(Valid.aeus)>> /\
     <<MEM: sim_mem ex m.(Machine.mem)>>.
 Proof.
@@ -1343,9 +1343,9 @@ Proof.
   cut (exists m0,
           <<STEP: rtc (Machine.step ExecUnit.state_step) m m0>> /\
           <<NOPROMISE: Machine.no_promise m0>> /\
-          <<TERMINAL: EX.(Valid.is_terminal) -> Machine.is_terminal m0>> /\
+          <<TERMINAL: Valid.is_terminal EX -> Machine.is_terminal m0>> /\
           <<STATE: IdMap.Forall2
-                     (fun tid sl aeu => sim_state_weak sl.(fst) aeu.(AExecUnit.state))
+                     (fun tid sl aeu => sim_state_weak (fst sl) aeu.(AExecUnit.state))
                      m0.(Machine.tpool) EX.(Valid.aeus)>> /\
           <<MEM: sim_mem ex (Machine.mem m0)>>).
   { i. des. esplits; eauto. econs; eauto.
@@ -1409,7 +1409,7 @@ Proof.
                          (Local.init_with_promises (Machine.promises_from_mem tid (Machine.mem m)))
                          (Machine.mem m))
                       (ExecUnit.mk st2 lc2 (Machine.mem m))>> /\
-          <<TERMINAL: EX.(Valid.is_terminal) -> State.is_terminal st2>> /\
+          <<TERMINAL: Valid.is_terminal EX -> State.is_terminal st2>> /\
           <<AEU: IdMap.find tid EX.(Valid.aeus) = Some aeu>> /\
           <<STATE: sim_state_weak st2 aeu.(AExecUnit.state)>> /\
           <<NOPROMISE: lc2.(Local.promises) = bot>>).
