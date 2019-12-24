@@ -8,7 +8,7 @@ Please visit the [project website](https://sf.snu.ac.kr/promising-arm-riscv/) fo
 
 ## Build
 
-- Requirement: [Coq 8.9](https://coq.inria.fr/download), Make, Rsync.
+- Requirement: [Coq 8.10](https://coq.inria.fr/download), Make, Rsync.
 
 - Initialization
 
