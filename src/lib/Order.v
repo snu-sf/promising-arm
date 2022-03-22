@@ -134,12 +134,6 @@ Next Obligation.
   - ii. antisym; apply H1.
 Qed.
 
-Variable A: Type.
-Variable B: Type.
-
-Check fun_partialorder.
-Check orderC.
-
 #[export]
 Program Instance fun_order A B `{_: orderC B}:
   @orderC
