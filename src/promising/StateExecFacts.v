@@ -30,7 +30,7 @@ Proof.
   revert WF. induction STEP.
   { econs; ss. ii. destruct (IdMap.find id (Machine.tpool x)); ss. econs. refl. }
   i. exploit Machine.step_state_step_wf; eauto. i.
-  exploit IHSTEP; eauto. i. inv x0.
+  exploit IHSTEP; eauto. intro x0. inv x0.
   destruct x as [tpool1 mem1].
   destruct y as [tpool2 mem2].
   inv H. inversion STEP0. inv STEP1. ss. subst. econs; ss.

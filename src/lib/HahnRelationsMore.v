@@ -168,12 +168,12 @@ Proof.
     eapply rtcn_tc; eauto.
   }
   cut (n <= n -> goal \/ exists b, rtcn (fun a b => rel a b /\ pred a /\ pred b) n a b /\ rtcn rel (n - n) b a).
-  { i. exploit H; eauto. i. des; eauto.
+  { i. exploit H; eauto. intro x. des; eauto.
     rewrite Nat.sub_diag in *. inv x0. eauto.
   }
   generalize n at 1 3 5 as m. induction m.
   { right. esplits; eauto. rewrite Nat.sub_0_r. ss. }
-  i. exploit IHm; [lia|]. i. des; eauto. inv x0; [lia|].
+  i. exploit IHm; [lia|]. intro x. des; eauto. inv x0; [lia|].
   replace n with (S n0 + m) in * by lia. clear H1 H CYCLE0.
   replace (S n0 + m - S m) with n0 by lia.
   destruct (classic (pred b)); cycle 1.

@@ -357,33 +357,33 @@ Proof.
   - ii. rewrite ? IdMap.add_spec. condtac; eauto.
   - s. ii. rewrite ? IdMap.add_spec. condtac; eauto. inversion e0. subst. clear e0 X. econs.
     econs 2; eauto. econs; eauto.
-Grab Existential Variables.
+Unshelve.
 all: ss.
+all: try apply bot.
+1: { econs. }
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+3: { funext. i. funext. i. propext. econs; ss. i. inv H.
+     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
+     inv RELS. inv REL. ss.
+}
+1: { ii. rewrite IdMap.mapi_spec. destruct (IdMap.find id p); ss. econs. refl. }
+1: { unfold IdMap.map. rewrite IdMap.mapi_mapi. f_equal. }
 1: { ii. generalize (PRE.(Valid.AEUS) id). intro X.
      rewrite IdMap.add_spec. condtac; ss. inversion e0. subst. clear e0 X0.
      generalize (ATR tid). rewrite <- H. intro Y. inv Y. des. inv REL.
      rewrite <- H6 in X. inv X. econs. etrans; eauto.
 }
-3: { funext. i. funext. i. propext. econs; ss. i. inv H.
-     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
-     inv RELS. inv REL. ss.
-}
-3: { funext. i. funext. i. propext. econs; ss. i. inv H.
-     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
-     inv RELS. inv REL. ss.
-}
-3: { funext. i. funext. i. propext. econs; ss. i. inv H.
-     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
-     inv RELS. inv REL. ss.
-}
-3: { funext. i. funext. i. propext. econs; ss. i. inv H.
-     rewrite IdMap.map_spec, IdMap.mapi_spec in RELS. destruct (IdMap.find tid p); ss.
-     inv RELS. inv REL. ss.
-}
-4: { ii. rewrite IdMap.mapi_spec. destruct (IdMap.find id p); ss. econs. refl. }
-3: { unfold IdMap.map. rewrite IdMap.mapi_mapi. f_equal. }
-1: { apply bot. (* it's ex's co. *) }
-1: { apply bot. (* it's ex's rf. *) }
 Qed.
 
 Inductive sim_th
@@ -537,8 +537,7 @@ Proof.
   destruct aeu as [ast2 alc2].
   assert (mem1 = mem); subst.
   { exploit sim_trace_memory; eauto. }
-  ss. exploit IHSIM; eauto.
-  i. rename x into IH.
+  ss. exploit IHSIM; eauto. intro IH.
   assert (EU_WF2: ExecUnit.wf tid (ExecUnit.mk st2 lc2 mem2)).
   { destruct IH.
     eapply ExecUnit.state_step_wf; eauto. econs; eauto. }
@@ -827,6 +826,6 @@ Proof.
       { subst. inv REL. inv Y. }
       eapply IH.(PO); eauto.
   }
-Grab Existential Variables.
+Unshelve.
 all: auto. (* tid *)
 Qed.

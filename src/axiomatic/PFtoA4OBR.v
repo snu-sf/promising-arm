@@ -214,7 +214,7 @@ Proof.
               rewrite WRITE in EID0. inv EID0. ss.
               destruct (equiv_dec (ValA.val (sem_expr rmap eloc)) (ValA.val (sem_expr rmap eloc))); ss.
               exfalso. apply c. ss. }
-          subst. rewrite <- join_r. exploit VIEW; eauto. i.
+          subst. rewrite <- join_r. exploit VIEW; eauto. intro x.
           rewrite x. rewrite H0 in *. eapply Local.fwd_view_le; eauto.
           apply SIM_TH.(EU_WF).
       }

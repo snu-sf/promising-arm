@@ -181,7 +181,7 @@ Proof.
     exploit sim_trace_sim_th; try exact REL0; eauto. intro TH'.
     exploit TH'.(WPROP1); eauto. i. des; ss.
     + destruct b. ss. inv NOPROMISE.
-      exploit PROMISES; eauto. i. rewrite x in x3.
+      exploit PROMISES; eauto. intro x. rewrite x in x3.
       rewrite Promises.lookup_bot in x3. ss.
     + generalize (ATR tid'). intro ATR2. inv ATR2; try congr.
       des. simplify. eexists (tid', eid). esplits; ss.
@@ -561,7 +561,7 @@ Proof.
            | [|- _ _ = _ _] => try by erewrite XW0; eauto; tac; lia
            end.
   - exploit ADDR0; eauto; tac; try lia.
-    inv x; ss. inv H. lia.
+    inv x0; ss. inv H. lia.
   - rewrite XCOV0; eauto; tac; try lia.
     condtac; ss. apply Nat.eqb_eq in X. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
@@ -571,11 +571,11 @@ Proof.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - eapply ADDR_REV0; eauto. left. ss.
   - exploit ADDR0; eauto; tac; try lia.
-    inv x; ss. inv H. lia.
+    inv x0; ss. inv H. lia.
   - exploit DATA0; eauto; tac; try lia.
-    inv x; ss. inv H. lia.
+    inv x0; ss. inv H. lia.
   - exploit RMW0; eauto; tac; try lia.
-    inv x; ss. destruct ex1; ss. inv H. lia.
+    inv x0; ss. destruct ex1; ss. inv H. lia.
   - rewrite XCOV0; eauto; tac; try lia.
     inv RES. destruct res1. ss. subst.
     condtac; ss. apply Nat.eqb_eq in X. lia.
@@ -600,7 +600,7 @@ Proof.
   - erewrite XR0; eauto; tac; try lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.
   - exploit CTRL0; eauto; tac; try lia.
-    inv x; ss. inv H. lia.
+    inv x0; ss. inv H. lia.
   - rewrite XVEXT0; eauto; tac; try lia.
   - erewrite XR0; eauto; tac; try lia.
   - eapply LABELS_REV0; eauto. apply nth_error_app_mon. ss.

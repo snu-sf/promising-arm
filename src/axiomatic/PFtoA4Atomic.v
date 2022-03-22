@@ -152,7 +152,7 @@ Proof.
         exploit List.nth_error_Some. i. des.
         exploit x7.
         { ii. rewrite LABEL_EX in H. inv H. }
-        i. clear - x. lia. }
+        intro x. clear - x. lia. }
       i. rewrite R in x7. rewrite x1 in x7. inv x7.
       rewrite W1 in W3. inv W3. ss.
     - inv H1. inv H. inv H5. inv H. inv H1. inv H5.
@@ -169,8 +169,8 @@ Proof.
       { ii. rewrite LABEL_EX in H. inv H. }
       i. clear x1. clear x6.
       exploit EX2.(LABELS); try eapply EID1; ss.
-      { rewrite List.app_length. ss. clear - x. lia. }
-      i. rewrite List.nth_error_app1 in x6; ss.
+      { rewrite List.app_length. ss. clear - x7. lia. }
+      intro x6. rewrite List.nth_error_app1 in x6; ss.
       rewrite LABEL_EX in x6. inv x6.
       unfold Execution.label in EID2. ss.
       rewrite PRE.(Valid.LABELS) in EID2.

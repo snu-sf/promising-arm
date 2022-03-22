@@ -519,7 +519,7 @@ Module AExecUnit.
           { exploit RMW_LIMIT; eauto. lia. }
           { destruct ex0; ss. inv H. lia. }
         * i. apply nth_error_snoc_inv in LABEL. des.
-          { exploit RMW1; eauto. i. inv x. econs. left. eauto. }
+          { exploit RMW1; eauto. intro x. inv x. econs. left. eauto. }
           { subst. inv LABEL0. exploit EX; eauto. i. des. econs. right. econs; eauto. }
         * i. inv RMW0.
           { exploit RMW2; eauto. i. des. esplits.
@@ -527,7 +527,7 @@ Module AExecUnit.
             - apply nth_error_app_mon. eauto.
             - i. rewrite List.nth_error_app1; eauto. etrans; [apply C|]. apply List.nth_error_Some. congr.
           }
-          { destruct ex0; ss. inv H. exploit EX; eauto. i. des. inv x0. des.
+          { destruct ex0; ss. inv H. exploit EX; eauto. intro x. des. inv x0. des.
             destruct a0; ss. destruct ex; ss.
             rewrite H0 in x. inv x. symmetry in H1.
             esplits.
@@ -1709,7 +1709,7 @@ Module Valid.
     rewrite e, e0 in *.
     exploit CO1; eauto.
     { esplits; [exact EID|exact EID0]. }
-    i. des; eauto.
+    intro x. des; eauto.
     - inv x. inv PO. ss. lia.
     - exfalso. eapply INTERNAL. econs 2.
       + econs 1. left. left. left. econs; eauto.

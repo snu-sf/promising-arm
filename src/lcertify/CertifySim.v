@@ -619,7 +619,7 @@ Proof.
         * ss.
         * rewrite <- app_assoc. ss.
         * rewrite <- app_assoc. ss.
-        * i. exploit SRC_PROMISES_WF; eauto. i. des. esplits; ss.
+        * i. exploit SRC_PROMISES_WF; eauto. intro x. des. esplits; ss.
           { apply nth_error_app_mon; eauto. }
           { ii. eapply x2; eauto. apply nth_error_snoc_inv in MSG0. des; subst; ss. }
           { rewrite app_length. s. ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
@@ -1093,7 +1093,7 @@ Proof.
             * ss.
             * rewrite <- app_assoc. ss.
             * ss.
-            * i. exploit SRC_PROMISES_WF; eauto. i. des. esplits; ss.
+            * i. exploit SRC_PROMISES_WF; eauto. intro x. des. esplits; ss.
               { apply nth_error_app_mon; eauto. }
               { ii. eapply x2; eauto. apply nth_error_snoc_inv in MSG0. des; subst; ss. }
               { rewrite app_length. s. ii. apply nth_error_snoc_inv in MSG0. des; subst; ss.
@@ -1104,7 +1104,7 @@ Proof.
             * i. apply nth_error_snoc_inv in MSG0. des.
               { exploit SRC_PROMISES; eauto. i. des. subst. splits; ss.
                 exploit SRC_PROMISES_BELOW; eauto. rewrite ? fun_add_spec.
-                condtac; ss. clear X. inv e. i. clear -TS0 x. lia.
+                condtac; ss. clear X. inv e. i. clear -TS0 x1. lia.
               }
               { subst. splits; ss.
                 rewrite fun_add_spec. condtac; ss; cycle 1.
@@ -1186,7 +1186,7 @@ Proof.
   revert eu1 SIM SRC_PROMISES_BELOW WF1 WF2. induction STEP; eauto.
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
+    { i. exploit SRC_PROMISES_BELOW; eauto. intro x0. rewrite <- x0.
       eapply rtc_certify_step_incr. eauto.
     }
     i. des.
@@ -1215,7 +1215,7 @@ Proof.
   apply Promises.ext. i. inv SIM. inv LOCAL. destruct (le_lt_dec i ts).
   - rewrite PROMISES1, EU2; ss. destruct (Promises.lookup i src_promises) eqn:TSP; ss.
     destruct i; ss.
-    inv MEM. exploit SRC_PROMISES_WF; eauto. i. des. clear -l x. lia.
+    inv MEM. exploit SRC_PROMISES_WF; eauto. i. des. clear - l x0. lia.
   - rewrite PROMISES2; ss.
 Qed.
 
@@ -1241,7 +1241,7 @@ Proof.
   }
   i. destruct (le_lt_dec (View.ts (Local.vcap (ExecUnit.local y))) ts).
   - exploit sim_eu_step; eauto.
-    { i. exploit SRC_PROMISES_BELOW; eauto. i. rewrite <- x0.
+    { i. exploit SRC_PROMISES_BELOW; eauto. intro x0. rewrite <- x0.
       eapply rtc_certify_step_incr. eauto.
     }
     i. des.

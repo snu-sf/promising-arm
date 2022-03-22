@@ -1651,7 +1651,7 @@ Module Machine.
       eapply ExecUnit.promise_step_wf; eauto. econs; eauto. econs; eauto.
       + econs; eauto.
       + refl.
-    - i. exploit WF0; eauto. i. inv x. ss. econs; ss.
+    - i. exploit WF0; eauto. intro x. inv x. ss. econs; ss.
       + apply ExecUnit.rmap_append_wf. ss.
       + inv LOCAL. econs; eauto.
         all: try rewrite List.app_length; s; try lia.

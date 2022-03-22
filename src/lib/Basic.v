@@ -472,7 +472,7 @@ Proof.
   { i. apply List.nth_error_In in NTH. inv NTH. }
   destruct n; s.
   - i. inv NTH. destruct (equiv_dec a0 a0); [|congr]. ss.
-  - i. inv NODUP. exploit IHl; eauto. i. rewrite x.
+  - i. inv NODUP. exploit IHl; eauto. intro x. rewrite x.
     destruct (equiv_dec a a0); ss. inv e.
     contradict H2. eapply List.nth_error_In. eauto.
 Qed.

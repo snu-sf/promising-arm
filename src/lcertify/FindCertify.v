@@ -122,7 +122,8 @@ Proof.
   clear TS0. intro EVAL. rewrite <- EVAL in *.
   remember view_pre as view_pre' eqn:VIEW_PRE'. guardH VIEW_PRE'. rewrite VIEW_PRE' in VIEW_PRE.
   inversion MEM. subst. inv LOCAL.
-  exploit SRC_PROMISES_WF; eauto. i. des. rename x into ABOVE, x0 into XMSG, x1 into XCLUSIVE, x2 into XLATEST.
+  exploit SRC_PROMISES_WF; eauto. intro x. des.
+  rename x into ABOVE, x0 into XMSG, x1 into XCLUSIVE, x2 into XLATEST.
   rewrite XMSG in TSPMSG. inv TSPMSG. ss.
   eexists (ExecUnit.mk _ _ _). esplits.
   - econs 1. econs. econs; ss.
@@ -202,7 +203,7 @@ Proof.
         exploit SRC_PROMISES_BELOW; eauto.
         { rewrite Promises.unset_o. condtac; ss. }
         rewrite ? fun_add_spec. condtac; ss. clear X0. inv e.
-        exploit SRC_PROMISES_WF; eauto. i. des. rewrite MSG0 in x1. inv x1. splits; ss.
+        exploit SRC_PROMISES_WF; eauto. intro x0. des. rewrite MSG0 in x1. inv x1. splits; ss.
         destruct (Time.compare_spec (S tsp) (S tsp0)).
         { subst. congr. }
         { clear -H. lia. }

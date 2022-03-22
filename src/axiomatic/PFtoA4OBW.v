@@ -246,7 +246,7 @@ Proof.
       intro Y. inv Y.
       { exploit sim_trace_sim_th; try exact TRACE; eauto. intro L1.
         destruct L1.(AEU_WF). ss. exploit RMW_LIMIT; eauto. clear. lia. }
-      destruct ex0; ss. inv H. exploit EX; eauto. i. des. rewrite H2 in x. inv x.
+      destruct ex0; ss. inv H. exploit EX; eauto. intro x. des. rewrite H2 in x. inv x.
       inv x3. des. destruct a; ss. 
       generalize L.(LC).(EXBANK). s. rewrite H2. intro Y. inv Y. des.
       inv REL. apply Label.is_reading_inv in LABEL1. des. subst.

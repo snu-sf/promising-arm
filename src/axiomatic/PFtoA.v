@@ -432,7 +432,7 @@ Lemma internal_acyclic
            ex.(Execution.label_is) Label.is_read eid2)):
   acyclic (Execution.internal ex).
 Proof.
-  ii. exploit INTERNAL; eauto. i. des.
+  ii. exploit INTERNAL; eauto. intro x0. des.
   - inv x0; lia.
   - inv x1. lia.
   - inv x1. inv x2. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
@@ -504,8 +504,8 @@ Proof.
               ex'.(Execution.label_is) Label.is_write eid1 /\
               ex'.(Execution.label_is) Label.is_read eid2)).
   { i. induction INTERNAL0.
-    + exploit INTERNAL; eauto. i. des; eauto.
-      { exploit Valid.internal_rw; eauto. i. des.
+    + exploit INTERNAL; eauto. intro x0. des; eauto.
+      { exploit Valid.internal_rw; eauto. intro x2. des.
         inversion EID1. inversion EID2.
         destruct l0; ss.
         - destruct l; ss.
@@ -581,19 +581,19 @@ Proof.
   s. esplits; eauto.
   ii. inv H. specialize (STATE tid). inv STATE; try congr.
   rewrite FIND in H. inv H. destruct a. destruct aeu. ss.
-  exploit TERMINAL; eauto. i. des. inv REL. inv x. congr.
-Grab Existential Variables.
-{ (* external *)
-  ii. exploit Valid.ob_cycle; eauto. i. des. rename x1 into NONBARRIER.
-  clear - EXTERNAL NONBARRIER.
-  exploit EXTERNAL; eauto. i. des.
-  - inv x; lia.
-  - inv x0. lia.
-  - inv x0. inv x1. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
-}
+  exploit TERMINAL; eauto. intro x. des. inv REL. inv x. congr.
+Unshelve.
 { (* internal *)
   clear - INTERNAL.
   eapply internal_acyclic. auto.
+}
+{ (* external *)
+  ii. exploit Valid.ob_cycle; eauto. i. des. rename x1 into NONBARRIER.
+  clear - EXTERNAL NONBARRIER.
+  exploit EXTERNAL; eauto. intro x. des.
+  - inv x; lia.
+  - inv x0. lia.
+  - inv x0. inv x1. rewrite EID in EID0. inv EID0. destruct l0; ss; congr.
 }
 Qed.
 

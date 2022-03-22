@@ -64,11 +64,11 @@ Proof.
           - ii. eapply COH; eauto.
             rewrite nth_error_app1 in MSG0; ss.
             eapply lt_le_trans; eauto.
-            inv WF. exploit WF0; eauto. i. inv x. ss. inv LOCAL. ss.
+            inv WF. exploit WF0; eauto. intro x. inv x. ss. inv LOCAL. ss.
           - ii. eapply LATEST; eauto.
             rewrite nth_error_app1 in MSG0; ss.
             eapply lt_le_trans; eauto.
-            inv WF. exploit WF0; eauto. i. inv x. ss. inv LOCAL.
+            inv WF. exploit WF0; eauto. intro x. inv x. ss. inv LOCAL.
             repeat apply join_spec; viewtac.
             inv STATE0. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.
@@ -109,13 +109,13 @@ Proof.
             { rewrite nth_error_app1 in MSG0; ss. }
             contradict n.
             eapply lt_le_trans; [apply TS2|].
-            inv WF. exploit WF0; try exact FIND; eauto. i. inv x. inv LOCAL. ss.
+            inv WF. exploit WF0; try exact FIND; eauto. intro x. inv x. inv LOCAL. ss.
           - ii. eapply LATEST; eauto.
             destruct (lt_dec ts0 (length mem1)).
             { rewrite nth_error_app1 in MSG0; ss. }
             contradict n.
             eapply Time.lt_le_trans; [apply TS2|].
-            inv WF. exploit WF0; try exact FIND; eauto. i. inv x. inv LOCAL. ss.
+            inv WF. exploit WF0; try exact FIND; eauto. intro x. inv x. inv LOCAL. ss.
             repeat apply join_spec; viewtac.
             inv STATE. apply ExecUnit.expr_wf. ss.
           - apply Memory.read_mon. ss.

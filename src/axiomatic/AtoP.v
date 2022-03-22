@@ -887,7 +887,7 @@ Proof.
         }
         { unfold ifc. condtac; cycle 1.
           { apply bot_spec. }
-          destruct ex1; ss. exploit EX0; eauto. i. des. inv x0.
+          destruct ex1; ss. exploit EX0; eauto. intro x. des. inv x0.
           generalize (SIM_LOCAL.(EXBANK)). rewrite x. intro Y. inv Y. des.
           inv REL2.
           { rewrite VIEW2. apply bot_spec. }
@@ -928,7 +928,7 @@ Proof.
         { (* read from uninit *)
           exploit EX.(Valid.RF1); eauto. i. des; cycle 1.
           { exploit label_write_mem_of_ex; eauto. i. des.
-            exploit REL0; eauto. rewrite VIEW3. i. inv x.
+            exploit REL0; eauto. rewrite VIEW3. intro x. inv x.
           }
 
           eapply EX.(Valid.ATOMIC). econs; cycle 1.

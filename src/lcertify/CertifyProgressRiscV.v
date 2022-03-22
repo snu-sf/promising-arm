@@ -769,7 +769,7 @@ Proof.
                   { rewrite <- POST_BELOW, POST. s.
                     rewrite <- join_l, <- join_r, <- join_l. ss.
                   }
-                  instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). i.
+                  instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). intro x.
                   apply sim_time_below in x; cycle 1.
                   { rewrite <- l0. apply Memory.latest_latest_ts. ss. }
                   eapply Memory.latest_mon1.
@@ -899,7 +899,7 @@ Proof.
             { rewrite <- POST_BELOW, POST. s.
               rewrite <- join_l, <- join_r, <- join_l. ss.
             }
-            instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). i.
+            instantiate (1 := (ValA.val (sem_expr rmap2 eloc))). intro x.
             destruct (le_lt_dec (Memory.latest_ts (ValA.val (sem_expr rmap2 eloc))
                                                   (View.ts (Local.coh lc2 (ValA.val (sem_expr rmap2 eloc)))) mem2) ts).
             { apply sim_time_below in x; ss.
@@ -1387,11 +1387,11 @@ Proof.
   exploit (IHps m2); ss.
   { i. rewrite <- TPOOL, IdMap.add_spec.
     assert (TID0: tid =/= tid0).
-    { ii. inv H0. apply H1. apply SetoidList.findA_NoDupA in H; ss; cycle 1.
+    { ii. inv H. apply H1. apply SetoidList.findA_NoDupA in FIND1; ss; cycle 1.
       { apply Build_Equivalence; ss. apply equiv_transitive. }
-      revert H. clear. induction ps.
-      - i. inv H.
-      - i. inv H; [left|right]; eauto.
+      revert FIND1. clear. induction ps.
+      - i. inv FIND1.
+      - i. inv FIND1; [left|right]; eauto.
         des. ss.
     }
     exploit (IN tid0); eauto.
