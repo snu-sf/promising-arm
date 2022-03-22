@@ -24,12 +24,12 @@ Ltac congr := congruence.
 Ltac etrans := etransitivity.
 Ltac etrans' :=
   match goal with
-  | [H: @PreOrder ?A ?R |- ?R (_:?A) (_:?A)] =>
+  | [H: @PreOrder ?A ?R |- ?R _ _] =>
     eapply (@PreOrder_Transitive _ _ H)
   end.
 Ltac antisym :=
   match goal with
-  | [H: @PartialOrder ?A ?EQ _ ?LE _ |- ?EQ (_:?A) (_:?A)] =>
+  | [H: @PartialOrder ?A ?EQ _ ?LE _ |- ?EQ _ _] =>
     apply (partial_order_antisym H)
   end.
 Ltac funext := apply functional_extensionality.
@@ -52,9 +52,12 @@ Coercion proj_sumbool: sumbool >-> bool.
 Notation rtc := (clos_refl_trans_1n _). (* reflexive transitive closure *)
 Notation rc := (clos_refl _). (* reflexive transitive closure *)
 Notation tc := (clos_trans_1n _). (* transitive closure *)
-Hint Immediate rt1n_refl rt1n_trans t1n_step.
-Hint Resolve Relation_Operators.rt1n_trans.
+#[export]
+Hint Immediate rt1n_refl rt1n_trans t1n_step: core.
+#[export]
+Hint Resolve Relation_Operators.rt1n_trans: core.
 
+#[export]
 Program Instance rtc_PreOrder A (R:A -> A -> Prop): PreOrder (rtc R).
 Next Obligation.
   ii. revert H0. induction H; auto. i.
@@ -91,7 +94,8 @@ Inductive rtcn A (R: A -> A -> Prop): forall (n:nat) (a1 a2:A), Prop :=
     (A23: rtcn R n a2 a3):
     rtcn R (S n) a1 a3
 .
-Hint Constructors rtcn.
+#[export]
+Hint Constructors rtcn: core.
 
 Lemma rtcn_rtc A (R: A -> A -> Prop) n a1 a2
       (RTCN: rtcn R n a1 a2):
@@ -167,7 +171,8 @@ Inductive opt_pred A (pred: A -> Prop): forall (a:option A), Prop :=
     (PRED: pred a):
     opt_pred pred (Some a)
 .
-Hint Constructors opt_pred.
+#[export]
+Hint Constructors opt_pred: core.
 
 Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), Prop :=
 | opt_rel_None:
@@ -177,7 +182,8 @@ Inductive opt_rel A B (rel: A -> B -> Prop): forall (a:option A) (b:option B), P
     (REL: rel a b):
     opt_rel rel (Some a) (Some b)
 .
-Hint Constructors opt_rel.
+#[export]
+Hint Constructors opt_rel: core.
 
 Inductive opt_rel6 A B C D E F (rel6: A -> B -> C -> D -> E -> F -> Prop):
   forall (a: option A) (b: option B) (c: option C) (d: option D) (e: option E) (f: option F), Prop :=
@@ -188,7 +194,8 @@ Inductive opt_rel6 A B C D E F (rel6: A -> B -> C -> D -> E -> F -> Prop):
     (REL6: rel6 a b c d e f):
     opt_rel6 rel6 (Some a) (Some b) (Some c) (Some d) (Some e) (Some f)
 .
-Hint Constructors opt_rel6.
+#[export]
+Hint Constructors opt_rel6: core.
 
 
 Fixpoint filter_map A B (f: A -> option B) (l: list A): list B :=
@@ -567,7 +574,8 @@ Definition linearized A
     (J: List.nth_error l j = Some y)
     (REL: rel x y),
     i < j.
-Hint Unfold linearized.
+#[export]
+Hint Unfold linearized: core.
 
 Lemma linearize A
       (l: list A)
@@ -669,7 +677,9 @@ Proof.
   auto.
 Defined.
 
+#[export]
 Instance Pos_eqdec: EqDec positive eq := Pos.eq_dec.
+#[export]
 Instance Z_eqdec: EqDec Z eq := Z.eq_dec.
 
 Module Id := Pos.

@@ -29,7 +29,8 @@ Inductive inverse A (rel:relation A) (codom:A -> Prop) (a:A): Prop :=
     (REL: rel a a')
     (CODOM: codom a')
 .
-Hint Constructors inverse.
+#[export]
+Hint Constructors inverse: core.
 
 Lemma inverse_mon A (r1 r2:relation A)
       (REL: r1 ⊆ r2):
@@ -61,20 +62,23 @@ Inductive sim_val_weak (vala:ValA.t (A:=View.t (A:=unit))) (avala:ValA.t (A:=nat
 | sim_val_weak_intro
     (VAL: vala.(ValA.val) = avala.(ValA.val))
 .
-Hint Constructors sim_val_weak.
+#[export]
+Hint Constructors sim_val_weak: core.
 
 Inductive sim_rmap_weak (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
 | sim_rmap_weak_intro
     (RMAP: IdMap.Forall2 (fun reg => sim_val_weak) rmap armap)
 .
-Hint Constructors sim_rmap_weak.
+#[export]
+Hint Constructors sim_rmap_weak: core.
 
 Inductive sim_state_weak (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
 | sim_state_weak_intro
     (STMTS: state.(State.stmts) = astate.(State.stmts))
     (RMAP: sim_rmap_weak state.(State.rmap) astate.(State.rmap))
 .
-Hint Constructors sim_state_weak.
+#[export]
+Hint Constructors sim_state_weak: core.
 
 Inductive sim_local_weak (local: Local.t (A:=unit)) (alocal: ALocal.t): Prop :=
 | sim_local_weak_none
@@ -88,7 +92,8 @@ Inductive sim_local_weak (local: Local.t (A:=unit)) (alocal: ALocal.t): Prop :=
     (EX_EX: ex = true)
     (EX_LOC: loc = eb.(Exbank.loc))
 .
-Hint Constructors sim_local_weak.
+#[export]
+Hint Constructors sim_local_weak: core.
 
 Lemma sim_state_weak_init stmts:
   sim_state_weak (State.init stmts) (State.init stmts).
@@ -150,7 +155,8 @@ Inductive sim_event: forall (e1: Event.t (A:=View.t (A:=unit))) (e2: Event.t (A:
     ctrl1 ctrl2:
     sim_event (Event.control ctrl1) (Event.control ctrl2)
 .
-Hint Constructors sim_event.
+#[export]
+Hint Constructors sim_event: core.
 
 Definition sim_local_coh ex loc :=
   ⦗ex.(Execution.label_is) (Label.is_writing loc)⦘ ⨾

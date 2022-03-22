@@ -16,6 +16,7 @@ Inductive archT :=
 | riscv
 .
 
+#[export]
 Program Instance archT_eqdec: EqDec archT eq.
 Next Obligation.
   destruct x, y;
@@ -37,14 +38,16 @@ Module Loc := Val.
 Inductive opT1 :=
 | op_not
 .
-Hint Constructors opT1.
+#[export]
+Hint Constructors opT1: core.
 
 Inductive opT2 :=
 | op_add
 | op_sub
 | op_mul
 .
-Hint Constructors opT2.
+#[export]
+Hint Constructors opT2: core.
 
 Inductive exprT :=
 | expr_const (const:Val.t)
@@ -52,7 +55,8 @@ Inductive exprT :=
 | expr_op1 (op:opT1) (e1:exprT)
 | expr_op2 (op:opT2) (e1 e2:exprT)
 .
-Hint Constructors exprT.
+#[export]
+Hint Constructors exprT: core.
 Coercion expr_const: Val.t >-> exprT.
 Coercion expr_reg: Id.t >-> exprT.
 
@@ -62,7 +66,8 @@ Module OrdR.
   | acquire_pc
   | acquire
   .
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition ge (a b:t): bool :=
     match a, b with
@@ -80,7 +85,8 @@ Module OrdW.
   | release_pc
   | release
   .
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition ge (a b:t): bool :=
     match a, b with
@@ -97,7 +103,8 @@ Module Barrier.
   | isb
   | dmb (rr rw wr ww:bool)
   .
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition is_dmb_rr (b:t): bool :=
     match b with
@@ -131,7 +138,8 @@ Inductive instrT :=
 | instr_store (ex:bool) (ord:OrdW.t) (res:Id.t) (eloc:exprT) (eval:exprT)
 | instr_barrier (b:Barrier.t)
 .
-Hint Constructors instrT.
+#[export]
+Hint Constructors instrT: core.
 Coercion instr_barrier: Barrier.t >-> instrT.
 
 Inductive stmtT :=
@@ -139,7 +147,8 @@ Inductive stmtT :=
 | stmt_if (cond:exprT) (s1 s2:list stmtT)
 | stmt_dowhile (s:list stmtT) (cond:exprT)
 .
-Hint Constructors stmtT.
+#[export]
+Hint Constructors stmtT: core.
 Coercion stmt_instr: instrT >-> stmtT.
 
 Definition program := IdMap.t (list stmtT).
@@ -150,7 +159,8 @@ Module ValA.
     val: Val.t;
     annot: A;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 End ValA.
 
 Module RMap.
@@ -237,7 +247,8 @@ Section State.
 
   Definition is_terminal (st:t): Prop :=
     st.(stmts) = [].
-  Hint Unfold is_terminal.
+  #[local]
+  Hint Unfold is_terminal: core.
 
   Inductive step: forall (e:Event.t (A:=A)) (st1 st2:t), Prop :=
   | step_skip
@@ -285,6 +296,7 @@ Section State.
            (mk ((stmt_dowhile s cond)::stmts) rmap)
            (mk stmts' rmap)
   .
-  Hint Constructors step.
+  #[local]
+  Hint Constructors step: core.
 End State.
 End State.

@@ -89,7 +89,8 @@ Inductive sim_view_rev (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop
     (EID: eids eid)
     (VIEW: le view (vext eid))
 .
-Hint Constructors sim_view_rev.
+#[export]
+Hint Constructors sim_view_rev: core.
 
 Definition sim_view_eq (vext: eidT -> Time.t) (view: Time.t) (eids: eidT -> Prop): Prop :=
   sim_view vext view eids /\ sim_view_rev vext view eids.
@@ -99,20 +100,23 @@ Inductive sim_val (tid:Id.t) (vext:eidT -> Time.t) (vala:ValA.t (A:=View.t (A:=u
     (VAL: vala.(ValA.val) = avala.(ValA.val))
     (VIEW: sim_view vext vala.(ValA.annot).(View.ts) (fun eid => (fst eid) = tid /\ avala.(ValA.annot) (snd eid)))
 .
-Hint Constructors sim_val.
+#[export]
+Hint Constructors sim_val: core.
 
 Inductive sim_rmap (tid:Id.t) (vext:eidT -> Time.t) (rmap:RMap.t (A:=View.t (A:=unit))) (armap:RMap.t (A:=nat -> Prop)): Prop :=
 | sim_rmap_intro
     (RMAP: IdMap.Forall2 (fun reg => sim_val tid vext) rmap armap)
 .
-Hint Constructors sim_rmap.
+#[export]
+Hint Constructors sim_rmap: core.
 
 Inductive sim_state (tid:Id.t) (vext:eidT -> Time.t) (state:State.t (A:=View.t (A:=unit))) (astate:State.t (A:=nat -> Prop)): Prop :=
 | sim_state_intro
     (STMTS: state.(State.stmts) = astate.(State.stmts))
     (RMAP: sim_rmap tid vext state.(State.rmap) astate.(State.rmap))
 .
-Hint Constructors sim_state.
+#[export]
+Hint Constructors sim_state: core.
 
 Lemma sim_rmap_add
       tid vext rmap armap reg vala avala
@@ -205,7 +209,8 @@ Inductive sim_local (tid:Id.t) (mem: Memory.t) (ex: Execution.t) (vext: eidT -> 
         <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
         <<VIEW: vext (tid, n) = view>>;
 }.
-Hint Constructors sim_local.
+#[export]
+Hint Constructors sim_local: core.
 
 Definition sim_ob_write
            (tid:Id.t) (ex:Execution.t) (vext: eidT -> Time.t)
@@ -253,4 +258,5 @@ Inductive sim_th'
   FR: sim_fr tid ex vext eu aeu;
   ATOMIC: sim_atomic tid ex vext eu aeu;
 }.
-Hint Constructors sim_th'.
+#[export]
+Hint Constructors sim_th': core.

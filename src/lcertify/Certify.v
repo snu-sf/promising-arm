@@ -32,7 +32,8 @@ Inductive write_step (tid:Id.t) (loc:Loc.t) (val:Val.t) (view_pre:View.t (A:=uni
     (PROMISE: Local.promise vloc.(ValA.val) vval.(ValA.val) ts tid eu1.(ExecUnit.local) eu1.(ExecUnit.mem) lc eu2.(ExecUnit.mem))
     (FULFILL: Local.fulfill ex ord vloc vval res ts tid view_pre lc eu2.(ExecUnit.mem) eu2.(ExecUnit.local))
 .
-Hint Constructors write_step.
+#[export]
+Hint Constructors write_step: core.
 
 Inductive certify_step (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | certify_step_state
@@ -41,7 +42,8 @@ Inductive certify_step (tid:Id.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
     loc val view_pre
     (STEP: write_step tid loc val view_pre eu1 eu2)
 .
-Hint Constructors certify_step.
+#[export]
+Hint Constructors certify_step: core.
 
 Inductive certify (tid:Id.t) (eu1:ExecUnit.t (A:=unit)): Prop :=
 | certify_intro
@@ -49,7 +51,8 @@ Inductive certify (tid:Id.t) (eu1:ExecUnit.t (A:=unit)): Prop :=
     (STEPS: rtc (certify_step tid) eu1 eu2)
     (NOPROMISE: eu2.(ExecUnit.local).(Local.promises) = bot)
 .
-Hint Constructors certify.
+#[export]
+Hint Constructors certify: core.
 
 
 Lemma write_step_wf
@@ -66,7 +69,8 @@ Proof.
   i. exploit (ExecUnit.state_step_wf (A:=unit)); eauto. econs. econs; eauto. s.
   econs 3; eauto.
 Qed.
-Hint Resolve write_step_wf.
+#[export]
+Hint Resolve write_step_wf: core.
 
 Lemma certify_step_wf
       tid eu1 eu2
@@ -196,7 +200,8 @@ Inductive certified_exec (p:program) (m:Machine.t): Prop :=
     (STEP: rtc (Machine.step certified_eu_step) (Machine.init p) m)
     (NOPROMISE: Machine.no_promise m)
 .
-Hint Constructors certified_exec.
+#[export]
+Hint Constructors certified_exec: core.
 
 Theorem certified_exec_sound p m
         (EXEC: certified_exec p m):

@@ -27,7 +27,8 @@ Module Label.
   | barrier (b:Barrier.t)
   | ctrl
   .
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition is_ex (label:t): bool :=
     match label with
@@ -168,7 +169,8 @@ Module ALocal.
     rmw: relation nat;
     exbank: option nat;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition init: t := mk [] bot bot bot bot None.
 
@@ -245,7 +247,8 @@ Module ALocal.
                  alocal1.(rmw)
                  alocal1.(exbank))
   .
-  Hint Constructors step.
+  #[global]
+  Hint Constructors step: core.
 
   Inductive le (alocal1 alocal2:t): Prop :=
   | le_intro
@@ -255,7 +258,8 @@ Module ALocal.
       (CTRL: alocal1.(ctrl) ⊆ alocal2.(ctrl))
       (RMW: alocal1.(rmw) ⊆ alocal2.(rmw))
   .
-  Hint Constructors le.
+  #[global]
+  Hint Constructors le: core.
 
   Global Program Instance le_preorder: PreOrder le.
   Next Obligation.
@@ -275,7 +279,8 @@ Module AExecUnit.
     state: State.t (A:=nat -> Prop);
     local: ALocal.t;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Inductive step (eu1 eu2:t): Prop :=
   | step_intro
@@ -283,7 +288,8 @@ Module AExecUnit.
       (STATE: State.step e eu1.(state) eu2.(state))
       (LOCAL: ALocal.step e eu1.(local) eu2.(local))
   .
-  Hint Constructors step.
+  #[global]
+  Hint Constructors step: core.
 
   Inductive label_is (labels:list Label.t) (pred:Label.t -> Prop) (iid:nat): Prop :=
   | label_is_intro
@@ -291,13 +297,15 @@ Module AExecUnit.
       (EID: List.nth_error labels iid = Some l)
       (LABEL: pred l)
   .
-  Hint Constructors label_is.
+  #[global]
+  Hint Constructors label_is: core.
 
   Definition wf_rmap (rmap: RMap.t (A:=nat -> Prop)) (labels:list Label.t): Prop :=
     forall r n
       (N: (RMap.find r rmap).(ValA.annot) n),
       label_is labels Label.is_access n.
-  Hint Unfold wf_rmap.
+  #[global]
+  Hint Unfold wf_rmap: core.
 
   Lemma wf_rmap_expr
         rmap labels e n
@@ -340,7 +348,8 @@ Module AExecUnit.
                  (C: eb < c),
           List.nth_error aeu.(local).(ALocal.labels) c <> Some (Label.read true ord3 loc3 val3))
   .
-  Hint Constructors wf.
+  #[global]
+  Hint Constructors wf: core.
 
   Lemma label_is_lt
         labels pred iid
@@ -649,7 +658,8 @@ Module Execution.
     co: relation eidT;
     rf: relation eidT;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition label (eid:eidT) (ex:t): option Label.t :=
     match IdMap.find (fst eid) ex.(labels) with
@@ -719,7 +729,8 @@ Module Execution.
       (EID: label eid ex = Some l)
       (LABEL: pred l)
   .
-  Hint Constructors label_is.
+  #[global]
+  Hint Constructors label_is: core.
 
   Inductive label_rel (ex:t) (rel:relation Label.t) (eid1 eid2:eidT): Prop :=
   | label_rel_intro
@@ -728,7 +739,8 @@ Module Execution.
       (EID2: label eid2 ex = Some l2)
       (LABEL: rel l1 l2)
   .
-  Hint Constructors label_rel.
+  #[global]
+  Hint Constructors label_rel: core.
 
   Inductive label_is_rel (ex: t) (pred: Label.t -> Prop) (eid1 eid2: eidT): Prop :=
   | label_is_rel_intro
@@ -738,7 +750,8 @@ Module Execution.
       (LABEL1: pred l1)
       (LABEL2: pred l2)
   .
-  Hint Constructors label_is_rel.
+  #[global]
+  Hint Constructors label_is_rel: core.
 
   Inductive label_loc (x y:Label.t): Prop :=
   | label_loc_intro
@@ -746,7 +759,8 @@ Module Execution.
       (X: Label.is_accessing loc x)
       (Y: Label.is_accessing loc y)
   .
-  Hint Constructors label_loc.
+  #[global]
+  Hint Constructors label_loc: core.
 
   (* let obs = rfe | fr | co *)
 
@@ -775,7 +789,8 @@ Module Execution.
       (TID: fst eid1 = fst eid2)
       (N: snd eid1 < snd eid2)
   .
-  Hint Constructors po.
+  #[global]
+  Hint Constructors po: core.
 
   Global Program Instance po_trans: Transitive po.
   Next Obligation.
@@ -787,7 +802,8 @@ Module Execution.
       (TID: fst eid1 = fst eid2)
       (N: snd eid2 = S (snd eid1))
   .
-  Hint Constructors po_adj.
+  #[global]
+  Hint Constructors po_adj: core.
 
   Lemma po_adj_po:
     po_adj ⊆ po.
@@ -818,13 +834,15 @@ Module Execution.
   | i_intro
       (TID: fst eid1 = fst eid2)
   .
-  Hint Constructors i.
+  #[global]
+  Hint Constructors i: core.
 
   Inductive e (eid1 eid2:eidT): Prop :=
   | e_intro
       (TID: fst eid1 <> fst eid2)
   .
-  Hint Constructors e.
+  #[global]
+  Hint Constructors e: core.
 
 
   Definition ctrl (ex: t): relation eidT := ex.(ctrl0) ⨾ po.
@@ -898,7 +916,8 @@ Inductive tid_lift (tid:Id.t) (rel:relation nat) (eid1 eid2:eidT): Prop :=
     (TID1: fst eid2 = tid)
     (REL: rel (snd eid1) (snd eid2))
 .
-Hint Constructors tid_lift.
+#[export]
+Hint Constructors tid_lift: core.
 
 Lemma tid_lift_incl
       tid rel1 rel2
@@ -914,7 +933,8 @@ Inductive tid_join (rels: IdMap.t (relation nat)) (eid1 eid2:eidT): Prop :=
     (RELS: IdMap.find tid rels = Some rel)
     (REL: tid_lift tid rel eid1 eid2)
 .
-Hint Constructors tid_join.
+#[export]
+Hint Constructors tid_join: core.
 
 
 Module Valid.
@@ -933,7 +953,8 @@ Module Valid.
     CTRL: ex.(Execution.ctrl0) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.ctrl)) aeus);
     RMW: ex.(Execution.rmw) = tid_join (IdMap.map (fun aeu => aeu.(AExecUnit.local).(ALocal.rmw)) aeus);
   }.
-  Hint Constructors pre_ex.
+  #[global]
+  Hint Constructors pre_ex: core.
 
   Definition co1 (ex: Execution.t) :=
     forall eid1 eid2,
@@ -980,7 +1001,8 @@ Module Valid.
     EXTERNAL: acyclic (Execution.ob ex);
     ATOMIC: le (ex.(Execution.rmw) ∩ ((Execution.fre ex) ⨾ (Execution.coe ex))) bot;
   }.
-  Hint Constructors ex.
+  #[global]
+  Hint Constructors ex: core.
   Coercion PRE: ex >-> pre_ex.
 
   Definition is_terminal

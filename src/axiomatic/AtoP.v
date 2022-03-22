@@ -55,7 +55,8 @@ Inductive sim_mem (ex:Execution.t) (mem: Memory.t): Prop :=
     (EIDS: Permutation ob (Execution.eids ex))
     (MEM: mem = mem_of_ex ex ob)
 .
-Hint Constructors sim_mem.
+#[export]
+Hint Constructors sim_mem: core.
 
 Definition view_of_eid (ex:Execution.t) (ob: list eidT) (eid:eidT): option Time.t :=
   option_map
@@ -155,7 +156,8 @@ Inductive sim_view (ex:Execution.t) (ob: list eidT) (eids:eidT -> Prop) (view:Ti
     (VIEW_OF_EID: view_of_eid ex ob eid = Some v)
     (VIEW: le view v)
 .
-Hint Constructors sim_view.
+#[export]
+Hint Constructors sim_view: core.
 
 Lemma sim_view_join ex ob pred v1 v2
       (V1: sim_view ex ob pred v1)
@@ -196,20 +198,23 @@ Inductive sim_val (tid:Id.t) (ex:Execution.t) (ob: list eidT) (avala:ValA.t (A:=
     (VAL: avala.(ValA.val) = vala.(ValA.val))
     (VIEW: sim_view ex ob (fun eid => (fst eid) = tid /\ avala.(ValA.annot) (snd eid)) vala.(ValA.annot).(View.ts))
 .
-Hint Constructors sim_val.
+#[export]
+Hint Constructors sim_val: core.
 
 Inductive sim_rmap (tid:Id.t) (ex:Execution.t) (ob: list eidT) (armap:RMap.t (A:=nat -> Prop)) (rmap:RMap.t (A:=View.t (A:=unit))): Prop :=
 | sim_rmap_intro
     (RMAP: IdMap.Forall2 (fun reg => sim_val tid ex ob) armap rmap)
 .
-Hint Constructors sim_rmap.
+#[export]
+Hint Constructors sim_rmap: core.
 
 Inductive sim_state (tid:Id.t) (ex:Execution.t) (ob: list eidT) (astate:State.t (A:=nat -> Prop)) (state:State.t (A:=View.t (A:=unit))): Prop :=
 | sim_state_intro
     (STMTS: astate.(State.stmts) = state.(State.stmts))
     (RMAP: sim_rmap tid ex ob astate.(State.rmap) state.(State.rmap))
 .
-Hint Constructors sim_state.
+#[export]
+Hint Constructors sim_state: core.
 
 Lemma sim_rmap_add
       tid ex ob armap rmap reg avala vala
@@ -305,7 +310,8 @@ Inductive sim_local (tid:Id.t) (ex:Execution.t) (ob: list eidT) (alocal:ALocal.t
           <<WRITE: ex.(Execution.label_is) Label.is_write (tid, n)>> /\
           <<VIEW: view_of_eid ex ob (tid, n) = Some view>>);
 }.
-Hint Constructors sim_local.
+#[export]
+Hint Constructors sim_local: core.
 
 Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (eu:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
@@ -313,7 +319,8 @@ Inductive sim_eu (tid:Id.t) (ex:Execution.t) (ob: list eidT) (aeu:AExecUnit.t) (
     (LOCAL: sim_local tid ex ob aeu.(AExecUnit.local) eu.(ExecUnit.local))
     (MEM: eu.(ExecUnit.mem) = mem_of_ex ex ob)
 .
-Hint Constructors sim_eu.
+#[export]
+Hint Constructors sim_eu: core.
 
 Lemma label_read_mem_of_ex
       eid ex ob exm ord loc val

@@ -27,13 +27,15 @@ Inductive sim_time (ts:Time.t) (v1 v2:Time.t): Prop :=
 | sim_time_intro
     (TS: v2 <= ts -> v1 = v2)
 .
-Hint Constructors sim_time.
+#[export]
+Hint Constructors sim_time: core.
 
 Inductive sim_view (ts:Time.t) (v1 v2:View.t (A:=unit)): Prop :=
 | sim_view_intro
     (TS: v2.(View.ts) <= ts -> le v1 v2)
 .
-Hint Constructors sim_view.
+#[export]
+Hint Constructors sim_view: core.
 
 Inductive sim_val (ts:Time.t) (v1 v2:ValA.t (A:=View.t (A:=unit))): Prop :=
 | sim_val_intro
@@ -41,20 +43,23 @@ Inductive sim_val (ts:Time.t) (v1 v2:ValA.t (A:=View.t (A:=unit))): Prop :=
          le v1.(ValA.annot) v2.(ValA.annot) /\
          v1.(ValA.val) = v2.(ValA.val))
 .
-Hint Constructors sim_val.
+#[export]
+Hint Constructors sim_val: core.
 
 Inductive sim_rmap (ts:Time.t) (rmap1 rmap2:RMap.t (A:=View.t (A:=unit))): Prop :=
 | sim_rmap_intro
     (RMAP: IdMap.Forall2 (fun _ => sim_val ts) rmap1 rmap2)
 .
-Hint Constructors sim_rmap.
+#[export]
+Hint Constructors sim_rmap: core.
 
 Inductive sim_state (ts:Time.t) (st1 st2:State.t (A:=View.t (A:=unit))): Prop :=
 | sim_state_intro
     (STMTS: st1.(State.stmts) = st2.(State.stmts))
     (RMAP: sim_rmap ts st1.(State.rmap) st2.(State.rmap))
 .
-Hint Constructors sim_state.
+#[export]
+Hint Constructors sim_state: core.
 
 Inductive sim_mem (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t): Prop :=
 | sim_mem_intro
@@ -63,7 +68,8 @@ Inductive sim_mem (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t): Prop :=
     (MEM1: mem1 = mem ++ mem1')
     (MEM2: mem2 = mem ++ mem2')
 .
-Hint Constructors sim_mem.
+#[export]
+Hint Constructors sim_mem: core.
 
 Inductive sim_fwdbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (loc:Loc.t) (fwd1 fwd2:FwdItem.t (A:=unit)): Prop :=
 | sim_fwdbank_below
@@ -94,7 +100,8 @@ Inductive sim_exbank (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (eb1 eb2:Exbank
     (ABOVE: ts < eb2.(Exbank.view).(View.ts))
     (EXCLUSIVE: Memory.exclusive tid eb1.(Exbank.loc) eb1.(Exbank.ts) ts mem1)
 .
-Hint Constructors sim_exbank.
+#[export]
+Hint Constructors sim_exbank: core.
 
 Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A:=unit)): Prop :=
 | sim_lc_intro
@@ -114,7 +121,8 @@ Inductive sim_lc (tid:Id.t) (ts:Time.t) (mem1 mem2:Memory.t) (lc1 lc2:Local.t (A
     (PROMISES1: forall tsp (TSP: tsp <= ts), Promises.lookup tsp lc1.(Local.promises) = Promises.lookup tsp lc2.(Local.promises))
     (PROMISES2: forall tsp (TSP: tsp > ts), Promises.lookup tsp lc1.(Local.promises) = false)
 .
-Hint Constructors sim_lc.
+#[export]
+Hint Constructors sim_lc: core.
 
 Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
 | sim_eu_intro
@@ -122,7 +130,8 @@ Inductive sim_eu (tid:Id.t) (ts:Time.t) (eu1 eu2:ExecUnit.t (A:=unit)): Prop :=
     (LOCAL: sim_lc tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem) eu1.(ExecUnit.local) eu2.(ExecUnit.local))
     (MEM: sim_mem tid ts eu1.(ExecUnit.mem) eu2.(ExecUnit.mem))
 .
-Hint Constructors sim_eu.
+#[export]
+Hint Constructors sim_eu: core.
 
 Lemma sim_time_join
       ts l1 l2 r1 r2

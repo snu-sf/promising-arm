@@ -26,7 +26,8 @@ Module Msg.
     val: Val.t;
     tid: Id.t;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Global Program Instance eqdec: EqDec t eq.
   Next Obligation.
@@ -434,7 +435,8 @@ Section View.
     ts: Time.t;
     annot: A;
   }.
-  Hint Constructors t.
+  #[local]
+  Hint Constructors t: core.
 
   Inductive _le (a b:t): Prop :=
   | _le_intro
@@ -518,7 +520,8 @@ Section FwdItem.
     view: View.t (A:=A);
     ex: bool;
   }.
-  Hint Constructors t.
+  #[local]
+  Hint Constructors t: core.
 
   Definition init: t := mk bot bot false.
 
@@ -538,7 +541,8 @@ Section Exbank.
     ts: Time.t;
     view: View.t (A:=A);
   }.
-  Hint Constructors t.
+  #[local]
+  Hint Constructors t: core.
 End Exbank.
 End Exbank.
 
@@ -549,7 +553,8 @@ Section Eqts.
   | eqts_view_intro
       (TS: v1.(View.ts) = v2.(View.ts))
   .
-  Hint Constructors eqts_view.
+  #[local]
+  Hint Constructors eqts_view: core.
 
   Inductive eqts_fwd (fwd1:FwdItem.t (A:=A)) (fwd2:FwdItem.t (A:=B)): Prop :=
   | eqts_fwd_intro
@@ -557,14 +562,16 @@ Section Eqts.
       (VIEW: eqts_view fwd1.(FwdItem.view) fwd2.(FwdItem.view))
       (EX: fwd1.(FwdItem.ex) = fwd2.(FwdItem.ex))
   .
-  Hint Constructors eqts_fwd.
+  #[local]
+  Hint Constructors eqts_fwd: core.
 
   Inductive eqts_val (v1:ValA.t (A:=View.t (A:=A))) (v2:ValA.t (A:=View.t (A:=B))): Prop :=
   | eqts_val_intro
       (VAL: v1.(ValA.val) = v2.(ValA.val))
       (VIEW: eqts_view v1.(ValA.annot) v2.(ValA.annot))
   .
-  Hint Constructors eqts_val.
+  #[local]
+  Hint Constructors eqts_val: core.
 
   Inductive eqts_event: forall (e1:Event.t (A:=View.t (A:=A))) (e2:Event.t (A:=View.t (A:=B))), Prop :=
   | eqts_event_internal:
@@ -588,7 +595,8 @@ Section Eqts.
       (CTRL: eqts_view ctrl1 ctrl2):
       eqts_event (Event.control ctrl1) (Event.control ctrl2)
   .
-  Hint Constructors eqts_event.
+  #[local]
+  Hint Constructors eqts_event: core.
 End Eqts.
 
 Section EqtsEquiv.
@@ -779,7 +787,8 @@ Section Local.
     exbank: option (Exbank.t (A:=A));
     promises: Promises.t;
   }.
-  Hint Constructors t.
+  #[local]
+  Hint Constructors t: core.
 
   Definition init: t := mk bot bot bot bot bot bot bot (fun _ => FwdItem.init) None bot.
 
@@ -802,7 +811,8 @@ Section Local.
               (Promises.set ts lc1.(promises)))
       (MEM2: Memory.append (Msg.mk loc val tid) mem1 = (ts, mem2))
   .
-  Hint Constructors promise.
+  #[local]
+  Hint Constructors promise: core.
 
   Inductive control (ctrl:View.t) (lc1 lc2:t): Prop :=
   | control_intro
@@ -819,7 +829,8 @@ Section Local.
               lc1.(exbank)
               lc1.(promises))
   .
-  Hint Constructors control.
+  #[local]
+  Hint Constructors control: core.
 
   Inductive read (ex:bool) (ord:OrdR.t) (vloc res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | read_intro
@@ -847,7 +858,8 @@ Section Local.
               (if ex then Some (Exbank.mk loc ts view_post) else lc1.(exbank))
               lc1.(promises))
   .
-  Hint Constructors read.
+  #[local]
+  Hint Constructors read: core.
 
   Inductive writable (ex:bool) (ord:OrdW.t) (vloc vval:ValA.t (A:=View.t (A:=A))) (tid:Id.t) (lc1:t) (mem1: Memory.t) (ts:Time.t) (view_pre:View.t (A:=A)): Prop :=
   | writable_intro
@@ -873,7 +885,8 @@ Section Local.
            <<TSX: lc1.(exbank) = Some eb>> /\
            <<EX: eb.(Exbank.loc) = loc -> Memory.exclusive tid loc eb.(Exbank.ts) ts mem1>>)
   .
-  Hint Constructors writable.
+  #[local]
+  Hint Constructors writable: core.
 
   Inductive fulfill (ex:bool) (ord:OrdW.t) (vloc vval res:ValA.t (A:=View.t (A:=A))) (ts:Time.t) (tid:Id.t) (view_pre:View.t (A:=A)) (lc1:t) (mem1: Memory.t) (lc2:t): Prop :=
   | fulfill_intro
@@ -900,7 +913,8 @@ Section Local.
               (if ex then None else lc1.(exbank))
               (Promises.unset ts lc1.(promises)))
   .
-  Hint Constructors fulfill.
+  #[local]
+  Hint Constructors fulfill: core.
 
   Inductive write_failure (ex:bool) (res: ValA.t (A:=View.t (A:=A))) (lc1:t) (lc2:t): Prop :=
   | write_failure_intro
@@ -919,7 +933,8 @@ Section Local.
               None
               lc1.(promises))
   .
-  Hint Constructors write_failure.
+  #[local]
+  Hint Constructors write_failure: core.
 
   Inductive isb (lc1 lc2:t): Prop :=
   | isb_intro
@@ -936,7 +951,8 @@ Section Local.
               lc1.(exbank)
               lc1.(promises))
   .
-  Hint Constructors isb.
+  #[local]
+  Hint Constructors isb: core.
 
   Inductive dmb (rr rw wr ww:bool) (lc1 lc2:t): Prop :=
   | dmb_intro
@@ -953,7 +969,8 @@ Section Local.
               lc1.(exbank)
               lc1.(promises))
   .
-  Hint Constructors dmb.
+  #[local]
+  Hint Constructors dmb: core.
 
   Inductive step (event:Event.t (A:=View.t (A:=A))) (tid:Id.t) (mem:Memory.t) (lc1 lc2:t): Prop :=
   | step_internal
@@ -983,7 +1000,8 @@ Section Local.
       (EVENT: event = Event.control ctrl)
       (LC: control ctrl lc1 lc2)
   .
-  Hint Constructors step.
+  #[local]
+  Hint Constructors step: core.
 
   Inductive wf_fwdbank (loc:Loc.t) (mem:Memory.t) (coh: Time.t) (fwd:FwdItem.t (A:=A)): Prop :=
   | wf_fwdbank_intro
@@ -1017,7 +1035,8 @@ Section Local.
                    (TS: (lc.(coh) msg.(Msg.loc)).(View.ts) < ts),
           Promises.lookup ts lc.(promises))
   .
-  Hint Constructors wf.
+  #[local]
+  Hint Constructors wf: core.
 
   Lemma init_wf tid: wf tid Memory.empty init.
   Proof.
@@ -1249,7 +1268,8 @@ Section ExecUnit.
     local: Local.t (A:=A);
     mem: Memory.t;
   }.
-  Hint Constructors t.
+  #[local]
+  Hint Constructors t: core.
 
   Inductive state_step0 (tid:Id.t) (e1 e2:Event.t (A:=View.t (A:=A))) (eu1 eu2:t): Prop :=
   | state_step0_intro
@@ -1257,14 +1277,16 @@ Section ExecUnit.
       (LOCAL: Local.step e2 tid eu1.(mem) eu1.(local) eu2.(local))
       (MEM: eu2.(mem) = eu1.(mem))
   .
-  Hint Constructors state_step0.
+  #[local]
+  Hint Constructors state_step0: core.
 
   Inductive state_step (tid:Id.t) (eu1 eu2:t): Prop :=
   | state_step_intro
       e
       (STEP: state_step0 tid e e eu1 eu2)
   .
-  Hint Constructors state_step.
+  #[local]
+  Hint Constructors state_step: core.
 
   Inductive promise_step (tid:Id.t) (eu1 eu2:t): Prop :=
   | promise_step_intro
@@ -1272,26 +1294,30 @@ Section ExecUnit.
       (STATE: eu1.(state) = eu2.(state))
       (LOCAL: Local.promise loc val ts tid eu1.(local) eu1.(mem) eu2.(local) eu2.(mem))
   .
-  Hint Constructors promise_step.
+  #[local]
+  Hint Constructors promise_step: core.
 
   Inductive step (tid:Id.t) (eu1 eu2:t): Prop :=
   | step_state (STEP: state_step tid eu1 eu2)
   | step_promise (STEP: promise_step tid eu1 eu2)
   .
-  Hint Constructors step.
+  #[local]
+  Hint Constructors step: core.
 
   Inductive rmap_wf (mem:Memory.t) (rmap:RMap.t (A:=View.t (A:=A))): Prop :=
   | rmap_wf_intro
       (RMAP: forall r, (RMap.find r rmap).(ValA.annot).(View.ts) <= List.length mem)
   .
-  Hint Constructors rmap_wf.
+  #[local]
+  Hint Constructors rmap_wf: core.
 
   Inductive wf (tid:Id.t) (eu:t): Prop :=
   | wf_intro
       (STATE: rmap_wf eu.(mem) eu.(state).(State.rmap))
       (LOCAL: Local.wf tid eu.(mem) eu.(local))
   .
-  Hint Constructors wf.
+  #[local]
+  Hint Constructors wf: core.
 
   Lemma rmap_add_wf
         mem rmap loc (val:ValA.t (A:=View.t (A:=A)))
@@ -1529,7 +1555,8 @@ Module Machine.
     tpool: IdMap.t (State.t (A:=View.t (A:=unit)) * Local.t (A:=unit));
     mem: Memory.t;
   }.
-  Hint Constructors t.
+  #[global]
+  Hint Constructors t: core.
 
   Definition init (p:program): t :=
     mk
@@ -1543,7 +1570,8 @@ Module Machine.
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
            State.is_terminal st /\ lc.(Local.promises) = bot)
   .
-  Hint Constructors is_terminal.
+  #[global]
+  Hint Constructors is_terminal: core.
 
   Inductive no_promise (m:t): Prop :=
   | no_promise_intro
@@ -1552,7 +1580,8 @@ Module Machine.
            (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
            lc.(Local.promises) = bot)
   .
-  Hint Constructors no_promise.
+  #[global]
+  Hint Constructors no_promise: core.
 
   Lemma is_terminal_no_promise
         m
@@ -1569,7 +1598,8 @@ Module Machine.
       (STEP: eustep tid (ExecUnit.mk st1 lc1 m1.(mem)) (ExecUnit.mk st2 lc2 m2.(mem)))
       (TPOOL: m2.(tpool) = IdMap.add tid (st2, lc2) m1.(tpool))
   .
-  Hint Constructors step.
+  #[global]
+  Hint Constructors step: core.
 
   Lemma rtc_eu_step_step
         eustep tid m st1 lc1 mem1 st2 lc2 mem2
@@ -1602,7 +1632,8 @@ Module Machine.
              (FIND: IdMap.find tid m.(tpool) = Some (st, lc)),
           ExecUnit.wf tid (ExecUnit.mk st lc m.(mem)))
   .
-  Hint Constructors wf.
+  #[global]
+  Hint Constructors wf: core.
 
   Lemma init_wf p:
     wf (init p).
@@ -1721,7 +1752,8 @@ Module Machine.
       (STEP: rtc (step ExecUnit.step) (init p) m)
       (NOPROMISE: no_promise m)
   .
-  Hint Constructors exec.
+  #[global]
+  Hint Constructors exec: core.
 
   Inductive state_exec (m1 m2:t): Prop :=
   | state_exec_intro
@@ -1741,7 +1773,8 @@ Module Machine.
       (STEP2: state_exec m1 m)
       (NOPROMISE: no_promise m)
   .
-  Hint Constructors pf_exec.
+  #[global]
+  Hint Constructors pf_exec: core.
 
   Inductive equiv (m1 m2:t): Prop :=
   | equiv_intro

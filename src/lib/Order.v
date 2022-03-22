@@ -87,7 +87,8 @@ Definition bot (A:Type) `{_: orderC A} := bot.
 
 Definition fun_add A B `{_: EqDec A} (a:A) (b:B) (f:A -> B): A -> B :=
   fun x => if x == a then b else f x.
-Hint Unfold fun_add.
+#[export]
+Hint Unfold fun_add: core.
 
 Lemma fun_add_spec A B `{_: EqDec A} a (b:B) f x:
   (fun_add a b f) x = if x == a then b else f x.
@@ -95,28 +96,35 @@ Proof. refl. Qed.
 
 Definition fun_eq A B `{_: Equivalence B} (f g: A -> B): Prop :=
   forall a, R (f a) (g a).
-Hint Unfold fun_eq.
+#[export]
+Hint Unfold fun_eq: core.
 
 Definition fun_le A B `{_: orderC B} (f g: A -> B): Prop :=
   forall a, LE (f a) (g a).
-Hint Unfold fun_le.
+#[export]
+Hint Unfold fun_le: core.
 
 Definition fun_join A B `{_: orderC B} (f g: A -> B) :=
   fun a => join (f a) (g a).
-Hint Unfold fun_join.
+#[export]
+Hint Unfold fun_join: core.
 
 Definition fun_bot A B `{_: orderC B} := fun (_:A) => bot.
-Hint Unfold fun_bot.
+#[export]
+Hint Unfold fun_bot: core.
 
+#[export]
 Program Instance fun_equiv A B `{_: Equivalence B}: Equivalence (fun_eq (A:=A) (B:=B)).
 Next Obligation. ii. refl. Qed.
 Next Obligation. ii. symmetry. ss. Qed.
 Next Obligation. ii. etrans; eauto. Qed.
 
+#[export]
 Program Instance fun_preorder A B `{_: orderC B}: PreOrder (fun_le (A:=A) (B:=B)).
 Next Obligation. ii. refl. Qed.
 Next Obligation. ii. etrans; eauto. Qed.
 
+#[export]
 Program Instance fun_partialorder A B `{_: orderC B}: @PartialOrder (A -> B) (fun_eq (A:=A) (B:=B)) _ (fun_le (A:=A) (B:=B)) _.
 Next Obligation.
   econs.
@@ -132,6 +140,7 @@ Variable B: Type.
 Check fun_partialorder.
 Check orderC.
 
+#[export]
 Program Instance fun_order A B `{_: orderC B}:
   @orderC
     (A -> B)
@@ -167,6 +176,7 @@ Next Obligation.
   eauto using bot_spec.
 Qed.
 
+#[export]
 Program Instance fun_eq_partialorder A B `{_: orderC B eq}: @PartialOrder (A -> B) eq _ (fun_le (A:=A) (B:=B)) _.
 Next Obligation.
   econs.
@@ -174,6 +184,7 @@ Next Obligation.
   - i. funext. i. antisym; apply H1.
 Qed.
 
+#[export]
 Program Instance fun_eq_order A B `{_: orderC B eq}:
   @orderC
     (A -> B)
@@ -213,13 +224,15 @@ Inductive opt_eq X `{_: Equivalence X}: forall (a b: option X), Prop :=
 | opt_eq_None: opt_eq None None
 | opt_eq_Some a b (EQX: equiv a b): opt_eq (Some a) (Some b)
 .
-Hint Constructors opt_eq.
+#[export]
+Hint Constructors opt_eq: core.
 
 Inductive opt_le X `{_: orderC X}: forall (a b: option X), Prop :=
 | opt_le_None b: opt_le None b
 | opt_le_Some a b (LEX: le a b): opt_le (Some a) (Some b)
 .
-Hint Constructors opt_le.
+#[export]
+Hint Constructors opt_le: core.
 
 Definition opt_join X `{_: orderC X}(a b:option X) :=
   match a, b with
@@ -227,16 +240,20 @@ Definition opt_join X `{_: orderC X}(a b:option X) :=
   | _, None => a
   | Some a, Some b => Some (join a b)
   end.
-Hint Unfold opt_join.
+#[export]
+Hint Unfold opt_join: core.
 
 Definition opt_bot X `{_: orderC X}: option X := None.
-Hint Unfold opt_bot.
+#[export]
+Hint Unfold opt_bot: core.
 
+#[export]
 Program Instance opt_equiv X `{_: Equivalence X}: Equivalence (opt_eq (X:=X)).
 Next Obligation. ii. destruct x; eauto. econs. refl. Qed.
 Next Obligation. ii. inv H0; eauto. econs. symmetry. ss. Qed.
 Next Obligation. ii. inv H0; inv H1; eauto. econs. etrans; eauto. Qed.
 
+#[export]
 Program Instance opt_eqdec X `{_: EqDec X eq}: EqDec (option X) eq.
 Next Obligation.
   destruct x, y;
@@ -247,10 +264,12 @@ Next Obligation.
   - right. intro Y. inv Y. intuition.
 Defined.
 
+#[export]
 Program Instance opt_preorder X `{_: orderC X}: PreOrder (opt_le (X:=X)).
 Next Obligation. ii. destruct x; eauto. econs. refl. Qed.
 Next Obligation. ii. inv H1; inv H2; eauto. econs. etrans; eauto. Qed.
 
+#[export]
 Program Instance opt_partialorder X `{_: orderC X}: PartialOrder (opt_eq (X:=X)) (opt_le (X:=X)).
 Next Obligation.
   econs.
@@ -260,6 +279,7 @@ Next Obligation.
   - i. inv H1. inv H2; inv H3; econs. antisym; eauto.
 Qed.
 
+#[export]
 Program Instance opt_order X `{_: orderC X}:
   @orderC
     (option X)
@@ -302,10 +322,12 @@ Definition prop_join (a b:Prop): Prop := a \/ b.
 
 Definition prop_bot: Prop := False.
 
+#[export]
 Program Instance prop_preorder: PreOrder prop_le.
 Next Obligation. ii. ss. Qed.
 Next Obligation. ii. auto. Qed.
 
+#[export]
 Program Instance prop_partialorder: PartialOrder eq prop_le.
 Next Obligation.
   econs.
@@ -313,6 +335,7 @@ Next Obligation.
   - i. inv H. propext. econs; eauto.
 Qed.
 
+#[export]
 Program Instance prop_order:
   @orderC
     Prop
@@ -355,10 +378,12 @@ Definition bool_join (a b:bool): bool := a || b.
 
 Definition bool_bot: bool := false.
 
+#[export]
 Program Instance bool_preorder: PreOrder bool_le.
 Next Obligation. ii. ss. Qed.
 Next Obligation. ii. auto. Qed.
 
+#[export]
 Program Instance bool_partialorder: PartialOrder eq bool_le.
 Next Obligation.
   unfold bool_le in *.
@@ -367,6 +392,7 @@ Next Obligation.
   - i. inv H. destruct x, x0; intuition.
 Qed.
 
+#[export]
 Program Instance bool_order:
   @orderC
     bool
@@ -405,14 +431,17 @@ Definition unit_join (a b:unit): unit := tt.
 
 Definition unit_bot: unit := tt.
 
+#[export]
 Program Instance unit_preorder: PreOrder unit_le.
 Next Obligation. ii. ss. Qed.
 
+#[export]
 Program Instance unit_partialorder: PartialOrder eq unit_le.
 Next Obligation.
   ii. econs; ss. destruct x, x0; ss.
 Qed.
 
+#[export]
 Program Instance unit_order:
   @orderC
     unit
