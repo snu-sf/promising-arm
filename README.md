@@ -8,7 +8,7 @@ Please visit the [project website](https://sf.snu.ac.kr/promising-arm-riscv/) fo
 
 ## Build
 
-- Requirement: [Coq 8.10](https://coq.inria.fr/download), Make, Rsync.
+- Requirement: [Coq 8.15](https://coq.inria.fr/download), Make.
 
 - Initialization
 
@@ -18,8 +18,7 @@ Please visit the [project website](https://sf.snu.ac.kr/promising-arm-riscv/) fo
 
 - `make`: quickly build without checking the proofs.
 
-- `./build.sh`: build with checking all the proofs.  It will incrementally copy the development to
-  `.build` sub-directory, and then build there.
+- `make build`: build with checking all the proofs.
 
 - Interactive Theorem Proving: use [ProofGeneral](https://proofgeneral.github.io/) or
   [CoqIDE](https://coq.inria.fr/download).  Note that `make` creates `_CoqProject`, which is then
