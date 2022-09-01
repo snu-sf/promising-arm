@@ -3,7 +3,7 @@ Require Import PArith.
 Require Import ZArith.
 Require Import Lia.
 Require Import EquivDec.
-Require Import sflib.
+From sflib Require Import sflib.
 
 Require Import PromisingArch.lib.Basic.
 Require Import PromisingArch.lib.Order.

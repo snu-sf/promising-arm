@@ -12,7 +12,7 @@ Require Import SetoidList.
 Require Import Permutation.
 Require Import FMapPositive.
 Require Import FSetPositive.
-Require Import sflib.
+From sflib Require Import sflib.
 Require Import PacoNotation.
 Require Import HahnRelationsBasic.
 

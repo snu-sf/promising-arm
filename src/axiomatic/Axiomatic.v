@@ -6,7 +6,7 @@ Require Import Lia.
 Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import EquivDec.
-Require Import sflib.
+From sflib Require Import sflib.
 Require Import PacoNotation.
 Require Import HahnRelationsBasic.
 Require Import HahnSets.

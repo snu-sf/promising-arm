@@ -10,7 +10,7 @@ Require Import ZArith.
 Require Import FMapPositive.
 Require Import FSetPositive.
 Require Import EquivDec.
-Require Import sflib.
+From sflib Require Import sflib.
 Require Import HahnSets.
 
 Require Import PromisingArch.lib.Basic.

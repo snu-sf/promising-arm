@@ -6,7 +6,7 @@ Require Import Relations.
 Require Import RelationClasses.
 Require Import EquivDec.
 Require Import List.
-Require Import sflib.
+From sflib Require Import sflib.
 
 Require Import PromisingArch.lib.Basic.
 
