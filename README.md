@@ -8,13 +8,7 @@ Please visit the [project website](https://sf.snu.ac.kr/promising-arm-riscv/) fo
 
 ## Build
 
-- Requirement: [Coq 8.15](https://coq.inria.fr/download), Make.
-
-- Initialization
-
-        cd promising-arm
-        git submodule init
-        git submodule update
+- Requirement: [Coq 8.19](https://coq.inria.fr/download), Make.
 
 - `make`: quickly build without checking the proofs.
 
