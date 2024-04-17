@@ -305,9 +305,6 @@ Qed.
 Next Obligation.
   inv AC; inv BC; econs; eauto. apply join_spec; ss.
 Qed.
-Next Obligation.
-  econs.
-Qed.
 
 
 Definition prop_le (a b:Prop): Prop := a -> b.

@@ -16,6 +16,7 @@ Require Import PromisingArch.lib.HahnRelationsMore.
 Require Import PromisingArch.lib.Order.
 Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
+Require Import PromisingArch.lib.Backward.
 Require Import PromisingArch.promising.Promising.
 Require Import PromisingArch.promising.StateExecFacts.
 Require Import PromisingArch.axiomatic.Axiomatic.
@@ -197,9 +198,9 @@ Proof.
     + econs 1.
     + econs; ss.
     + ss.
-    + ss.
+    (* + ss. *)
     + inv LOCAL1; [econs 1|econs 2]; eauto.
-  - eexists _, (AExecUnit.mk (State.mk _ _) _). splits; ss.
+  - eexists _, (AExecUnit.mk (State.mk _ _) _). splits. ss.
     + econs 2. ss.
     + econs; ss.
     + econs; ss.
@@ -213,7 +214,7 @@ Proof.
     + econs; ss. eauto using sim_rmap_weak_add, sim_rmap_weak_expr.
     + destruct ex0.
       * econs 2; ss.
-        rewrite List.nth_error_app2, minus_diag; ss.
+        rewrite List.nth_error_app2, Nat.sub_diag; ss.
         specialize (@sim_rmap_weak_expr rmap armap1 eloc RMAP). i.
         inv H. rewrite VAL. refl.
       * inv LOCAL1; [econs 1|econs 2]; eauto; ss.
@@ -277,7 +278,7 @@ Proof.
     + econs 7. ss.
     + econs; ss.
     + ss.
-    + ss.
+    (* + ss. *)
     + inv LOCAL1; [econs 1|econs 2]; eauto.
 Qed.
 
@@ -519,6 +520,7 @@ Proof.
         * econs; esplits; ss.
         * destruct ts; ss.
           rewrite Machine.promises_from_mem_spec in IN. des.
+          
           apply lt_le_S. rewrite <- List.nth_error_Some. ii. congr.
         * destruct ts; ss.
           unfold Memory.get_msg in *. ss. destruct msg.
@@ -689,7 +691,7 @@ Proof.
         * eapply nth_error_app_mon. eauto.
     - i. unfold ALocal.next_eid in *.
       specialize (Memory.latest_ts_spec (ValA.val vloc0) ts mem). i. des.
-      exploit Memory.latest_ts_read_le; [|refl|i; exploit le_antisym; try eapply LE; eauto; i].
+      exploit Memory.latest_ts_read_le; [|refl|i; exploit Nat.le_antisymm; try eapply LE; eauto; i].
       { eapply Memory.get_msg_read; eauto. }
       des_ifs.
       + apply Nat.eqb_eq in Heq. apply Nat.eqb_eq in Heq0. subst. ss.

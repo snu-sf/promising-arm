@@ -1,6 +1,6 @@
 COQMODULE    := PromisingArch
 COQDIRS      := lib promising axiomatic lcertify
-COQTHEORIES  := lib/hahn/*.v $(foreach dir, $(COQDIRS), src/$(dir)/*.v)
+COQTHEORIES  := lib/*.v $(foreach dir, $(COQDIRS), src/$(dir)/*.v)
 
 .PHONY: all theories clean
 
@@ -13,7 +13,7 @@ quick: Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
 Makefile.coq: Makefile $(COQTHEORIES)
-	(echo "-R lib/hahn Top"; \
+	(echo "-R lib Top"; \
    \
    echo $(foreach dir, $(COQDIRS), "-R src/$(dir) $(COQMODULE).$(dir)"); \
    \

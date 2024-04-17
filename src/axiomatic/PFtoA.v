@@ -516,12 +516,12 @@ Proof.
           rewrite H1 in *. destruct l0; ss; congr. }
     + des.
       * left. etrans; eauto.
-      * left. eapply le_lt_trans; eauto.
-      * left. eapply le_lt_trans; eauto.
-      * left. eapply lt_le_trans; eauto.
+      * left. eapply Nat.le_lt_trans; eauto.
+      * left. eapply Nat.le_lt_trans; eauto.
+      * left. eapply Nat.lt_le_trans; eauto.
       * right. left. splits; try etrans; eauto.
       * right. right. splits; try etrans; eauto.
-      * left. eapply lt_le_trans; eauto.
+      * left. eapply Nat.lt_le_trans; eauto.
       * inversion IHINTERNAL0_6. inversion IHINTERNAL0_0.
         rewrite EID in EID0. inversion EID0. rewrite H0 in *.
         destruct l0; ss; congr.
@@ -543,12 +543,12 @@ Proof.
       }
     + des.
       * left. etrans; eauto.
-      * left. eapply le_lt_trans; eauto.
-      * left. eapply le_lt_trans; eauto.
-      * left. eapply lt_le_trans; eauto.
+      * left. eapply Nat.le_lt_trans; eauto.
+      * left. eapply Nat.le_lt_trans; eauto.
+      * left. eapply Nat.lt_le_trans; eauto.
       * right. left. splits; try etrans; eauto.
       * right. right. splits; try etrans; eauto.
-      * left. eapply lt_le_trans; eauto.
+      * left. eapply Nat.lt_le_trans; eauto.
       * inversion IHOB6. inversion IHOB0. rewrite EID in EID0.
         inversion EID0. rewrite H0 in *. ss. destruct l0; ss; congr.
       * inversion IHOB5. inversion IHOB0. rewrite EID in EID0.

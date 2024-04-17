@@ -27,8 +27,8 @@ Module Time.
   Global Program Instance order: orderC join bot.
   Next Obligation. unfold join. lia. Qed.
   Next Obligation. unfold join. lia. Qed.
-  Next Obligation. eauto using Max.max_assoc. Qed.
-  Next Obligation. eauto using Max.max_comm. Qed.
+  Next Obligation. eauto using Nat.max_assoc. Qed.
+  Next Obligation. eauto using Nat.max_comm. Qed.
   Next Obligation. unfold join. lia. Qed.
   Next Obligation. unfold bot. lia. Qed.
 
