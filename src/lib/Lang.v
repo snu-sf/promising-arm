@@ -28,8 +28,7 @@ Defined.
 Parameter arch: archT.
 
 Module Val.
-  Include Z.
-
+  Include BinInt.Z.
   Definition default: t := 0.
 End Val.
 
@@ -174,7 +173,7 @@ Section RMap.
   Definition find (reg:Id.t) (rmap:t): (ValA.t (A:=A)) :=
     match IdMap.find reg rmap with
     | Some v => v
-    | None => ValA.mk _ 0 bot
+    | None => ValA.mk _ (Z.of_N 0) bot
     end.
 
   Definition add (reg:Id.t) (val:ValA.t (A:=A)) (rmap:t): t :=
@@ -193,6 +192,8 @@ Section RMap.
   Qed.
 End RMap.
 End RMap.
+
+
 
 Definition sem0_op1 (op:opT1) (v1:Val.t): Val.t :=
   match op with

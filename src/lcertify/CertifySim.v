@@ -547,8 +547,8 @@ Proof.
       + econs; ss.
       + econs; ss.
         * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
-          { eapply le_lt_trans; [|ss]. apply COH. }
-          { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
+          { eapply Nat.le_lt_trans; [|ss]. apply COH. }
+          { eapply Nat.le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
             all: unfold ifc.
             all: try condtac; ss.
             all: try apply bot_spec.
@@ -604,7 +604,7 @@ Proof.
                 condtac; ss.
               + eapply Memory.get_msg_read; eauto.
             - econs 2; ss.
-              + eapply lt_le_trans; eauto. apply join_r.
+              + eapply Nat.lt_le_trans; eauto. apply join_r.
               + rewrite app_length. s. ii. lia.
           }
           { eapply sim_fwdbank_mon; eauto.
@@ -847,7 +847,7 @@ Proof.
               { apply sim_view_join; [apply COH0|apply SIM_POST]. }
               { s. eauto. }
               i. apply View.eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
-              eapply le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
+              eapply Nat.le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
             * i. exploit MEM1'; eauto. i. des. subst.
               esplits; try exact MSG0; ss.
               { rewrite fun_add_spec. condtac; ss. inversion e. subst.
@@ -927,7 +927,7 @@ Proof.
               { apply sim_view_join; [apply COH0|apply SIM_POST]. }
               { s. eauto. }
               i. apply View.eq_time_eq in x2. ss. rewrite H0 in *. rewrite x2.
-              eapply le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
+              eapply Nat.le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
             * i. exploit MEM1'; eauto. i. des. subst.
               esplits; try exact MSG0; ss.
               { rewrite fun_add_spec. condtac; ss. inversion e. subst.
@@ -998,7 +998,7 @@ Proof.
             { i. exploit SRC_PROMISES; eauto. i. des. subst. splits; ss.
               exploit SRC_PROMISES_BELOW; eauto. rewrite ? fun_add_spec.
               condtac; ss. clear X. inv e. i.
-              eapply le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
+              eapply Nat.le_lt_trans; eauto. apply SRC_PROMISES_WF. ss.
             }
             { i. exploit MEM1'; eauto. i. des. subst.
               esplits; try exact MSG0; ss.
@@ -1023,8 +1023,8 @@ Proof.
           + econs; ss.
           + econs; ss.
             * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
-              { eapply le_lt_trans; [|ss]. apply COH. }
-              { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
+              { eapply Nat.le_lt_trans; [|ss]. apply COH. }
+              { eapply Nat.le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
                 all: unfold ifc.
                 all: try condtac; ss.
                 all: try apply bot_spec.
@@ -1076,7 +1076,7 @@ Proof.
                   + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
                   + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
-                  + eapply lt_le_trans; eauto. apply join_r.
+                  + eapply Nat.lt_le_trans; eauto. apply join_r.
                   + rewrite app_length. s. ii. lia.
               }
               { exploit sim_fwdbank_mon; try exact MEM; cycle 3.

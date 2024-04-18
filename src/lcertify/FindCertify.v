@@ -79,7 +79,7 @@ Proof.
     + i. revert TSP. rewrite Promises.set_o, Promises.lookup_bot. condtac; ss. clear X. inv e.
       apply nth_error_snoc_inv in MSG. des; subst; ss.
       * lia.
-      * splits; ss. inv WF. inv LOCAL. ss. eapply le_lt_trans; [apply COH|]. ss.
+      * splits; ss. inv WF. inv LOCAL. ss. eapply Nat.le_lt_trans; [apply COH|]. ss.
     + i. apply Memory.get_msg_snoc_inv in READ. des; subst; ss. lia.
     + i. apply nth_error_singleton_inv in NTH. des. subst.
       revert PROMISES. rewrite Promises.set_o. condtac; ss.
@@ -131,10 +131,10 @@ Proof.
     + econs 3; ss. instantiate (3 := S tsp).
       econs; ss.
       * inv WF1. ss. inv WRITABLE. ss. econs; ss.
-        { eapply le_lt_trans; [|exact ABOVE].
+        { eapply Nat.le_lt_trans; [|exact ABOVE].
           eapply sim_view_below_weak; [|exact COH_PRE]. ss.
         }
-        { eapply le_lt_trans; [|exact ABOVE].
+        { eapply Nat.le_lt_trans; [|exact ABOVE].
           eapply sim_view_below_weak; [|exact VIEW_PRE]. rewrite <- VIEW_PRE'.
           repeat apply sim_view_join; ss; eauto using sim_view_ifc.
           apply sim_view_ifc. inv EXBANK; ss. inv REL; ss. apply sim_view_above. ss.
@@ -176,7 +176,7 @@ Proof.
             + unfold Memory.read. s. rewrite XMSG. s. condtac; [|congr]. ss.
             + eapply Memory.get_msg_read; eauto.
           - econs 2; ss.
-            eapply lt_le_trans; eauto. rewrite <- EVAL, <- join_r. ss.
+            eapply Nat.lt_le_trans; eauto. rewrite <- EVAL, <- join_r. ss.
         }
         { replace (mem ++ mem1') with ((mem ++ mem1') ++ []) by apply app_nil_r.
           eapply sim_fwdbank_mon; eauto.
@@ -436,10 +436,10 @@ Proof.
         }
         { inv LOCAL. destruct (COH0 (ValA.val (sem_expr rmap2 eloc))).
           rewrite TS; ss.
-          - eapply lt_le_trans; [exact COH|]. exploit sim_mem_length; eauto. clear. lia.
+          - eapply Nat.lt_le_trans; [exact COH|]. exploit sim_mem_length; eauto. clear. lia.
           - clear -COH. lia.
         }
-        { eapply lt_le_trans; [exact EXT|]. exploit sim_mem_length; eauto. clear. lia. }
+        { eapply Nat.lt_le_trans; [exact EXT|]. exploit sim_mem_length; eauto. clear. lia. }
         { i. specialize (EX H). des. inv LOCAL. rewrite TSX in *. inv EXBANK.
           destruct a, eb. ss. esplits; eauto. ss. i. subst.
           eapply Memory.no_msgs_split'. instantiate (1 := ts). split; cycle 1.
@@ -479,7 +479,7 @@ Proof.
             + unfold Memory.read. s. rewrite ? nth_error_app2, ? Nat.sub_diag; ss. condtac; ss.
             + eapply Memory.get_msg_read; eauto.
           - econs 2; ss.
-            + eapply lt_le_trans; eauto. apply join_r.
+            + eapply Nat.lt_le_trans; eauto. apply join_r.
             + rewrite app_length. s. ii. lia.
         }
         { exploit sim_fwdbank_mon; try exact MEM; cycle 3.

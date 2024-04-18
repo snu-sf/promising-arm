@@ -16,6 +16,7 @@ Require Import PromisingArch.lib.HahnRelationsMore.
 Require Import PromisingArch.lib.Order.
 Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
+Require Import PromisingArch.lib.Backward.
 Require Import PromisingArch.promising.Promising.
 Require Import PromisingArch.axiomatic.Axiomatic.
 Require Import PromisingArch.axiomatic.CommonAxiomatic.
@@ -92,7 +93,7 @@ Proof.
   - subst. congr.
   - rewrite (@List_firstn_le (S n) (S n0)) in VIEW0; [|lia].
     rewrite mem_of_ex_app, List.app_length in VIEW0.
-    apply plus_minus in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
+    apply symmetry, Nat.add_sub_eq_l in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
     exploit List_nth_error_skipn; eauto. i.
     exploit @List_nth_error_firstn; [eauto| |i].
     { instantiate (1 := (n0 - n)). lia. }
@@ -101,11 +102,11 @@ Proof.
   - symmetry in VIEW0.
     rewrite (@List_firstn_le (S n0) (S n)) in VIEW0; [|lia].
     rewrite mem_of_ex_app, List.app_length in VIEW0.
-    apply plus_minus in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
+    apply symmetry, Nat.add_sub_eq_l in VIEW0. rewrite Nat.sub_diag, Nat.sub_succ in VIEW0.
     exploit List_nth_error_skipn; try exact N; eauto. i.
     exploit @List_nth_error_firstn; [eauto| |i].
     { instantiate (1 := (n - n0)). lia. }
-    exploit List.nth_error_In; eauto. i.
+    exploit List.nth_error_In;eauto. i.
     exfalso. eapply mem_of_ex_in_length; eauto.
 Qed.
 
@@ -1069,7 +1070,7 @@ Proof.
       econs 4; ss.
     + econs; ss.
       * econs; ss. apply sim_rmap_add; ss. econs; ss. econs 1. ss.
-      * inv SIM_LOCAL; econs; eauto. econs.
+      * inv SIM_LOCAL; econs; eauto.
   - (* barrier *)
     exploit LABEL.
     { rewrite List.nth_error_app2; ss. rewrite Nat.sub_diag. ss. }

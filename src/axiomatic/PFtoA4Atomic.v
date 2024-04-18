@@ -17,6 +17,7 @@ Require Import PromisingArch.lib.HahnRelationsMore.
 Require Import PromisingArch.lib.Order.
 Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
+Require Import PromisingArch.lib.Backward.
 Require Import PromisingArch.promising.Promising.
 Require Import PromisingArch.promising.StateExecFacts.
 Require Import PromisingArch.axiomatic.Axiomatic.
@@ -190,7 +191,7 @@ Proof.
       exploit sim_traces_vext_co; try exact H1; eauto. i.
       unfold v_gen in x1. ss.
       rewrite <- H8 in x1. rewrite x2 in x1.
-      eapply le_lt_trans; eauto.
+      eapply Nat.le_lt_trans; eauto.
     - inv H1. inv H9. inv H1. inv REL1. inv H13.
       { rewrite VIEW. ss. }
       exfalso. apply H12. unfold codom_rel.

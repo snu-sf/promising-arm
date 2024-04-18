@@ -63,11 +63,11 @@ Proof.
           econs; eauto; ss.
           - ii. eapply COH; eauto.
             rewrite nth_error_app1 in MSG0; ss.
-            eapply lt_le_trans; eauto.
+            eapply Nat.lt_le_trans; eauto.
             inv WF. exploit WF0; eauto. intro x. inv x. ss. inv LOCAL. ss.
           - ii. eapply LATEST; eauto.
             rewrite nth_error_app1 in MSG0; ss.
-            eapply lt_le_trans; eauto.
+            eapply Nat.lt_le_trans; eauto.
             inv WF. exploit WF0; eauto. intro x. inv x. ss. inv LOCAL.
             repeat apply join_spec; viewtac.
             inv STATE0. apply ExecUnit.expr_wf. ss.
@@ -108,7 +108,7 @@ Proof.
             destruct (lt_dec ts0 (length mem1)).
             { rewrite nth_error_app1 in MSG0; ss. }
             contradict n.
-            eapply lt_le_trans; [apply TS2|].
+            eapply Nat.lt_le_trans; [apply TS2|].
             inv WF. exploit WF0; try exact FIND; eauto. intro x. inv x. inv LOCAL. ss.
           - ii. eapply LATEST; eauto.
             destruct (lt_dec ts0 (length mem1)).

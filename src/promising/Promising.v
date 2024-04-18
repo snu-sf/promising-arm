@@ -16,7 +16,7 @@ Require Import PromisingArch.lib.Basic.
 Require Import PromisingArch.lib.Order.
 Require Import PromisingArch.lib.Time.
 Require Import PromisingArch.lib.Lang.
-
+Require Import PromisingArch.lib.Backward.
 Set Implicit Arguments.
 
 
@@ -72,7 +72,7 @@ Module Memory.
 
   Definition append (msg:Msg.t) (mem:t): Time.t * t :=
     (S (length mem), mem ++ [msg]).
-
+  
   Definition no_msgs (from to:nat) (pred:Msg.t -> Prop) (mem:t): Prop :=
     forall ts msg
       (TS1: from < S ts)
@@ -216,7 +216,7 @@ Module Memory.
     latest loc ts2 ts3 mem.
   Proof.
     ii. eapply LATEST; try eapply MSG; eauto.
-    eapply le_lt_trans; eauto.
+    eapply Nat.le_lt_trans; eauto.
   Qed.
 
   Lemma latest_mon2
@@ -226,7 +226,7 @@ Module Memory.
     latest loc ts1 ts2 mem.
   Proof.
     ii. eapply LATEST; try eapply MSG; eauto.
-    eapply lt_le_trans; eauto.
+    eapply Nat.lt_le_trans; eauto.
   Qed.
 
   Lemma latest_join
@@ -296,13 +296,13 @@ Module Memory.
       + i. subst. lia.
       + i. eapply IHto; eauto.
         destruct (le_lt_dec (S ts) to); auto.
-        apply lt_le_S in l. exploit le_antisym; eauto. i.
-        inv x0. destruct msg. ss. rewrite NTH in MSG. inv MSG.
+        apply lt_le_S in l. assert(ts = to) as teq by lia. subst. 
+        destruct msg. ss. rewrite NTH in MSG. inv MSG.
         contradiction.
     - eapply IHto; eauto.
       destruct (le_lt_dec (S ts) to); auto.
-      apply lt_le_S in l. exploit le_antisym; eauto. i.
-      inv x0. rewrite NTH in MSG. inv MSG.
+      apply lt_le_S in l. assert(ts = to) as teq by lia. subst.
+      rewrite NTH in MSG. inv MSG.
   Qed.
 
   Lemma latest_latest_ts
@@ -1099,7 +1099,7 @@ Section Local.
     inv READ. ss. rewrite fun_add_spec. condtac; [|congr]. splits.
     - apply Memory.latest_join; auto.
       apply Memory.ge_latest. eapply fwd_read_view_le; eauto.
-    - unfold join. ss. apply le_antisym.
+    - unfold join. ss. apply Nat.le_antisymm.
       + unfold FwdItem.read_view. des_ifs.
         * rewrite Bool.andb_true_iff in Heq. des.
           destruct (equiv_dec (FwdItem.ts (fwdbank lc1 (ValA.val vloc))) ts); ss.

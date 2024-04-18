@@ -579,8 +579,8 @@ Proof.
       + econs; ss.
       + econs; ss.
         * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
-          { eapply le_lt_trans; [|ss]. apply COH. }
-          { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
+          { eapply Nat.le_lt_trans; [|ss]. apply COH. }
+          { eapply Nat.le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
             all: unfold ifc.
             all: try condtac; ss.
             all: try apply bot_spec.
@@ -625,7 +625,7 @@ Proof.
                 condtac; ss.
               + eapply Memory.get_msg_read; eauto.
             - econs 2; ss.
-              + eapply lt_le_trans; eauto. apply join_r.
+              + eapply Nat.lt_le_trans; eauto. apply join_r.
               + rewrite app_length. s. ii. lia.
           }
           { eapply sim_fwdbank_mon; eauto.
@@ -708,7 +708,7 @@ Proof.
               revert COH_LATEST2. rewrite fun_add_spec. condtac; [|congr]. s. i. rewrite COH_LATEST2.
               generalize POST_ABOVE. rewrite POST. s. intro Y.
               apply Nat.max_lt_iff in Y. des; cycle 1.
-              { apply sim_time_above. eapply lt_le_trans; [by eauto|].
+              { apply sim_time_above. eapply Nat.lt_le_trans; [by eauto|].
                 eapply Local.fwd_read_view_le; eauto. apply WF2.
               }
               apply Nat.max_lt_iff in Y. des.
@@ -720,7 +720,7 @@ Proof.
                 - clear -Y. unfold join, bot, Time.join, Time.bot in Y. lia.
               }
             * i. rewrite ? fun_add_spec. condtac; ss. apply sim_view_above. s.
-              eapply lt_le_trans; eauto. apply join_r.
+              eapply Nat.lt_le_trans; eauto. apply join_r.
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_ifc; ss. apply sim_view_above. ss.
             * apply sim_view_join; ss. apply sim_view_above. ss.
@@ -802,7 +802,7 @@ Proof.
                   - unfold Memory.get_msg. ss. eauto.
                 }
                 { ss. }
-                { eapply le_lt_trans; [|by exact TS1].
+                { eapply Nat.le_lt_trans; [|by exact TS1].
                   inv TS. rewrite TS0; ss.
                 }
                 { rewrite TS2. s.
@@ -849,7 +849,7 @@ Proof.
               inversion e. subst.
               revert COH_LATEST1 COH_LATEST2. rewrite ? fun_add_spec. condtac; [|congr]. s. i. rewrite COH_LATEST1, COH_LATEST2.
               destruct (FWDBANK (ValA.val (sem_expr rmap2 eloc))); ss.
-              { apply sim_time_above. eapply lt_le_trans; eauto. apply WF2. }
+              { apply sim_time_above. eapply Nat.lt_le_trans; eauto. apply WF2. }
               { rewrite EX, RISCV in E0. ss. }
             * i. rewrite ? fun_add_spec. condtac; eauto.
               inversion e. subst.
@@ -980,9 +980,9 @@ Proof.
             { rewrite ELOC0, EVAL0, <- MSG. eapply sim_mem_get_msg; eauto. }
             { inv LOCAL. rewrite PROMISES1; ss. }
             { inv WRITABLE. econs; try by ss.
-              - inv LOCAL. rewrite <- ELOC0 in *. eapply le_lt_trans; [|exact COH].
+              - inv LOCAL. rewrite <- ELOC0 in *. eapply Nat.le_lt_trans; [|exact COH].
                 eapply sim_view_inv; eauto. rewrite <- TS0. apply Nat.le_lteq. left. ss.
-              - eapply le_lt_trans; [|exact EXT]. eapply sim_view_inv; cycle 1.
+              - eapply Nat.le_lt_trans; [|exact EXT]. eapply sim_view_inv; cycle 1.
                 { etrans; [|exact TS0]. apply Nat.le_lteq. left. ss. }
                 inv LOCAL. repeat apply sim_view_join; eauto 10 using sim_view_ifc, sim_view_bot.
                 destruct (ex0 && equiv_dec arch riscv); ss; cycle 1.
@@ -1052,8 +1052,8 @@ Proof.
           + econs; ss.
           + econs; ss.
             * inv WF1. ss. inv LOCAL0. inv WRITABLE. ss. econs; ss.
-              { eapply le_lt_trans; [|ss]. apply COH. }
-              { eapply le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
+              { eapply Nat.le_lt_trans; [|ss]. apply COH. }
+              { eapply Nat.le_lt_trans; [|ss]. s. repeat apply join_spec; ss.
                 all: unfold ifc.
                 all: try condtac; ss.
                 all: try apply bot_spec.
@@ -1099,7 +1099,7 @@ Proof.
                     condtac; ss.
                   + eapply Memory.get_msg_read; eauto.
                 - econs 2; ss.
-                  + eapply lt_le_trans; eauto. apply join_r.
+                  + eapply Nat.lt_le_trans; eauto. apply join_r.
                   + rewrite app_length. s. ii. lia.
               }
               { rewrite <- (List.app_nil_r mem2). eapply sim_fwdbank_mon; eauto.
@@ -1262,9 +1262,9 @@ Proof.
         - destruct (Local.exbank lc) eqn:X; ss. exploit EXBANK; eauto. intro Y. inv Y. des.
           econs. econs 1; ss.
           + rewrite VIEW, COH. ss.
-          + i. exploit lt_le_trans; eauto.
-            i. exploit lt_le_trans; [|apply Memory.latest_ts_spec|]; eauto.
-            i. exploit lt_le_trans; [|apply COH|]; eauto.
+          + i. exploit Nat.lt_le_trans; eauto.
+            i. exploit Nat.lt_le_trans; [|apply Memory.latest_ts_spec|]; eauto.
+            i. exploit Nat.lt_le_trans; [|apply COH|]; eauto.
             clear. lia.
           + refl.
         - i. destruct (Promises.lookup tsp (Local.promises lc)) eqn:X; ss.
