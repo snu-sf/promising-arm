@@ -2,4 +2,3 @@
 opam repo add coq-released https://coq.inria.fr/opam/released
 opam remote add coq-sf -k git --rank=1 https://github.com/snu-sf/sf-opam-coq-archive
 opam install coq-paco.4.1.2 coq-sflib
-git submodule update --init
